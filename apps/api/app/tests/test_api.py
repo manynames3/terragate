@@ -209,6 +209,36 @@ def test_demo_sample_review_runs_without_upload_or_auth_headers() -> None:
         get_settings.cache_clear()
 
 
+def test_json_upload_review_runs_in_public_demo_mode() -> None:
+    plan_path = ROOT / "sample-data" / "terraform-plans" / "risky-security-plan.json"
+    os.environ["PUBLIC_DEMO_MODE"] = "true"
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/terraform-reviews/json",
+                json={
+                    "file_name": "risky-security-plan.json",
+                    "plan_json_text": plan_path.read_text(),
+                    "environment": "prod",
+                    "cloud_provider": "aws",
+                    "policy_profile": "default",
+                },
+            )
+            assert response.status_code == 200, response.text
+            run_id = response.json()["run_id"]
+            run = client.get(f"/api/v1/runs/{run_id}")
+
+        assert run.status_code == 200
+        payload = run.json()
+        assert payload["terraform_execution"]["mode"] == "uploaded_plan"
+        assert payload["job"]["status"] == "completed"
+        assert payload["risk_score"] > 0
+    finally:
+        os.environ.pop("PUBLIC_DEMO_MODE", None)
+        get_settings.cache_clear()
+
+
 def test_public_demo_upload_limit_rejects_large_plans() -> None:
     plan_path = ROOT / "sample-data" / "terraform-plans" / "safe-plan.json"
     os.environ["PUBLIC_DEMO_MODE"] = "true"
@@ -222,6 +252,31 @@ def test_public_demo_upload_limit_rejects_large_plans() -> None:
                     files={"file": ("safe-plan.json", file, "application/json")},
                     data={"environment": "dev", "cloud_provider": "aws"},
                 )
+
+        assert response.status_code == 413
+        assert "Public demo uploads are limited" in response.json()["detail"]
+    finally:
+        os.environ.pop("PUBLIC_DEMO_MODE", None)
+        os.environ.pop("PUBLIC_DEMO_MAX_UPLOAD_BYTES", None)
+        get_settings.cache_clear()
+
+
+def test_public_demo_json_upload_limit_rejects_large_plans() -> None:
+    plan_path = ROOT / "sample-data" / "terraform-plans" / "safe-plan.json"
+    os.environ["PUBLIC_DEMO_MODE"] = "true"
+    os.environ["PUBLIC_DEMO_MAX_UPLOAD_BYTES"] = "10"
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/terraform-reviews/json",
+                json={
+                    "file_name": "safe-plan.json",
+                    "plan_json_text": plan_path.read_text(),
+                    "environment": "dev",
+                    "cloud_provider": "aws",
+                },
+            )
 
         assert response.status_code == 413
         assert "Public demo uploads are limited" in response.json()["detail"]

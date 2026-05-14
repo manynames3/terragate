@@ -54,11 +54,45 @@ export function getReport(runId: string): Promise<Report> {
   return request<Report>(`/api/v1/runs/${runId}/report`);
 }
 
-export function createTerraformReview(formData: FormData): Promise<{ run_id: string; status: string }> {
+export async function createTerraformReview(formData: FormData): Promise<{ run_id: string; status: string }> {
+  const file = formData.get("file");
+  if (typeof File !== "undefined" && file instanceof File) {
+    return request<{ run_id: string; status: string }>("/api/v1/terraform-reviews/json", {
+      method: "POST",
+      body: JSON.stringify({
+        file_name: file.name || "tfplan.json",
+        plan_json_text: await file.text(),
+        environment: String(formData.get("environment") ?? "dev"),
+        cloud_provider: String(formData.get("cloud_provider") ?? "aws"),
+        policy_profile: String(formData.get("policy_profile") ?? "default"),
+        repo_owner: nullableString(formData.get("repo_owner")),
+        repo_name: nullableString(formData.get("repo_name")),
+        pull_number: nullableNumber(formData.get("pull_number"))
+      })
+    });
+  }
+
   return request<{ run_id: string; status: string }>("/api/v1/terraform-reviews", {
     method: "POST",
     body: formData
   });
+}
+
+function nullableString(value: FormDataEntryValue | null): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function nullableNumber(value: FormDataEntryValue | null): number | null {
+  const text = nullableString(value);
+  if (!text) {
+    return null;
+  }
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function listDemoSamplePlans(): Promise<DemoSamplePlan[]> {

@@ -140,6 +140,17 @@ class DemoTerraformReviewRequest(BaseModel):
     pull_number: int | None = None
 
 
+class UploadedTerraformReviewRequest(BaseModel):
+    file_name: str = "tfplan.json"
+    plan_json_text: str
+    environment: str = "dev"
+    cloud_provider: str = "aws"
+    policy_profile: str = "default"
+    repo_owner: str | None = None
+    repo_name: str | None = None
+    pull_number: int | None = None
+
+
 class ReviewJob(BaseModel):
     id: str
     status: str

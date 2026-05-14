@@ -67,6 +67,34 @@ Response:
 }
 ```
 
+## POST /api/v1/terraform-reviews/json
+
+JSON upload path for browser-hosted/public-demo deployments where API Gateway/Lambda multipart handling is less predictable. Requires `reviewer` or `platform-admin`. The web UI reads the selected plan file client-side and sends the same file contents through this endpoint.
+
+Request:
+
+```json
+{
+  "file_name": "tfplan.json",
+  "plan_json_text": "{\"format_version\":\"1.2\",\"resource_changes\":[]}",
+  "environment": "prod",
+  "cloud_provider": "aws",
+  "policy_profile": "default",
+  "repo_owner": "example",
+  "repo_name": "infra",
+  "pull_number": 42
+}
+```
+
+Response:
+
+```json
+{
+  "run_id": "run_xxx",
+  "status": "queued"
+}
+```
+
 ## GET /api/v1/demo/sample-plans
 
 Returns bundled sample plans that can be launched without uploading a file. This endpoint is intended for public demo mode.

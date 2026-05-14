@@ -54,6 +54,7 @@ from app.schemas.review import (
     RunDetail,
     RunListItem,
     TerraformReviewCreateResponse,
+    UploadedTerraformReviewRequest,
 )
 from app.services.github_context import redact_github_patch_context
 from app.services.fix_patches import suggested_fix_patches
@@ -253,6 +254,50 @@ async def create_terraform_review(
         repo_name=repo_name,
         pull_number=pull_number,
         terraform_execution=terraform_execution,
+    )
+    return TerraformReviewCreateResponse(run_id=run.id, status=run.status)
+
+
+@router.post("/terraform-reviews/json", response_model=TerraformReviewCreateResponse)
+async def create_terraform_review_from_json_upload(
+    request: UploadedTerraformReviewRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: DevUser = Depends(get_current_user),
+) -> TerraformReviewCreateResponse:
+    require_role(user, {"reviewer", "platform-admin"})
+    settings = get_settings()
+    if settings.public_demo_mode and not settings.public_demo_allow_uploads:
+        raise HTTPException(
+            status_code=403,
+            detail="Plan uploads are disabled in public demo mode. Use one of the bundled sample reviews.",
+        )
+
+    raw_bytes = request.plan_json_text.encode()
+    _enforce_public_demo_upload_limit(raw_bytes, settings)
+    try:
+        raw_plan = json.loads(raw_bytes)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Uploaded file is not valid JSON.") from exc
+
+    try:
+        validate_terraform_plan(raw_plan)
+    except TerraformPlanError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    run = await _create_and_queue_review(
+        background_tasks=background_tasks,
+        db=db,
+        user=user,
+        raw_bytes=raw_bytes,
+        source_filename=request.file_name or "tfplan.json",
+        environment=request.environment,
+        cloud_provider=request.cloud_provider,
+        policy_profile=request.policy_profile,
+        repo_owner=request.repo_owner,
+        repo_name=request.repo_name,
+        pull_number=request.pull_number,
+        terraform_execution={"mode": "uploaded_plan"},
     )
     return TerraformReviewCreateResponse(run_id=run.id, status=run.status)
 
@@ -1333,12 +1378,19 @@ async def _read_upload_bytes(file: UploadFile, settings) -> bytes:
 
     max_bytes = max(settings.public_demo_max_upload_bytes, 1)
     raw_bytes = await file.read(max_bytes + 1)
+    _enforce_public_demo_upload_limit(raw_bytes, settings)
+    return raw_bytes
+
+
+def _enforce_public_demo_upload_limit(raw_bytes: bytes, settings) -> None:
+    if not settings.public_demo_mode:
+        return
+    max_bytes = max(settings.public_demo_max_upload_bytes, 1)
     if len(raw_bytes) > max_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=f"Public demo uploads are limited to {max_bytes} bytes.",
         )
-    return raw_bytes
 
 
 def _demo_plan_path(settings, filename: str) -> Path:
