@@ -10,8 +10,9 @@ from sqlalchemy import MetaData  # noqa: E402
 
 from app.config import get_settings  # noqa: E402
 from app.db.init_db import init_db  # noqa: E402
-from app.db.session import engine  # noqa: E402
+from app.db.session import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models import UserModel  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -234,6 +235,8 @@ def test_json_upload_review_runs_in_public_demo_mode() -> None:
         assert payload["terraform_execution"]["mode"] == "uploaded_plan"
         assert payload["job"]["status"] == "completed"
         assert payload["risk_score"] > 0
+        with SessionLocal() as db:
+            assert db.get(UserModel, "dev@terragate.local") is not None
     finally:
         os.environ.pop("PUBLIC_DEMO_MODE", None)
         get_settings.cache_clear()

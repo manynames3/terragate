@@ -36,6 +36,7 @@ from app.models import (
     RemediationModel,
     ReviewJobModel,
     RunModel,
+    UserModel,
 )
 from app.schemas.review import (
     ApprovalRequest,
@@ -788,6 +789,7 @@ async def _create_and_queue_review(
     terraform_execution: dict[str, Any],
 ) -> RunModel:
     settings = get_settings()
+    _ensure_user_record(db, user)
     run = RunModel(
         user_id=user.id if user else None,
         mode="terraform_pr_review",
@@ -896,6 +898,19 @@ async def _create_and_queue_review(
         )
         db.commit()
     return run
+
+
+def _ensure_user_record(db: Session, user: DevUser | None) -> None:
+    if not user or not user.id:
+        return
+    existing = db.scalar(select(UserModel).where(UserModel.id == user.id))
+    if existing:
+        existing.email = user.email
+        existing.name = user.name
+        db.add(existing)
+        return
+    db.add(UserModel(id=user.id, email=user.email, name=user.name))
+    db.flush()
 
 
 def _persist_final_state(db: Session, run: RunModel, final_state: dict[str, Any]) -> None:
