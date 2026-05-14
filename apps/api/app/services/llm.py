@@ -48,7 +48,7 @@ def summarize_with_llm(
             (
                 "system",
                 (
-                    "You are a CloudOps Terraform reviewer. Do not invent new findings. "
+                    "You are a TerraGate Terraform reviewer. Do not invent new findings. "
                     "Only explain and prioritize the provided deterministic evidence. "
                     "Return the same finding ids with concise impact and recommendation."
                 ),

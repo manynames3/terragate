@@ -13,9 +13,9 @@ type TokenResponse = {
   token_type: string;
 };
 
-const SESSION_KEY = "cloudops.auth.session";
-const PKCE_VERIFIER_KEY = "cloudops.auth.pkce_verifier";
-const PKCE_STATE_KEY = "cloudops.auth.state";
+const SESSION_KEY = "terragate.auth.session";
+const PKCE_VERIFIER_KEY = "terragate.auth.pkce_verifier";
+const PKCE_STATE_KEY = "terragate.auth.state";
 
 export function isCognitoAuthEnabled(): boolean {
   return process.env.NEXT_PUBLIC_AUTH_PROVIDER === "cognito";
@@ -111,7 +111,7 @@ export async function completeCognitoCallback(code: string, state: string | null
   window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   window.localStorage.removeItem(PKCE_VERIFIER_KEY);
   window.localStorage.removeItem(PKCE_STATE_KEY);
-  window.dispatchEvent(new Event("cloudops-auth-changed"));
+  window.dispatchEvent(new Event("terragate-auth-changed"));
   return session;
 }
 
@@ -122,7 +122,7 @@ export function clearAuthSession(): void {
   window.localStorage.removeItem(SESSION_KEY);
   window.localStorage.removeItem(PKCE_VERIFIER_KEY);
   window.localStorage.removeItem(PKCE_STATE_KEY);
-  window.dispatchEvent(new Event("cloudops-auth-changed"));
+  window.dispatchEvent(new Event("terragate-auth-changed"));
 }
 
 export function signOut(): void {

@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-These ADRs document the main architecture choices behind CloudOps AI Command Center.
+These ADRs document the main architecture choices behind TerraGate.
 
 ## ADR Index
 

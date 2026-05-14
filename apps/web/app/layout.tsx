@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CloudOps AI Command Center",
-  description: "Deterministic-first AI CloudOps review platform"
+  title: "TerraGate",
+  description: "Deterministic-first Terraform risk review platform"
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

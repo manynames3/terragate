@@ -211,7 +211,7 @@ class GitHubCheckModel(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("chk"))
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
-    name: Mapped[str] = mapped_column(String(120), default="CloudOps AI Terraform Review")
+    name: Mapped[str] = mapped_column(String(120), default="TerraGate Terraform Review")
     status: Mapped[str] = mapped_column(String(40), default="queued")
     conclusion: Mapped[str | None] = mapped_column(String(40), nullable=True)
     external_id: Mapped[str | None] = mapped_column(String(120), nullable=True)

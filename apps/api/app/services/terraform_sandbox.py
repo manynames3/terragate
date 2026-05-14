@@ -53,7 +53,7 @@ class TerraformSandboxRunner:
             raise TerraformSandboxError("TERRAFORM_SANDBOX_DRIVER must be 'local' or 'docker'.")
 
         source = self._resolve_working_dir(working_dir)
-        with tempfile.TemporaryDirectory(prefix="cloudops-tf-", dir=self.root) as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="terragate-tf-", dir=self.root) as temp_dir:
             isolated = Path(temp_dir) / "workspace"
             shutil.copytree(source, isolated, ignore=shutil.ignore_patterns(".terraform", ".git", "terraform.tfstate*"))
             plan_path = "tfplan.binary"

@@ -1,4 +1,4 @@
-package cloudops.terraform.governance
+package terragate.terraform.governance
 
 required_tags := {"owner", "environment", "service", "cost_center"}
 

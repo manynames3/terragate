@@ -3,7 +3,7 @@
 ## 1. Start App
 
 ```bash
-cd cloudops-ai-command-center
+cd terragate
 docker compose -f infra/docker-compose.yml up --build
 ```
 

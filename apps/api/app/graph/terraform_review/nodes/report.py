@@ -23,7 +23,7 @@ def _build_pr_comment(
 ) -> str:
     counts = Counter(finding.get("severity", "info") for finding in findings)
     lines = [
-        "## CloudOps AI Review",
+        "## TerraGate Review",
         "",
         f"Overall risk: {risk_score['risk_level'].title()} ({risk_score['overall_score']}/100)",
         (

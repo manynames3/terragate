@@ -67,7 +67,7 @@ export function Dashboard() {
       <div className="flex flex-col justify-between gap-4 border-b border-[#24324a] pb-6 md:flex-row md:items-end">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">Portfolio platform v1</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-normal text-white md:text-4xl">AI CloudOps review cockpit</h1>
+          <h1 className="mt-3 text-3xl font-semibold tracking-normal text-white md:text-4xl">Terraform PR risk gate</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
             A production-style workflow for reviewing infrastructure changes with deterministic evidence, AI-assisted remediation, and human approval before external actions.
           </p>

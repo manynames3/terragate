@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-CloudOps AI Command Center is a two-app monorepo: a Next.js dashboard calls a FastAPI backend that stores review state in PostgreSQL, artifacts on disk, and runs a LangGraph workflow for Terraform PR review. The backend uses deterministic policy checks before LLM enrichment, persists graph progress and findings, and gates all GitHub writes behind human approval.
+TerraGate is a two-app monorepo: a Next.js dashboard calls a FastAPI backend that stores review state in PostgreSQL, artifacts on disk, and runs a LangGraph workflow for Terraform PR review. The backend uses deterministic policy checks before LLM enrichment, persists graph progress and findings, and gates all GitHub writes behind human approval.
 
 ## System Overview
 

@@ -182,7 +182,7 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
               </ul>
             </DetailBlock>
           ) : null}
-          <DetailBlock title="Compliance references" body={finding.compliance_refs.join(", ") || "Internal CloudOps Policy"} />
+          <DetailBlock title="Compliance references" body={finding.compliance_refs.join(", ") || "Internal TerraGate Policy"} />
           <DetailBlock title="Review metadata" body={`${finding.source.replaceAll("_", " ")} via ${finding.reviewer_node}. Human review: ${finding.requires_human_review ? "required" : "not required"}.`} />
         </div>
       </aside>

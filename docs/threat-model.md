@@ -102,7 +102,7 @@ Approval, policy, and patch actions need stronger authorization than demo upload
 
 Mitigations:
 
-- Local development uses explicit `X-CloudOps-User-*` and `X-CloudOps-Role` headers only when `AUTH_MODE=dev`.
+- Local development uses explicit `X-TerraGate-User-*` and `X-TerraGate-Role` headers only when `AUTH_MODE=dev`.
 - Production-style deployments can set `AUTH_MODE=cognito` to require signed Cognito bearer tokens on API routes.
 - Cognito tokens are validated against issuer/JWKS, optional app client id, expiration, and token use.
 - Cognito groups and `custom:role` claims map to `platform-admin`, `reviewer`, and `viewer`.

@@ -16,9 +16,9 @@ from app.main import app
 def test_cognito_group_maps_to_platform_admin() -> None:
     settings = Settings(
         AUTH_MODE="cognito",
-        COGNITO_ADMIN_GROUP="cloudops-admins",
-        COGNITO_REVIEWER_GROUP="cloudops-reviewers",
-        COGNITO_VIEWER_GROUP="cloudops-viewers",
+        COGNITO_ADMIN_GROUP="terragate-admins",
+        COGNITO_REVIEWER_GROUP="terragate-reviewers",
+        COGNITO_VIEWER_GROUP="terragate-viewers",
         COGNITO_ORG_CLAIM="custom:org_id",
     )
     user = user_from_cognito_claims(
@@ -26,7 +26,7 @@ def test_cognito_group_maps_to_platform_admin() -> None:
             "sub": "user-123",
             "email": "lead@example.com",
             "name": "Platform Lead",
-            "cognito:groups": ["cloudops-admins"],
+            "cognito:groups": ["terragate-admins"],
             "custom:org_id": "acme",
         },
         settings,
@@ -41,12 +41,12 @@ def test_cognito_group_maps_to_platform_admin() -> None:
 
 
 def test_cognito_group_maps_to_reviewer() -> None:
-    settings = Settings(AUTH_MODE="cognito", COGNITO_REVIEWER_GROUP="cloudops-reviewers")
+    settings = Settings(AUTH_MODE="cognito", COGNITO_REVIEWER_GROUP="terragate-reviewers")
     user = user_from_cognito_claims(
         {
             "sub": "user-456",
             "email": "reviewer@example.com",
-            "cognito:groups": ["cloudops-reviewers"],
+            "cognito:groups": ["terragate-reviewers"],
         },
         settings,
     )
@@ -78,7 +78,7 @@ def test_cognito_mode_requires_and_accepts_signed_bearer_token(monkeypatch) -> N
         COGNITO_REGION="us-east-1",
         COGNITO_USER_POOL_ID="pool-123",
         COGNITO_APP_CLIENT_ID="client-123",
-        COGNITO_REVIEWER_GROUP="cloudops-reviewers",
+        COGNITO_REVIEWER_GROUP="terragate-reviewers",
     )
     claims = {
         "iss": settings.resolved_cognito_issuer,
@@ -87,7 +87,7 @@ def test_cognito_mode_requires_and_accepts_signed_bearer_token(monkeypatch) -> N
         "name": "Review Lead",
         "token_use": "access",
         "client_id": "client-123",
-        "cognito:groups": ["cloudops-reviewers"],
+        "cognito:groups": ["terragate-reviewers"],
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
     }

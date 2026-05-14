@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: cloudops
-      POSTGRES_USER: cloudops
-      POSTGRES_PASSWORD: cloudops
+      POSTGRES_DB: terragate
+      POSTGRES_USER: terragate
+      POSTGRES_PASSWORD: terragate
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cloudops -d cloudops"]
+      test: ["CMD-SHELL", "pg_isready -U terragate -d terragate"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -20,11 +20,11 @@ services:
       context: ..
       dockerfile: infra/Dockerfile.api
     environment:
-      DATABASE_URL: postgresql+psycopg://cloudops:cloudops@postgres:5432/cloudops
+      DATABASE_URL: postgresql+psycopg://terragate:terragate@postgres:5432/terragate
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.4-mini}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
-      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-cloudops-ai-command-center}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-terragate}
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-true}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_APP_ID: ${GITHUB_APP_ID:-}
@@ -53,9 +53,9 @@ services:
       COGNITO_APP_CLIENT_ID: ${COGNITO_APP_CLIENT_ID:-}
       COGNITO_ISSUER: ${COGNITO_ISSUER:-}
       COGNITO_JWKS_URL: ${COGNITO_JWKS_URL:-}
-      COGNITO_ADMIN_GROUP: ${COGNITO_ADMIN_GROUP:-cloudops-admins}
-      COGNITO_REVIEWER_GROUP: ${COGNITO_REVIEWER_GROUP:-cloudops-reviewers}
-      COGNITO_VIEWER_GROUP: ${COGNITO_VIEWER_GROUP:-cloudops-viewers}
+      COGNITO_ADMIN_GROUP: ${COGNITO_ADMIN_GROUP:-terragate-admins}
+      COGNITO_REVIEWER_GROUP: ${COGNITO_REVIEWER_GROUP:-terragate-reviewers}
+      COGNITO_VIEWER_GROUP: ${COGNITO_VIEWER_GROUP:-terragate-viewers}
       COGNITO_ORG_CLAIM: ${COGNITO_ORG_CLAIM:-custom:org_id}
       APP_ENV: development
       CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
@@ -74,11 +74,11 @@ services:
       dockerfile: infra/Dockerfile.api
     command: python -m app.worker
     environment:
-      DATABASE_URL: postgresql+psycopg://cloudops:cloudops@postgres:5432/cloudops
+      DATABASE_URL: postgresql+psycopg://terragate:terragate@postgres:5432/terragate
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.4-mini}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
-      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-cloudops-ai-command-center}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-terragate}
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-true}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_APP_ID: ${GITHUB_APP_ID:-}
@@ -102,9 +102,9 @@ services:
       COGNITO_APP_CLIENT_ID: ${COGNITO_APP_CLIENT_ID:-}
       COGNITO_ISSUER: ${COGNITO_ISSUER:-}
       COGNITO_JWKS_URL: ${COGNITO_JWKS_URL:-}
-      COGNITO_ADMIN_GROUP: ${COGNITO_ADMIN_GROUP:-cloudops-admins}
-      COGNITO_REVIEWER_GROUP: ${COGNITO_REVIEWER_GROUP:-cloudops-reviewers}
-      COGNITO_VIEWER_GROUP: ${COGNITO_VIEWER_GROUP:-cloudops-viewers}
+      COGNITO_ADMIN_GROUP: ${COGNITO_ADMIN_GROUP:-terragate-admins}
+      COGNITO_REVIEWER_GROUP: ${COGNITO_REVIEWER_GROUP:-terragate-reviewers}
+      COGNITO_VIEWER_GROUP: ${COGNITO_VIEWER_GROUP:-terragate-viewers}
       COGNITO_ORG_CLAIM: ${COGNITO_ORG_CLAIM:-custom:org_id}
       APP_ENV: development
     volumes:

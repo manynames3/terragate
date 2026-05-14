@@ -261,7 +261,7 @@ class GitHubClient:
                 return GitHubPostResult(
                     posted=True,
                     mock=False,
-                    message="Posted CloudOps AI review comment to GitHub.",
+                    message="Posted TerraGate review comment to GitHub.",
                     comment_url=payload.get("html_url"),
                 )
         except httpx.HTTPError as exc:
@@ -302,12 +302,12 @@ class GitHubClient:
             )
 
         payload: dict[str, Any] = {
-            "name": "CloudOps AI Terraform Review",
+            "name": "TerraGate Terraform Review",
             "head_sha": head_sha,
             "status": status,
             "external_id": external_id,
             "output": {
-                "title": "CloudOps AI Terraform Review",
+                "title": "TerraGate Terraform Review",
                 "summary": summary[:65000],
             },
         }
@@ -445,7 +445,7 @@ class GitHubClient:
                 return GitHubPatchCommitResult(
                     committed=True,
                     mock=False,
-                    message="Committed approved CloudOps AI patch to the PR branch.",
+                    message="Committed approved TerraGate patch to the PR branch.",
                     commit_url=commit.get("html_url"),
                 )
         except httpx.HTTPError as exc:
@@ -584,7 +584,7 @@ def _added_lines_from_diff(diff: str) -> str:
 
 def _append_patch(existing_content: str, patch_body: str) -> str:
     existing = existing_content.rstrip()
-    block = "\n\n# CloudOps AI approved remediation\n" + patch_body.strip() + "\n"
+    block = "\n\n# TerraGate approved remediation\n" + patch_body.strip() + "\n"
     return (existing + block) if existing else block.lstrip()
 
 

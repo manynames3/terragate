@@ -1,5 +1,5 @@
 [project]
-name = "cloudops-ai-command-center-api"
+name = "terragate-api"
 version = "0.1.0"
 requires-python = ">=3.11"
 

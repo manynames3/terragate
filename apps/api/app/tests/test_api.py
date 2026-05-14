@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-os.environ["DATABASE_URL"] = "sqlite:///./test_cloudops_api.db"
+os.environ["DATABASE_URL"] = "sqlite:///./test_terragate_api.db"
 os.environ["ARTIFACT_STORAGE_DIR"] = "./test_artifacts"
 os.environ["GITHUB_TOKEN"] = ""
 
@@ -28,9 +28,9 @@ def test_auth_me_uses_dev_header_identity() -> None:
         response = client.get(
             "/api/v1/auth/me",
             headers={
-                "X-CloudOps-User-Email": "reviewer@example.com",
-                "X-CloudOps-User-Name": "Review Lead",
-                "X-CloudOps-Role": "reviewer",
+                "X-TerraGate-User-Email": "reviewer@example.com",
+                "X-TerraGate-User-Name": "Review Lead",
+                "X-TerraGate-Role": "reviewer",
             },
         )
 
@@ -50,7 +50,7 @@ def test_review_creation_is_role_gated() -> None:
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/terraform-reviews",
-            headers={"X-CloudOps-Role": "viewer"},
+            headers={"X-TerraGate-Role": "viewer"},
             data={"environment": "dev", "cloud_provider": "aws"},
         )
 
@@ -176,7 +176,7 @@ def test_policy_pack_update_is_role_gated() -> None:
     with TestClient(app) as client:
         blocked = client.put(
             "/api/v1/policy-packs/default",
-            headers={"X-CloudOps-Role": "viewer"},
+            headers={"X-TerraGate-Role": "viewer"},
             json={"max_monthly_delta": 900},
         )
         allowed = client.get("/api/v1/policy-packs/default")

@@ -19,9 +19,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(
-    title="CloudOps AI Command Center API",
+    title="TerraGate API",
     version="0.1.0",
-    description="FastAPI backend for deterministic-first AI CloudOps reviews.",
+    description="FastAPI backend for deterministic-first Terraform risk reviews.",
     lifespan=lifespan,
 )
 

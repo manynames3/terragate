@@ -25,10 +25,10 @@ export function AuthSessionButton({ compact = false }: { compact?: boolean }) {
     };
     refresh();
     window.addEventListener("storage", refresh);
-    window.addEventListener("cloudops-auth-changed", refresh);
+    window.addEventListener("terragate-auth-changed", refresh);
     return () => {
       window.removeEventListener("storage", refresh);
-      window.removeEventListener("cloudops-auth-changed", refresh);
+      window.removeEventListener("terragate-auth-changed", refresh);
     };
   }, []);
 

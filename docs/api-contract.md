@@ -9,15 +9,16 @@ Auth:
 
 Dev auth headers:
 
-- `X-CloudOps-User-Email`: optional actor email.
-- `X-CloudOps-User-Name`: optional actor display name.
-- `X-CloudOps-Role`: optional role. Defaults to `platform-admin`; use `reviewer` for approval flows and `viewer` to verify restricted actions.
+- `X-TerraGate-User-Email`: optional actor email.
+- `X-TerraGate-User-Name`: optional actor display name.
+- `X-TerraGate-Role`: optional role. Defaults to `platform-admin`; use `reviewer` for approval flows and `viewer` to verify restricted actions.
+- Legacy `X-CloudOps-*` headers are still accepted for older local scripts.
 
 Cognito role mapping:
 
-- `cloudops-admins` -> `platform-admin`
-- `cloudops-reviewers` -> `reviewer`
-- `cloudops-viewers` -> `viewer`
+- `terragate-admins` -> `platform-admin`
+- `terragate-reviewers` -> `reviewer`
+- `terragate-viewers` -> `viewer`
 - `custom:role` can override when set to `platform-admin`, `reviewer`, or `viewer`.
 
 ## GET /api/v1/auth/me
@@ -31,7 +32,7 @@ Returns the current authenticated actor:
   "name": "Review Lead",
   "role": "reviewer",
   "org_id": "acme",
-  "groups": ["cloudops-reviewers"],
+  "groups": ["terragate-reviewers"],
   "auth_provider": "cognito"
 }
 ```

@@ -16,7 +16,7 @@
           "tags": {
             "owner": "platform",
             "environment": "dev",
-            "service": "cloudops",
+            "service": "terragate",
             "cost_center": "cc-1020"
           }
         },
@@ -41,7 +41,7 @@
           "tags": {
             "owner": "platform",
             "environment": "dev",
-            "service": "cloudops",
+            "service": "terragate",
             "cost_center": "cc-1020"
           }
         },
@@ -71,7 +71,7 @@
           "tags": {
             "owner": "platform",
             "environment": "dev",
-            "service": "cloudops",
+            "service": "terragate",
             "cost_center": "cc-1020"
           }
         },

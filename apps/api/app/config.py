@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     openai_model: str = Field(default="gpt-5.4-mini", alias="OPENAI_MODEL")
     langsmith_api_key: str | None = Field(default=None, alias="LANGSMITH_API_KEY")
     langsmith_project: str = Field(
-        default="cloudops-ai-command-center", alias="LANGSMITH_PROJECT"
+        default="terragate", alias="LANGSMITH_PROJECT"
     )
     langsmith_tracing: str = Field(default="true", alias="LANGSMITH_TRACING")
     github_token: str | None = Field(default=None, alias="GITHUB_TOKEN")
@@ -44,9 +44,9 @@ class Settings(BaseSettings):
     cognito_app_client_id: str | None = Field(default=None, alias="COGNITO_APP_CLIENT_ID")
     cognito_issuer_url: str | None = Field(default=None, alias="COGNITO_ISSUER")
     cognito_jwks_url: str | None = Field(default=None, alias="COGNITO_JWKS_URL")
-    cognito_admin_group: str = Field(default="cloudops-admins", alias="COGNITO_ADMIN_GROUP")
-    cognito_reviewer_group: str = Field(default="cloudops-reviewers", alias="COGNITO_REVIEWER_GROUP")
-    cognito_viewer_group: str = Field(default="cloudops-viewers", alias="COGNITO_VIEWER_GROUP")
+    cognito_admin_group: str = Field(default="terragate-admins", alias="COGNITO_ADMIN_GROUP")
+    cognito_reviewer_group: str = Field(default="terragate-reviewers", alias="COGNITO_REVIEWER_GROUP")
+    cognito_viewer_group: str = Field(default="terragate-viewers", alias="COGNITO_VIEWER_GROUP")
     cognito_org_claim: str = Field(default="custom:org_id", alias="COGNITO_ORG_CLAIM")
     artifact_storage_dir: str = Field(default="./artifacts", alias="ARTIFACT_STORAGE_DIR")
     cors_origins: str = Field(
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     def resolved_database_url(self) -> str:
         if self.database_url:
             return self.database_url
-        return "sqlite:///./cloudops_dev.db"
+        return "sqlite:///./terragate_dev.db"
 
     @property
     def artifact_root(self) -> Path:

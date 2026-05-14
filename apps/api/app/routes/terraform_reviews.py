@@ -549,7 +549,7 @@ def commit_fix_patch_to_github(
             run.pull_number,
             patch.pr_file_path,
             patch.diff,
-            commit_message=f"fix(terraform): apply CloudOps AI remediation for {run.id}",
+            commit_message=f"fix(terraform): apply TerraGate remediation for {run.id}",
         )
     )
     if result.committed:
@@ -864,7 +864,7 @@ def _execute_review_job(run_id: str, initial_state: dict[str, Any]) -> None:
             "raw_plan": raw_plan,
             "trace_id": configure_langsmith(settings),
         }
-        _record_github_check(db, run, status="in_progress", summary="CloudOps AI Terraform review started.")
+        _record_github_check(db, run, status="in_progress", summary="TerraGate Terraform review started.")
         final_state: dict[str, Any] = {}
         try:
             for state_update in stream_terraform_review(state):

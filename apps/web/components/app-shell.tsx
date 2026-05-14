@@ -24,8 +24,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <ShieldCheck className="h-5 w-5 text-[#43c6ac]" />
           </span>
           <span>
-            <span className="block text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">CloudOps AI</span>
-            <span className="block text-lg font-semibold text-white">Command Center</span>
+            <span className="block text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">TerraGate</span>
+            <span className="block text-lg font-semibold text-white">Terraform Risk Gate</span>
           </span>
         </Link>
         <nav className="mt-10 space-y-2">
@@ -60,7 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
       <header className="border-b border-[#24324a] bg-[#081120]/90 px-4 py-4 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between">
-          <Link href="/" className="font-semibold text-white">CloudOps AI</Link>
+          <Link href="/" className="font-semibold text-white">TerraGate</Link>
           <div className="flex items-center gap-2">
             <AuthSessionButton compact />
             <Link href="/reviews/new" className="rounded-md bg-[#43c6ac] px-3 py-2 text-sm font-semibold text-[#07111f]">New Review</Link>

@@ -34,5 +34,5 @@ def _refs_for(finding: dict[str, Any]) -> list[str]:
     if category == "governance" or "tag" in title:
         refs.extend(["NIST CM-8", "NIST PM-5"])
     if not refs:
-        refs.append("Internal CloudOps Policy")
+        refs.append("Internal TerraGate Policy")
     return list(dict.fromkeys(refs))

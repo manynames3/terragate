@@ -22,7 +22,7 @@ VALID_ROLES = {ROLE_PLATFORM_ADMIN, ROLE_REVIEWER, ROLE_VIEWER}
 @dataclass
 class DevUser:
     id: str | None = None
-    email: str = "dev@cloudops.local"
+    email: str = "dev@terragate.local"
     name: str = "Dev Reviewer"
     role: str = ROLE_PLATFORM_ADMIN
     org_id: str | None = "dev"
@@ -61,6 +61,9 @@ _jwks_cache = CognitoJwksCache()
 
 async def get_current_user(
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+    x_terragate_user_email: Annotated[str | None, Header(alias="X-TerraGate-User-Email")] = None,
+    x_terragate_user_name: Annotated[str | None, Header(alias="X-TerraGate-User-Name")] = None,
+    x_terragate_role: Annotated[str | None, Header(alias="X-TerraGate-Role")] = None,
     x_cloudops_user_email: Annotated[str | None, Header(alias="X-CloudOps-User-Email")] = None,
     x_cloudops_user_name: Annotated[str | None, Header(alias="X-CloudOps-User-Name")] = None,
     x_cloudops_role: Annotated[str | None, Header(alias="X-CloudOps-Role")] = None,
@@ -68,11 +71,15 @@ async def get_current_user(
 ) -> DevUser:
     if settings.auth_mode.lower() == "cognito":
         return await _get_cognito_user(authorization, settings)
-    return _get_dev_user(x_cloudops_user_email, x_cloudops_user_name, x_cloudops_role)
+    return _get_dev_user(
+        x_terragate_user_email or x_cloudops_user_email,
+        x_terragate_user_name or x_cloudops_user_name,
+        x_terragate_role or x_cloudops_role,
+    )
 
 
 def _get_dev_user(email_header: str | None, name_header: str | None, role_header: str | None) -> DevUser:
-    email = (email_header or "dev@cloudops.local").strip()
+    email = (email_header or "dev@terragate.local").strip()
     role = (role_header or ROLE_PLATFORM_ADMIN).strip()
     if role not in VALID_ROLES:
         role = ROLE_VIEWER

@@ -1,6 +1,6 @@
-# CloudOps AI Command Center
+# TerraGate
 
-CloudOps AI Command Center is a production-style AI CloudOps dashboard for reviewing Terraform pull requests before infrastructure changes merge. It parses Terraform plan JSON, redacts sensitive values, runs deterministic security/cost/reliability/governance checks, uses a LangGraph workflow to enrich and rank findings, persists review history, drafts a GitHub PR comment, and requires human approval before posting or committing suggested fixes.
+TerraGate is a production-style Terraform PR risk gate for reviewing infrastructure changes before they merge. It parses Terraform plan JSON, redacts sensitive values, runs deterministic security/cost/reliability/governance checks, uses a LangGraph workflow to enrich and rank findings, persists review history, drafts a GitHub PR comment, and requires human approval before posting or committing suggested fixes.
 
 ## TL;DR
 
@@ -96,7 +96,7 @@ sample-data/terraform-plans/
 ### Option A: Docker Compose
 
 ```bash
-cd cloudops-ai-command-center
+cd terragate
 cp .env.example .env
 docker compose -f infra/docker-compose.yml up --build
 ```
@@ -113,7 +113,7 @@ Docker Compose runs PostgreSQL, the API, the worker, and the web app. Optional R
 Backend:
 
 ```bash
-cd cloudops-ai-command-center/apps/api
+cd terragate/apps/api
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -123,7 +123,7 @@ uvicorn app.main:app --reload --port 8000
 Frontend:
 
 ```bash
-cd cloudops-ai-command-center/apps/web
+cd terragate/apps/web
 npm install
 npm run dev
 ```
@@ -168,7 +168,7 @@ Copy `.env.example` to `.env`. Important variables:
 | `TERRAFORM_SANDBOX_*` | Optional Terraform plan execution sandbox settings |
 | `REVIEW_EXECUTION_MODE` | `inline`, `background`, or worker-backed execution |
 
-For Cognito, create a public app client without a client secret, enable authorization-code + PKCE, add `http://localhost:3000/auth/callback` as an allowed callback URL, and add `http://localhost:3000` as an allowed sign-out URL. Groups map to app roles by default: `cloudops-admins`, `cloudops-reviewers`, and `cloudops-viewers`.
+For Cognito, create a public app client without a client secret, enable authorization-code + PKCE, add `http://localhost:3000/auth/callback` as an allowed callback URL, and add `http://localhost:3000` as an allowed sign-out URL. Groups map to app roles by default: `terragate-admins`, `terragate-reviewers`, and `terragate-viewers`.
 
 ## Generating Terraform Plan JSON
 

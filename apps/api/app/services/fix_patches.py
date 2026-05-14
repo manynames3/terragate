@@ -29,7 +29,7 @@ def _fallback_path(finding: dict[str, Any]) -> str:
 
 def _diff_for(path: str, finding: dict[str, Any], remediation: dict[str, Any]) -> str:
     snippet = remediation.get("snippet", "").rstrip()
-    title = finding.get("title", "CloudOps AI suggested fix")
+    title = finding.get("title", "TerraGate suggested fix")
     resource = finding.get("resource_address") or "unknown resource"
     patch_context = _patch_context(finding.get("pr_patch"))
     added = "\n".join(f"+{line}" if line else "+" for line in snippet.splitlines())
@@ -43,7 +43,7 @@ def _diff_for(path: str, finding: dict[str, Any], remediation: dict[str, Any]) -
         lines.extend(patch_context)
     lines.extend(
         [
-            f"+# CloudOps AI suggested fix: {title}",
+            f"+# TerraGate suggested fix: {title}",
             f"+# Resource: {resource}",
             added,
             "",
