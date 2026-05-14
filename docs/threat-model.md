@@ -119,6 +119,20 @@ Mitigations:
 - Unsupported events/actions are accepted as no-ops and do not start work.
 - The webhook route only uses configured sandbox paths; it does not trust repo paths from the payload.
 
+## Public Demo Abuse Risk
+
+A hosted demo can be abused to upload large files, trigger expensive sandbox execution, edit policy files, or mutate an external GitHub repository.
+
+Mitigations:
+
+- `PUBLIC_DEMO_MODE=true` enables public-demo guardrails.
+- Sample-review endpoints let visitors try the product without uploading private plans.
+- Uploads can be disabled or capped with `PUBLIC_DEMO_ALLOW_UPLOADS` and `PUBLIC_DEMO_MAX_UPLOAD_BYTES`.
+- Sandbox execution is disabled by default in public demo mode.
+- Policy packs are read-only in public demo mode.
+- GitHub comments, checks, and patch commits are mocked by default after approval.
+- Live GitHub reads are disabled by default.
+
 ## Future Hardening
 
 - Encrypt artifact storage.

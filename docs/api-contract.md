@@ -67,6 +67,38 @@ Response:
 }
 ```
 
+## GET /api/v1/demo/sample-plans
+
+Returns bundled sample plans that can be launched without uploading a file. This endpoint is intended for public demo mode.
+
+## POST /api/v1/demo/terraform-reviews
+
+Starts a review from a bundled sample Terraform plan. This exercises the same parser, redaction, policy, LangGraph, persistence, findings, report, and approval flow as uploaded plans. The endpoint is open when `PUBLIC_DEMO_MODE=true` or when running with local dev auth.
+
+Request:
+
+```json
+{
+  "sample": "risky-security"
+}
+```
+
+Supported samples:
+
+- `safe`
+- `risky-security`
+- `risky-cost`
+- `destructive-prod`
+
+Response:
+
+```json
+{
+  "run_id": "run_xxx",
+  "status": "queued"
+}
+```
+
 ## GET /api/v1/runs
 
 Returns recent runs with risk and severity counts.
@@ -88,6 +120,7 @@ Returns one policy pack with the same editable fields.
 ## PUT /api/v1/policy-packs/{name}
 
 Updates an editable policy pack and records an audit event. Requires `platform-admin`.
+When `PUBLIC_DEMO_MODE=true`, policy packs are read-only and this endpoint returns HTTP 403.
 
 Editable fields:
 

@@ -1,6 +1,7 @@
 import type {
   AuthUser,
   AuditLogEntry,
+  DemoSamplePlan,
   Finding,
   FixPatch,
   GitHubCommentResponse,
@@ -57,6 +58,17 @@ export function createTerraformReview(formData: FormData): Promise<{ run_id: str
   return request<{ run_id: string; status: string }>("/api/v1/terraform-reviews", {
     method: "POST",
     body: formData
+  });
+}
+
+export function listDemoSamplePlans(): Promise<DemoSamplePlan[]> {
+  return request<DemoSamplePlan[]>("/api/v1/demo/sample-plans");
+}
+
+export function createDemoTerraformReview(sample: string): Promise<{ run_id: string; status: string }> {
+  return request<{ run_id: string; status: string }>("/api/v1/demo/terraform-reviews", {
+    method: "POST",
+    body: JSON.stringify({ sample })
   });
 }
 

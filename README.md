@@ -7,7 +7,7 @@ TerraGate is a production-style Terraform PR risk gate for reviewing infrastruct
 - **What it is:** An AI-assisted Terraform PR reviewer for cloud/platform teams.
 - **What it does:** Turns Terraform plan JSON or sandbox-generated plans into evidence-backed risk findings, remediation guidance, check status, and approval-gated GitHub comments.
 - **Why it is credible:** It uses deterministic policy checks first, redacts artifacts before AI review, persists runs/findings/evidence, has Alembic migrations, tests, CI, Docker Compose, GitHub integration, and Cognito-ready auth.
-- **Live demo:** No public hosted demo is configured in this repo. The project is demoable locally with Docker Compose and included Terraform plan fixtures.
+- **Live demo:** Public demo mode is implemented for a low-cost Cloudflare + AWS deployment path. Add the hosted URL here after deployment.
 
 ## About
 
@@ -37,6 +37,7 @@ The core product philosophy is deterministic first, AI second:
 | Cost | Optional Infracost CLI, deterministic heuristic fallback |
 | Observability | Optional LangSmith tracing, audit log records in the database |
 | Local dev/deploy | Docker Compose, API/web Dockerfiles, GitHub Actions CI |
+| Public demo hosting | Cloudflare Pages frontend, AWS API Gateway + Lambda/Mangum backend path |
 
 ## Engineering Highlights
 
@@ -48,6 +49,7 @@ The core product philosophy is deterministic first, AI second:
 - **Production-style persistence:** Stores runs, artifacts, findings, evidence, remediations, approvals, GitHub checks/comments, fix patches, review jobs, and audit events.
 - **Async-capable execution:** Supports inline execution, FastAPI background tasks, and a worker process that claims queued review jobs from the database.
 - **Operational risk analysis:** Detects destructive stateful changes and generates runbook-grade checklists for backup, maintenance window, rollback, owner signoff, and post-apply validation.
+- **Hosted-demo guardrails:** Includes preloaded sample-review endpoints, upload size limits, sandbox disablement, read-only policy packs, and mock GitHub writes for public demos.
 - **Recruiter-visible engineering hygiene:** TypeScript checks, ESLint, pytest suite, Docker Compose, Alembic migrations, sample data, API contract docs, threat model, and ADRs.
 
 ## Architecture
@@ -58,6 +60,7 @@ Architecture docs:
 
 - [Architecture overview and C4-style diagram](docs/architecture.md)
 - [Architecture Decision Records](docs/adrs/README.md)
+- [Low-cost public demo deployment](docs/public-demo.md)
 - [API contract](docs/api-contract.md)
 - [Threat model](docs/threat-model.md)
 - [Demo script](docs/demo-script.md)
@@ -78,6 +81,7 @@ Architecture docs:
 - Require approval before posting comments or committing suggested fixes.
 - Persist review history, audit log events, and graph progress.
 - Run locally without OpenAI or GitHub credentials using deterministic and mock fallbacks.
+- Launch bundled public-demo sample reviews without requiring visitors to upload Terraform plans.
 
 ## Project Structure
 
@@ -107,6 +111,22 @@ Open:
 - API docs: `http://localhost:8000/docs`
 
 Docker Compose runs PostgreSQL, the API, the worker, and the web app. Optional Redis and Qdrant services are defined behind Compose profiles for future expansion.
+
+### Public Demo Mode
+
+For a hosted portfolio demo, enable the safe public path:
+
+```bash
+PUBLIC_DEMO_MODE=true
+PUBLIC_DEMO_ALLOW_UPLOADS=true
+PUBLIC_DEMO_MAX_UPLOAD_BYTES=1500000
+PUBLIC_DEMO_DISABLE_SANDBOX=true
+PUBLIC_DEMO_MOCK_GITHUB_WRITES=true
+PUBLIC_DEMO_ALLOW_LIVE_GITHUB_READS=false
+REVIEW_EXECUTION_MODE=inline
+```
+
+This keeps the full review workflow functional for bundled sample plans and optional capped uploads, while blocking expensive or risky actions such as Terraform sandbox execution and live GitHub writes. See [docs/public-demo.md](docs/public-demo.md) for the Cloudflare Pages + AWS API Gateway/Lambda deployment shape.
 
 ### Option B: Manual Local Run
 
@@ -167,6 +187,7 @@ Copy `.env.example` to `.env`. Important variables:
 | `COGNITO_*` and `NEXT_PUBLIC_COGNITO_*` | Cognito JWT validation and Hosted UI login |
 | `TERRAFORM_SANDBOX_*` | Optional Terraform plan execution sandbox settings |
 | `REVIEW_EXECUTION_MODE` | `inline`, `background`, or worker-backed execution |
+| `PUBLIC_DEMO_*` | Enables hosted-demo guardrails, sample-review flow, upload limits, and mock external writes |
 
 For Cognito, create a public app client without a client secret, enable authorization-code + PKCE, add `http://localhost:3000/auth/callback` as an allowed callback URL, and add `http://localhost:3000` as an allowed sign-out URL. Groups map to app roles by default: `terragate-admins`, `terragate-reviewers`, and `terragate-viewers`.
 
@@ -221,6 +242,7 @@ GitHub Actions runs backend pytest plus frontend typecheck, lint, and build.
 
 - The worker is database-polling, not a durable queue system such as SQS, Celery, or Temporal.
 - Terraform sandboxing is useful for demos and trusted local environments, but it is not a hardened multi-tenant SaaS isolation boundary.
+- Public demo mode intentionally disables sandbox execution by default; a serious multi-tenant hosted version should isolate Terraform execution in short-lived containers with no shared credentials.
 - Cost estimates are strongest when Infracost is installed and configured; fallback estimates are intentionally labeled heuristic.
 - Suggested patches are reviewable drafts and may need human editing before commit.
 - Policy packs are editable JSON files, not yet a full approval/versioning workflow.

@@ -64,6 +64,16 @@ export type AuthUser = {
   auth_provider: "dev" | "cognito";
 };
 
+export type DemoSamplePlan = {
+  sample: string;
+  filename: string;
+  label: string;
+  description: string;
+  environment: string;
+  cloud_provider: string;
+  policy_profile: string;
+};
+
 export type Finding = {
   id: string;
   title: string;

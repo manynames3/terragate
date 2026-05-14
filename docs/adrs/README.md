@@ -9,3 +9,4 @@ These ADRs document the main architecture choices behind TerraGate.
 - [ADR 0003: Keep the product as a FastAPI and Next.js monorepo](0003-fastapi-nextjs-monorepo.md)
 - [ADR 0004: Gate GitHub writes behind human approval](0004-human-approval-before-github-writes.md)
 - [ADR 0005: Use local-first adapters with production integration seams](0005-local-first-production-adapters.md)
+- [ADR 0006: Add guarded public demo mode](0006-guarded-public-demo-mode.md)

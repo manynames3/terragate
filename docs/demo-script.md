@@ -9,7 +9,9 @@ docker compose -f infra/docker-compose.yml up --build
 
 Open http://localhost:3000.
 
-## 2. Upload Risky Terraform Plan
+## 2. Launch Or Upload Risky Terraform Plan
+
+Fast public-demo path: click **Try security risk** on the dashboard or use the sample buttons in New Review. This launches a bundled plan through the same backend review workflow without requiring a visitor to upload Terraform JSON.
 
 Go to New Review and upload:
 

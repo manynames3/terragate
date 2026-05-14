@@ -2,8 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ExternalLink, FileJson, GitPullRequest, UploadCloud } from "lucide-react";
-import { createTerraformReview, getGitHubPrContext, listPolicyPacks } from "@/lib/api";
+import { AlertTriangle, ExternalLink, FileJson, GitPullRequest, Play, UploadCloud } from "lucide-react";
+import { createDemoTerraformReview, createTerraformReview, getGitHubPrContext, listPolicyPacks } from "@/lib/api";
 import type { GitHubPRContext, PolicyPack } from "@/types/api";
 import { Button, Card, FieldLabel } from "@/components/ui";
 
@@ -27,6 +27,7 @@ export function NewReviewForm() {
   const [prContext, setPrContext] = useState<GitHubPRContext | null>(null);
   const [fetchingPr, setFetchingPr] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [launchingSample, setLaunchingSample] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,6 +84,19 @@ export function NewReviewForm() {
       setError(err instanceof Error ? err.message : "Failed to fetch GitHub PR context.");
     } finally {
       setFetchingPr(false);
+    }
+  }
+
+  async function launchDemoSample(sample: string) {
+    setLaunchingSample(sample);
+    setError(null);
+    try {
+      const result = await createDemoTerraformReview(sample);
+      router.push(`/runs/${result.run_id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to launch demo sample.");
+    } finally {
+      setLaunchingSample(null);
     }
   }
 
@@ -256,7 +270,18 @@ terraform show -json tfplan.binary > tfplan.json`}
         </Card>
         <Card className="p-5">
           <h2 className="text-base font-semibold text-white">Sample plans</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">Use files in sample-data/terraform-plans for a demo: risky-security-plan.json, risky-cost-plan.json, or destructive-prod-plan.json.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-400">Use files in sample-data/terraform-plans, or launch a hosted-safe sample without uploading anything.</p>
+          <div className="mt-4 grid gap-2">
+            <Button type="button" variant="secondary" onClick={() => void launchDemoSample("risky-security")} disabled={launchingSample !== null}>
+              <Play className="h-4 w-4" /> {launchingSample === "risky-security" ? "Launching..." : "Security risk sample"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => void launchDemoSample("risky-cost")} disabled={launchingSample !== null}>
+              <Play className="h-4 w-4" /> {launchingSample === "risky-cost" ? "Launching..." : "Cost spike sample"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => void launchDemoSample("destructive-prod")} disabled={launchingSample !== null}>
+              <Play className="h-4 w-4" /> {launchingSample === "destructive-prod" ? "Launching..." : "Destructive prod sample"}
+            </Button>
+          </div>
         </Card>
       </div>
     </div>

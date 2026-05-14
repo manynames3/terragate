@@ -120,6 +120,26 @@ class TerraformReviewCreateResponse(BaseModel):
     status: str
 
 
+class DemoSamplePlan(BaseModel):
+    sample: str
+    filename: str
+    label: str
+    description: str
+    environment: str
+    cloud_provider: str = "aws"
+    policy_profile: str = "default"
+
+
+class DemoTerraformReviewRequest(BaseModel):
+    sample: str
+    environment: str | None = None
+    cloud_provider: str | None = None
+    policy_profile: str | None = None
+    repo_owner: str | None = None
+    repo_name: str | None = None
+    pull_number: int | None = None
+
+
 class ReviewJob(BaseModel):
     id: str
     status: str

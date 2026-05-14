@@ -8,6 +8,7 @@ os.environ["GITHUB_TOKEN"] = ""
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import MetaData  # noqa: E402
 
+from app.config import get_settings  # noqa: E402
 from app.db.init_db import init_db  # noqa: E402
 from app.db.session import engine  # noqa: E402
 from app.main import app  # noqa: E402
@@ -184,3 +185,64 @@ def test_policy_pack_update_is_role_gated() -> None:
     assert blocked.status_code == 403
     assert allowed.status_code == 200
     assert allowed.json()["name"] == "default"
+
+
+def test_demo_sample_review_runs_without_upload_or_auth_headers() -> None:
+    os.environ["PUBLIC_DEMO_MODE"] = "true"
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/demo/terraform-reviews", json={"sample": "risky-cost"})
+
+            assert response.status_code == 200, response.text
+            run_id = response.json()["run_id"]
+            run = client.get(f"/api/v1/runs/{run_id}")
+
+        assert run.status_code == 200
+        payload = run.json()
+        assert payload["terraform_execution"]["mode"] == "demo_sample"
+        assert payload["terraform_execution"]["sample"] == "risky-cost"
+        assert payload["job"]["status"] == "completed"
+        assert payload["risk_score"] > 0
+    finally:
+        os.environ.pop("PUBLIC_DEMO_MODE", None)
+        get_settings.cache_clear()
+
+
+def test_public_demo_upload_limit_rejects_large_plans() -> None:
+    plan_path = ROOT / "sample-data" / "terraform-plans" / "safe-plan.json"
+    os.environ["PUBLIC_DEMO_MODE"] = "true"
+    os.environ["PUBLIC_DEMO_MAX_UPLOAD_BYTES"] = "10"
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            with plan_path.open("rb") as file:
+                response = client.post(
+                    "/api/v1/terraform-reviews",
+                    files={"file": ("safe-plan.json", file, "application/json")},
+                    data={"environment": "dev", "cloud_provider": "aws"},
+                )
+
+        assert response.status_code == 413
+        assert "Public demo uploads are limited" in response.json()["detail"]
+    finally:
+        os.environ.pop("PUBLIC_DEMO_MODE", None)
+        os.environ.pop("PUBLIC_DEMO_MAX_UPLOAD_BYTES", None)
+        get_settings.cache_clear()
+
+
+def test_public_demo_policy_packs_are_read_only() -> None:
+    os.environ["PUBLIC_DEMO_MODE"] = "true"
+    get_settings.cache_clear()
+    try:
+        with TestClient(app) as client:
+            response = client.put(
+                "/api/v1/policy-packs/default",
+                json={"max_monthly_delta": 900},
+            )
+
+        assert response.status_code == 403
+        assert "read-only in public demo mode" in response.json()["detail"]
+    finally:
+        os.environ.pop("PUBLIC_DEMO_MODE", None)
+        get_settings.cache_clear()

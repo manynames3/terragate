@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     cognito_viewer_group: str = Field(default="terragate-viewers", alias="COGNITO_VIEWER_GROUP")
     cognito_org_claim: str = Field(default="custom:org_id", alias="COGNITO_ORG_CLAIM")
     artifact_storage_dir: str = Field(default="./artifacts", alias="ARTIFACT_STORAGE_DIR")
+    public_demo_mode: bool = Field(default=False, alias="PUBLIC_DEMO_MODE")
+    public_demo_allow_uploads: bool = Field(default=True, alias="PUBLIC_DEMO_ALLOW_UPLOADS")
+    public_demo_max_upload_bytes: int = Field(default=1_500_000, alias="PUBLIC_DEMO_MAX_UPLOAD_BYTES")
+    public_demo_mock_github_writes: bool = Field(default=True, alias="PUBLIC_DEMO_MOCK_GITHUB_WRITES")
+    public_demo_allow_live_github_reads: bool = Field(default=False, alias="PUBLIC_DEMO_ALLOW_LIVE_GITHUB_READS")
+    public_demo_disable_sandbox: bool = Field(default=True, alias="PUBLIC_DEMO_DISABLE_SANDBOX")
+    public_demo_sample_data_dir: str | None = Field(default=None, alias="PUBLIC_DEMO_SAMPLE_DATA_DIR")
     cors_origins: str = Field(
         default="http://localhost:3000,http://127.0.0.1:3000",
         alias="CORS_ORIGINS",

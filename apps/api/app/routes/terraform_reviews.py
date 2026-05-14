@@ -15,7 +15,13 @@ from app.auth.dev import DevUser, get_current_user, require_role
 from app.config import get_settings
 from app.db.session import SessionLocal, get_db
 from app.graph.terraform_review.graph import stream_terraform_review
-from app.integrations.github import GitHubClient
+from app.integrations.github import (
+    GitHubCheckResult,
+    GitHubClient,
+    GitHubPatchCommitResult,
+    GitHubPostResult,
+    GitHubPRContext as GitHubPRContextData,
+)
 from app.integrations.langsmith import configure_langsmith
 from app.integrations.storage import FileSystemArtifactStore
 from app.models import (
@@ -35,6 +41,8 @@ from app.schemas.review import (
     ApprovalRequest,
     AuthUser,
     AuditLogEntry,
+    DemoSamplePlan,
+    DemoTerraformReviewRequest,
     DecisionResponse,
     Finding,
     FixPatch,
@@ -58,6 +66,42 @@ from app.services.terraform_sandbox import TerraformSandboxError, TerraformSandb
 router = APIRouter(prefix="/api/v1", tags=["terraform reviews"])
 
 
+DEMO_SAMPLE_PLANS: dict[str, dict[str, str]] = {
+    "safe": {
+        "filename": "safe-plan.json",
+        "label": "Safe baseline",
+        "description": "A low-risk Terraform plan with compliant tagging and no public exposure.",
+        "environment": "dev",
+        "cloud_provider": "aws",
+        "policy_profile": "default",
+    },
+    "risky-security": {
+        "filename": "risky-security-plan.json",
+        "label": "Public exposure",
+        "description": "Public SSH, public RDS, and wildcard IAM findings for a security-heavy demo.",
+        "environment": "prod",
+        "cloud_provider": "aws",
+        "policy_profile": "default",
+    },
+    "risky-cost": {
+        "filename": "risky-cost-plan.json",
+        "label": "Cost spike",
+        "description": "Large compute, NAT gateway, and tagging gaps for cost governance review.",
+        "environment": "staging",
+        "cloud_provider": "aws",
+        "policy_profile": "startup_cost_control",
+    },
+    "destructive-prod": {
+        "filename": "destructive-prod-plan.json",
+        "label": "Destructive production change",
+        "description": "Stateful replacement and weak rollback controls for blast-radius analysis.",
+        "environment": "prod",
+        "cloud_provider": "aws",
+        "policy_profile": "restricted",
+    },
+}
+
+
 @router.get("/auth/me", response_model=AuthUser)
 def get_auth_user(user: DevUser = Depends(get_current_user)) -> AuthUser:
     return AuthUser(
@@ -69,6 +113,66 @@ def get_auth_user(user: DevUser = Depends(get_current_user)) -> AuthUser:
         groups=user.groups,
         auth_provider=user.auth_provider,
     )
+
+
+@router.get("/demo/sample-plans", response_model=list[DemoSamplePlan])
+def list_demo_sample_plans() -> list[DemoSamplePlan]:
+    return [
+        DemoSamplePlan(sample=sample, **metadata)
+        for sample, metadata in DEMO_SAMPLE_PLANS.items()
+    ]
+
+
+@router.post("/demo/terraform-reviews", response_model=TerraformReviewCreateResponse)
+async def create_demo_terraform_review(
+    request: DemoTerraformReviewRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> TerraformReviewCreateResponse:
+    settings = get_settings()
+    if not settings.public_demo_mode and settings.auth_mode.lower() != "dev":
+        raise HTTPException(
+            status_code=403,
+            detail="Demo sample reviews require PUBLIC_DEMO_MODE=true or local dev auth.",
+        )
+    sample = DEMO_SAMPLE_PLANS.get(request.sample)
+    if not sample:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown demo sample '{request.sample}'.",
+        )
+
+    plan_path = _demo_plan_path(settings, sample["filename"])
+    raw_bytes = plan_path.read_bytes()
+    try:
+        raw_plan = json.loads(raw_bytes)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=500, detail="Demo sample plan is not valid JSON.") from exc
+
+    try:
+        validate_terraform_plan(raw_plan)
+    except TerraformPlanError as exc:
+        raise HTTPException(status_code=500, detail=f"Demo sample plan is invalid: {exc}") from exc
+
+    run = await _create_and_queue_review(
+        background_tasks=background_tasks,
+        db=db,
+        user=None,
+        raw_bytes=raw_bytes,
+        source_filename=sample["filename"],
+        environment=request.environment or sample["environment"],
+        cloud_provider=request.cloud_provider or sample["cloud_provider"],
+        policy_profile=request.policy_profile or sample["policy_profile"],
+        repo_owner=request.repo_owner,
+        repo_name=request.repo_name,
+        pull_number=request.pull_number,
+        terraform_execution={
+            "mode": "demo_sample",
+            "sample": request.sample,
+            "source": f"sample-data/terraform-plans/{sample['filename']}",
+        },
+    )
+    return TerraformReviewCreateResponse(run_id=run.id, status=run.status)
 
 
 @router.post("/terraform-reviews", response_model=TerraformReviewCreateResponse)
@@ -96,6 +200,11 @@ async def create_terraform_review(
     terraform_execution = {"mode": "uploaded_plan"}
     source_filename = "tfplan.json"
     if execution_mode == "sandbox_plan":
+        if settings.public_demo_mode and settings.public_demo_disable_sandbox:
+            raise HTTPException(
+                status_code=403,
+                detail="Terraform sandbox execution is disabled in public demo mode. Use a sample review or upload a plan JSON.",
+            )
         try:
             sandbox_result = TerraformSandboxRunner(settings).create_plan_json(
                 terraform_working_dir,
@@ -114,7 +223,12 @@ async def create_terraform_review(
     else:
         if file is None:
             raise HTTPException(status_code=400, detail="Choose a Terraform plan JSON file or enable sandbox execution.")
-        raw_bytes = await file.read()
+        if settings.public_demo_mode and not settings.public_demo_allow_uploads:
+            raise HTTPException(
+                status_code=403,
+                detail="Plan uploads are disabled in public demo mode. Use one of the bundled sample reviews.",
+            )
+        raw_bytes = await _read_upload_bytes(file, settings)
         source_filename = file.filename or "tfplan.json"
         try:
             raw_plan = json.loads(raw_bytes)
@@ -151,6 +265,10 @@ async def get_github_pr_context(
     _user: DevUser = Depends(get_current_user),
 ) -> GitHubPRContext:
     settings = get_settings()
+    if settings.public_demo_mode and not settings.public_demo_allow_live_github_reads:
+        return GitHubPRContext(
+            **_public_demo_pr_context(repo_owner, repo_name, pull_number).to_dict()
+        )
     context = await _github_client(settings).fetch_pr_context(
         repo_owner,
         repo_name,
@@ -194,6 +312,13 @@ async def github_webhook(
         return {
             "accepted": False,
             "reason": "Set GITHUB_WEBHOOK_TERRAFORM_WORKING_DIR to enable automatic Terraform plan execution.",
+            "repo": repository.get("full_name"),
+            "pull_number": pull_number,
+        }
+    if settings.public_demo_mode and settings.public_demo_disable_sandbox:
+        return {
+            "accepted": False,
+            "reason": "Automatic Terraform plan execution is disabled in public demo mode.",
             "repo": repository.get("full_name"),
             "pull_number": pull_number,
         }
@@ -258,6 +383,11 @@ def update_policy_pack(
     user: DevUser = Depends(get_current_user),
 ) -> dict[str, Any]:
     require_role(user, {"platform-admin"})
+    if get_settings().public_demo_mode:
+        raise HTTPException(
+            status_code=403,
+            detail="Policy packs are read-only in public demo mode. Fork the repo or run locally to edit policy files.",
+        )
     try:
         saved = save_policy_pack(name, payload)
     except ValueError as exc:
@@ -410,12 +540,22 @@ async def post_github_comment(
             detail="Human approval is required before posting a GitHub comment.",
         )
     settings = get_settings()
-    result = await _github_client(settings).post_pr_comment(
-        run.repo_owner,
-        run.repo_name,
-        run.pull_number,
-        run.pr_comment_draft,
-    )
+    if settings.public_demo_mode and settings.public_demo_mock_github_writes:
+        result = GitHubPostResult(
+            posted=False,
+            mock=True,
+            message=(
+                "Public demo mode: approval was recorded, but no external GitHub comment was posted. "
+                f"Would post to {run.repo_owner or 'owner'}/{run.repo_name or 'repo'} PR #{run.pull_number or 0}."
+            ),
+        )
+    else:
+        result = await _github_client(settings).post_pr_comment(
+            run.repo_owner,
+            run.repo_name,
+            run.pull_number,
+            run.pr_comment_draft,
+        )
     if result.comment_url or result.mock:
         db.add(
             GitHubCommentModel(
@@ -542,16 +682,26 @@ def commit_fix_patch_to_github(
         )
 
     settings = get_settings()
-    result = _run_async(
-        _github_client(settings).commit_patch_to_pr_branch(
-            run.repo_owner,
-            run.repo_name,
-            run.pull_number,
-            patch.pr_file_path,
-            patch.diff,
-            commit_message=f"fix(terraform): apply TerraGate remediation for {run.id}",
+    if settings.public_demo_mode and settings.public_demo_mock_github_writes:
+        result = GitHubPatchCommitResult(
+            committed=False,
+            mock=True,
+            message=(
+                "Public demo mode: patch approval was recorded, but no commit was pushed. "
+                f"Would commit the approved patch to {run.repo_owner or 'owner'}/{run.repo_name or 'repo'} PR #{run.pull_number or 0}."
+            ),
         )
-    )
+    else:
+        result = _run_async(
+            _github_client(settings).commit_patch_to_pr_branch(
+                run.repo_owner,
+                run.repo_name,
+                run.pull_number,
+                patch.pr_file_path,
+                patch.diff,
+                commit_message=f"fix(terraform): apply TerraGate remediation for {run.id}",
+            )
+        )
     if result.committed:
         patch.status = "committed"
         patch.commit_url = result.commit_url
@@ -747,7 +897,7 @@ def _persist_final_state(db: Session, run: RunModel, final_state: dict[str, Any]
                 EvidenceModel(
                     finding_id=finding.id,
                     json_path=evidence.get("json_path", "$"),
-                    observed_value=_stringify(evidence.get("observed_value")),
+                    observed_value=_stringify(evidence.get("observed_value")) or "null",
                     expected_value=_stringify(evidence.get("expected_value")),
                     rule_id=evidence.get("rule_id"),
                     explanation=evidence.get("explanation", ""),
@@ -788,7 +938,7 @@ def _persist_final_state(db: Session, run: RunModel, final_state: dict[str, Any]
     run.plan_summary = final_state.get("plan_summary", {})
     run.cost_estimate = final_state.get("cost_estimate", {})
     run.blast_radius = final_state.get("blast_radius", {})
-    run.terraform_execution = final_state.get("terraform_execution", {"mode": "uploaded_plan"})
+    run.terraform_execution = final_state.get("terraform_execution") or run.terraform_execution or {"mode": "uploaded_plan"}
     run.report_markdown = final_state.get("report_markdown", "")
     run.pr_comment_draft = final_state.get("pr_comment_draft", "")
     run.remediation_summary = final_state.get("remediation_summary", "")
@@ -808,11 +958,14 @@ async def _fetch_and_store_github_context(
         return None
 
     settings = get_settings()
-    context = await _github_client(settings).fetch_pr_context(
-        repo_owner,
-        repo_name,
-        pull_number,
-    )
+    if settings.public_demo_mode and not settings.public_demo_allow_live_github_reads:
+        context = _public_demo_pr_context(repo_owner, repo_name, pull_number)
+    else:
+        context = await _github_client(settings).fetch_pr_context(
+            repo_owner,
+            repo_name,
+            pull_number,
+        )
     payload = redact_github_patch_context(context.to_dict())
     storage_uri, sha = store.write_json(run_id, "github-pr-context.json", payload)
     db.add(
@@ -936,17 +1089,27 @@ def _record_github_check(
     context = _github_context_schema(run)
     head_sha = context.latest_commit_sha if context else None
     settings = get_settings()
-    result = _run_async(
-        _github_client(settings).create_check_run(
-            run.repo_owner,
-            run.repo_name,
-            head_sha,
+    if settings.public_demo_mode and settings.public_demo_mock_github_writes:
+        result = GitHubCheckResult(
+            posted=False,
+            mock=True,
             status=status,
             conclusion=conclusion,
-            summary=summary,
+            message="Public demo mode: would create or update a GitHub check run. No external write was made.",
             external_id=run.id,
         )
-    )
+    else:
+        result = _run_async(
+            _github_client(settings).create_check_run(
+                run.repo_owner,
+                run.repo_name,
+                head_sha,
+                status=status,
+                conclusion=conclusion,
+                summary=summary,
+                external_id=run.id,
+            )
+        )
     db.add(
         GitHubCheckModel(
             run_id=run.id,
@@ -1162,6 +1325,60 @@ def _fix_patch_schema(patch: FixPatchModel) -> dict[str, Any]:
         "commit_url": patch.commit_url,
         "committed_at": patch.committed_at,
     }
+
+
+async def _read_upload_bytes(file: UploadFile, settings) -> bytes:
+    if not settings.public_demo_mode:
+        return await file.read()
+
+    max_bytes = max(settings.public_demo_max_upload_bytes, 1)
+    raw_bytes = await file.read(max_bytes + 1)
+    if len(raw_bytes) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"Public demo uploads are limited to {max_bytes} bytes.",
+        )
+    return raw_bytes
+
+
+def _demo_plan_path(settings, filename: str) -> Path:
+    candidates: list[Path] = []
+    if settings.public_demo_sample_data_dir:
+        candidates.append(Path(settings.public_demo_sample_data_dir).expanduser() / filename)
+    repo_root = Path(__file__).resolve().parents[4]
+    candidates.extend(
+        [
+            repo_root / "sample-data" / "terraform-plans" / filename,
+            Path("/sample-data/terraform-plans") / filename,
+            Path("/var/task/sample-data/terraform-plans") / filename,
+        ]
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise HTTPException(
+        status_code=500,
+        detail=(
+            "Demo sample Terraform plan was not found. Set PUBLIC_DEMO_SAMPLE_DATA_DIR "
+            "or include sample-data/terraform-plans in the deployment image."
+        ),
+    )
+
+
+def _public_demo_pr_context(
+    repo_owner: str | None,
+    repo_name: str | None,
+    pull_number: int | None,
+) -> GitHubPRContextData:
+    return GitHubPRContextData(
+        available=False,
+        mock=True,
+        message="Public demo mode: live GitHub reads are disabled, so this is a safe placeholder PR context.",
+        repo_owner=repo_owner,
+        repo_name=repo_name,
+        repo_full_name=f"{repo_owner}/{repo_name}" if repo_owner and repo_name else None,
+        pull_number=pull_number,
+    )
 
 
 def _github_client(settings):

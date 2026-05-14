@@ -1,0 +1,17 @@
+FROM public.ecr.aws/lambda/python:3.12
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=${LAMBDA_TASK_ROOT}
+ENV ARTIFACT_STORAGE_DIR=/tmp/artifacts
+ENV PUBLIC_DEMO_SAMPLE_DATA_DIR=/var/task/sample-data/terraform-plans
+
+COPY apps/api/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt --target ${LAMBDA_TASK_ROOT}
+
+COPY apps/api/app ${LAMBDA_TASK_ROOT}/app
+COPY apps/api/alembic ${LAMBDA_TASK_ROOT}/alembic
+COPY apps/api/alembic.ini ${LAMBDA_TASK_ROOT}/alembic.ini
+COPY sample-data ${LAMBDA_TASK_ROOT}/sample-data
+
+CMD ["app.lambda_handler.handler"]

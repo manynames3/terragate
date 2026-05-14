@@ -86,6 +86,15 @@ Manual local mode:
 - Web app runs with `npm run dev`.
 - External services are optional; mock fallbacks keep the demo working without OpenAI, GitHub, Infracost, or Cognito credentials.
 
+Low-cost public demo mode:
+
+- Cloudflare Pages serves the Next.js dashboard.
+- AWS API Gateway invokes the FastAPI app through Mangum on Lambda.
+- `REVIEW_EXECUTION_MODE=inline` is used for bundled sample reviews to avoid running an idle worker.
+- `PUBLIC_DEMO_MODE=true` enables upload limits, read-only policy packs, mock GitHub writes, and sandbox disablement.
+- RDS PostgreSQL can be stopped outside demos to keep idle cost low.
+- See [public demo deployment](public-demo.md).
+
 Intended production direction:
 
 - API and worker run as separate services.

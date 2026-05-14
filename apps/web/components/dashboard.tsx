@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, ClipboardCheck, CloudCog, DollarSign, FileText, ShieldAlert, Siren } from "lucide-react";
-import { listRuns } from "@/lib/api";
+import { ArrowRight, ClipboardCheck, CloudCog, DollarSign, FileText, Play, ShieldAlert, Siren } from "lucide-react";
+import { createDemoTerraformReview, listRuns } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { RunListItem } from "@/types/api";
 import { Badge, Button, Card, EmptyState, SeverityBadge } from "@/components/ui";
@@ -43,9 +44,12 @@ const modes = [
 ];
 
 export function Dashboard() {
+  const router = useRouter();
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [demoError, setDemoError] = useState<string | null>(null);
+  const [launchingSample, setLaunchingSample] = useState<string | null>(null);
 
   useEffect(() => {
     listRuns()
@@ -61,6 +65,19 @@ export function Dashboard() {
     const high = runs.filter((run) => ["high", "critical"].includes(run.risk_level)).length;
     return { total, pending, high };
   }, [runs]);
+
+  async function launchDemo(sample: string) {
+    setLaunchingSample(sample);
+    setDemoError(null);
+    try {
+      const result = await createDemoTerraformReview(sample);
+      router.push(`/runs/${result.run_id}`);
+    } catch (err) {
+      setDemoError(err instanceof Error ? err.message : "Failed to launch demo review.");
+    } finally {
+      setLaunchingSample(null);
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -93,6 +110,29 @@ export function Dashboard() {
           <p className="mt-2 text-3xl font-semibold text-white">{stats.high}</p>
         </Card>
       </div>
+
+      <Card className="p-5">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <Play className="h-4 w-4 text-[#43c6ac]" />
+              <h2 className="text-base font-semibold text-white">Public demo path</h2>
+            </div>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+              Launch a preloaded review without uploading sensitive Terraform data. Demo mode keeps approvals real but mocks external GitHub writes.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => void launchDemo("risky-security")} disabled={launchingSample !== null}>
+              {launchingSample === "risky-security" ? "Launching..." : "Try security risk"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => void launchDemo("destructive-prod")} disabled={launchingSample !== null}>
+              {launchingSample === "destructive-prod" ? "Launching..." : "Try prod blast radius"}
+            </Button>
+          </div>
+        </div>
+        {demoError ? <p className="mt-3 text-sm text-red-200">{demoError}</p> : null}
+      </Card>
 
       <section>
         <div className="mb-4 flex items-center justify-between">
@@ -145,7 +185,7 @@ export function Dashboard() {
             <div className="p-6 text-sm text-red-200">{error}</div>
           ) : runs.length === 0 ? (
             <div className="p-5">
-              <EmptyState title="No runs yet" body="Upload one of the sample Terraform plans to populate the command center." />
+              <EmptyState title="No runs yet" body="Launch a public demo sample or upload one of the Terraform plan fixtures to populate the command center." />
             </div>
           ) : (
             <div className="overflow-x-auto">
