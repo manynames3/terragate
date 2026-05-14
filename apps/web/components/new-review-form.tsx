@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ExternalLink, FileJson, GitPullRequest, Play, UploadCloud } from "lucide-react";
 import { createDemoTerraformReview, createTerraformReview, getGitHubPrContext, listPolicyPacks } from "@/lib/api";
@@ -9,6 +9,7 @@ import { Button, Card, FieldLabel } from "@/components/ui";
 
 export function NewReviewForm() {
   const router = useRouter();
+  const uploadSectionRef = useRef<HTMLDivElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [environment, setEnvironment] = useState("dev");
   const [cloudProvider, setCloudProvider] = useState("aws");
@@ -29,6 +30,7 @@ export function NewReviewForm() {
   const [submitting, setSubmitting] = useState(false);
   const [launchingSample, setLaunchingSample] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     listPolicyPacks()
@@ -39,11 +41,14 @@ export function NewReviewForm() {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (executionMode === "uploaded_plan" && !file) {
-      setError("Choose a Terraform plan JSON file.");
+      setUploadError("Choose a Terraform plan JSON file first, or launch a hosted-safe sample from the sample plans panel.");
+      setError(null);
+      window.requestAnimationFrame(() => uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
       return;
     }
     setSubmitting(true);
     setError(null);
+    setUploadError(null);
     const formData = new FormData();
     if (file) formData.append("file", file);
     formData.append("environment", environment);
@@ -114,9 +119,9 @@ export function NewReviewForm() {
         </div>
 
         <form onSubmit={onSubmit} className="space-y-6">
-          <div>
+          <div ref={uploadSectionRef}>
             <FieldLabel>Terraform plan JSON</FieldLabel>
-            <label className="mt-2 flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-[#3a506d] bg-[#091424] px-6 py-8 text-center transition hover:border-[#43c6ac]">
+            <label className={`mt-2 flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-[#091424] px-6 py-8 text-center transition hover:border-[#43c6ac] ${uploadError ? "border-red-300/70 ring-2 ring-red-400/20" : "border-[#3a506d]"}`}>
               <UploadCloud className="h-8 w-8 text-[#6ea8fe]" />
               <span className="mt-3 text-sm font-medium text-white">{file ? file.name : "Drop or choose tfplan.json"}</span>
               <span className="mt-2 max-w-xl text-xs leading-5 text-slate-400">Generated from terraform show -json. The backend stores raw and redacted artifacts, but only reduced redacted evidence is eligible for AI explanation.</span>
@@ -124,9 +129,19 @@ export function NewReviewForm() {
                 type="file"
                 accept="application/json,.json"
                 className="sr-only"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                aria-invalid={Boolean(uploadError)}
+                onChange={(event) => {
+                  setFile(event.target.files?.[0] ?? null);
+                  setUploadError(null);
+                  setError(null);
+                }}
               />
             </label>
+            {uploadError ? (
+              <div className="mt-3 rounded-md border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100" role="alert">
+                {uploadError}
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
@@ -134,7 +149,10 @@ export function NewReviewForm() {
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <button
                 type="button"
-                onClick={() => setExecutionMode("uploaded_plan")}
+                onClick={() => {
+                  setExecutionMode("uploaded_plan");
+                  setUploadError(null);
+                }}
                 className={`rounded-md border px-4 py-3 text-left text-sm ${executionMode === "uploaded_plan" ? "border-[#43c6ac] bg-[#102033] text-white" : "border-[#26364d] bg-[#091424] text-slate-300"}`}
               >
                 Upload existing plan JSON
@@ -142,7 +160,10 @@ export function NewReviewForm() {
               </button>
               <button
                 type="button"
-                onClick={() => setExecutionMode("sandbox_plan")}
+                onClick={() => {
+                  setExecutionMode("sandbox_plan");
+                  setUploadError(null);
+                }}
                 className={`rounded-md border px-4 py-3 text-left text-sm ${executionMode === "sandbox_plan" ? "border-[#43c6ac] bg-[#102033] text-white" : "border-[#26364d] bg-[#091424] text-slate-300"}`}
               >
                 Sandbox Terraform plan
@@ -246,7 +267,7 @@ export function NewReviewForm() {
             <Button type="submit" disabled={submitting}>
               {submitting ? "Running review..." : "Run LangGraph review"}
             </Button>
-            <span className="text-xs text-slate-500">Runs usually complete in a few seconds for sample plans.</span>
+            <span className="text-xs text-slate-500">{file || executionMode === "sandbox_plan" ? "Runs usually complete in a few seconds for sample plans." : "Upload a plan JSON first, or use a hosted sample on the right."}</span>
           </div>
         </form>
       </Card>
