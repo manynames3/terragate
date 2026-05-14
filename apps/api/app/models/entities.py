@@ -104,6 +104,9 @@ class FindingModel(Base):
     source: Mapped[str] = mapped_column(String(80), default="deterministic_rule")
     reviewer_node: Mapped[str] = mapped_column(String(120), default="deterministic_policy_checks")
     requires_human_review: Mapped[bool] = mapped_column(default=False)
+    pr_file_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    pr_file_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pr_patch: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     run: Mapped[RunModel] = relationship(back_populates="findings")

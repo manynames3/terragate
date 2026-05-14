@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Eye, X } from "lucide-react";
+import { ExternalLink, Eye, X } from "lucide-react";
 import type { Category, Finding } from "@/types/api";
 import { Button, Card, EmptyState, SeverityBadge } from "@/components/ui";
 
@@ -40,12 +40,13 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">
+            <table className="w-full min-w-[1120px] text-left text-sm">
               <thead className="border-b border-[#24324a] bg-[#101b2d] text-xs uppercase tracking-[0.12em] text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Severity</th>
                   <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3">Resource</th>
+                  <th className="px-4 py-3">PR file</th>
                   <th className="px-4 py-3">Action</th>
                   <th className="px-4 py-3">Title</th>
                   <th className="px-4 py-3">Confidence</th>
@@ -60,6 +61,20 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
                     <td className="px-4 py-4"><SeverityBadge severity={finding.severity} /></td>
                     <td className="px-4 py-4 capitalize text-slate-300">{finding.category}</td>
                     <td className="max-w-56 truncate px-4 py-4 font-mono text-xs text-slate-300">{finding.resource_address ?? "n/a"}</td>
+                    <td className="max-w-56 truncate px-4 py-4 font-mono text-xs text-slate-400">
+                      {finding.pr_file_path ? (
+                        finding.pr_file_url ? (
+                          <a href={finding.pr_file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#9eeadf] hover:text-white">
+                            {finding.pr_file_path}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        ) : (
+                          finding.pr_file_path
+                        )
+                      ) : (
+                        "n/a"
+                      )}
+                    </td>
                     <td className="px-4 py-4 font-mono text-xs text-slate-400">{finding.change_actions.join(", ") || "n/a"}</td>
                     <td className="px-4 py-4 text-white">{finding.title}</td>
                     <td className="px-4 py-4 text-slate-300">{Math.round(finding.confidence * 100)}%</td>
@@ -121,6 +136,33 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
               </div>
             </dl>
           </DetailBlock>
+          {finding.pr_file_path || finding.pr_patch ? (
+            <DetailBlock title="GitHub PR context">
+              <dl className="grid gap-3 text-sm">
+                <div>
+                  <dt className="text-slate-500">Changed file</dt>
+                  <dd className="mt-1 font-mono text-slate-200">
+                    {finding.pr_file_url ? (
+                      <a href={finding.pr_file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[#9eeadf] hover:text-white">
+                        {finding.pr_file_path}
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    ) : (
+                      finding.pr_file_path ?? "n/a"
+                    )}
+                  </dd>
+                </div>
+                {finding.pr_patch ? (
+                  <div>
+                    <dt className="text-slate-500">Patch excerpt</dt>
+                    <dd>
+                      <pre className="mt-1 max-h-80 overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-3 text-xs leading-6 text-slate-200">{finding.pr_patch}</pre>
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </DetailBlock>
+          ) : null}
           {finding.remediation ? (
             <DetailBlock title="Remediation">
               <p className="text-sm leading-6 text-slate-400">{finding.remediation.explanation}</p>

@@ -11,6 +11,7 @@ from app.graph.terraform_review.nodes.ingest import ingest_plan
 from app.graph.terraform_review.nodes.merge import deduplicate_and_rank, merge_findings
 from app.graph.terraform_review.nodes.normalize import normalize_resource_changes
 from app.graph.terraform_review.nodes.policy_checks import deterministic_policy_checks
+from app.graph.terraform_review.nodes.pr_context import map_github_pr_context
 from app.graph.terraform_review.nodes.reliability_reviewer import reliability_reviewer
 from app.graph.terraform_review.nodes.remediation import generate_remediations
 from app.graph.terraform_review.nodes.report import report_builder
@@ -31,6 +32,7 @@ def build_terraform_review_graph():
     builder.add_node("governance_reviewer", governance_reviewer)
     builder.add_node("merge_findings", merge_findings)
     builder.add_node("deduplicate_and_rank", deduplicate_and_rank)
+    builder.add_node("map_github_pr_context", map_github_pr_context)
     builder.add_node("generate_remediations", generate_remediations)
     builder.add_node("compliance_mapper", compliance_mapper)
     builder.add_node("report_builder", report_builder)
@@ -47,7 +49,8 @@ def build_terraform_review_graph():
     builder.add_edge("reliability_reviewer", "governance_reviewer")
     builder.add_edge("governance_reviewer", "merge_findings")
     builder.add_edge("merge_findings", "deduplicate_and_rank")
-    builder.add_edge("deduplicate_and_rank", "generate_remediations")
+    builder.add_edge("deduplicate_and_rank", "map_github_pr_context")
+    builder.add_edge("map_github_pr_context", "generate_remediations")
     builder.add_edge("generate_remediations", "compliance_mapper")
     builder.add_edge("compliance_mapper", "report_builder")
     builder.add_edge("report_builder", "human_approval_gate")

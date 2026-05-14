@@ -73,6 +73,9 @@ export type Finding = {
   source: "deterministic_rule" | "llm_reviewer" | "external_scanner";
   reviewer_node: string;
   requires_human_review: boolean;
+  pr_file_path: string | null;
+  pr_file_url: string | null;
+  pr_patch: string | null;
 };
 
 export type RunListItem = {

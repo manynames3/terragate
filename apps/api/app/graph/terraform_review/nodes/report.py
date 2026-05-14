@@ -58,6 +58,7 @@ def _build_pr_comment(
             [
                 f"{index}. {finding.get('severity', 'info').title()} - {finding.get('title')}",
                 f"   - Resource: {finding.get('resource_address') or 'n/a'}",
+                _pr_file_line(finding),
                 f"   - Evidence: {evidence.get('explanation', 'See finding evidence.')}",
                 f"   - Recommendation: {finding.get('recommendation')}",
                 "",
@@ -116,6 +117,7 @@ def _build_report(
                 f"### {finding.get('severity', 'info').title()} - {finding.get('title')}",
                 finding.get("description", ""),
                 f"Resource: `{finding.get('resource_address')}`",
+                f"PR file: {_pr_file_text(finding)}",
                 f"Recommendation: {finding.get('recommendation')}",
                 "",
             ]
@@ -131,3 +133,23 @@ def _repo_name(state: dict[str, Any]) -> str | None:
     if owner and repo:
         return f"{owner}/{repo}"
     return None
+
+
+def _pr_file_line(finding: dict[str, Any]) -> str:
+    path = finding.get("pr_file_path")
+    url = finding.get("pr_file_url")
+    if not path:
+        return "   - PR file: not mapped"
+    if url:
+        return f"   - PR file: [{path}]({url})"
+    return f"   - PR file: {path}"
+
+
+def _pr_file_text(finding: dict[str, Any]) -> str:
+    path = finding.get("pr_file_path")
+    url = finding.get("pr_file_url")
+    if not path:
+        return "not mapped"
+    if url:
+        return f"[{path}]({url})"
+    return path

@@ -24,6 +24,7 @@ class TerraformReviewState(TypedDict, total=False):
     reliability_findings: list[dict[str, Any]]
     governance_findings: list[dict[str, Any]]
     merged_findings: list[dict[str, Any]]
+    pr_mapped_findings: list[dict[str, Any]]
     remediations: list[dict[str, Any]]
     compliance_mappings: dict[str, list[str]]
     risk_score: dict[str, Any]

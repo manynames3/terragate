@@ -332,6 +332,9 @@ def _persist_final_state(db: Session, run: RunModel, final_state: dict[str, Any]
             source=item.get("source", "deterministic_rule"),
             reviewer_node=item.get("reviewer_node", "deterministic_policy_checks"),
             requires_human_review=item.get("requires_human_review", False),
+            pr_file_path=item.get("pr_file_path"),
+            pr_file_url=item.get("pr_file_url"),
+            pr_patch=item.get("pr_patch"),
         )
         db.add(finding)
         for evidence in item.get("evidence", []):
@@ -518,6 +521,9 @@ def _finding_schema(finding: FindingModel) -> Finding:
         source=finding.source,
         reviewer_node=finding.reviewer_node,
         requires_human_review=finding.requires_human_review,
+        pr_file_path=finding.pr_file_path,
+        pr_file_url=finding.pr_file_url,
+        pr_patch=finding.pr_patch,
     )
 
 

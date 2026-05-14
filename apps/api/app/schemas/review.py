@@ -44,6 +44,9 @@ class Finding(BaseModel):
     source: FindingSource = "deterministic_rule"
     reviewer_node: str = "deterministic_policy_checks"
     requires_human_review: bool = False
+    pr_file_path: str | None = None
+    pr_file_url: str | None = None
+    pr_patch: str | None = None
 
 
 class RiskScore(BaseModel):
