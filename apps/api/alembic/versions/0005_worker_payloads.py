@@ -6,7 +6,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0005_worker_payloads_patch_commits"
+revision = "0005_worker_payloads"
 down_revision = "0004_runbook_checklists"
 branch_labels = None
 depends_on = None
