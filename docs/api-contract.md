@@ -31,7 +31,46 @@ Returns recent runs with risk and severity counts.
 
 ## GET /api/v1/runs/{run_id}
 
-Returns run status, risk score, summary, graph progress, plan summary, repo context, and timestamps.
+Returns run status, risk score, summary, graph progress, plan summary, repo context, stored GitHub PR context, and timestamps.
+
+## GET /api/v1/github/pr-context
+
+Query params:
+
+- `repo_owner`
+- `repo_name`
+- `pull_number`
+
+Fetches live GitHub PR context with `GITHUB_TOKEN` when configured. If the token is missing, returns a structured dev placeholder.
+
+Response:
+
+```json
+{
+  "available": true,
+  "mock": false,
+  "message": "Fetched live GitHub PR metadata and changed-file context.",
+  "repo_full_name": "example/infra",
+  "pull_number": 42,
+  "title": "Harden production database",
+  "state": "open",
+  "author": "octocat",
+  "base_ref": "main",
+  "head_ref": "feature/rds-hardening",
+  "changed_files_count": 3,
+  "additions": 120,
+  "deletions": 18,
+  "terraform_files": [
+    {
+      "filename": "infra/rds.tf",
+      "status": "modified",
+      "additions": 40,
+      "deletions": 4,
+      "changes": 44
+    }
+  ]
+}
+```
 
 ## GET /api/v1/runs/{run_id}/findings
 

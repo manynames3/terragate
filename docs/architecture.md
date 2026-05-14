@@ -20,11 +20,12 @@ Browser
 1. User uploads Terraform plan JSON from the web app.
 2. API validates the upload and creates a run record.
 3. Raw artifact is stored locally and recorded in `artifacts`.
-4. LangGraph workflow validates, redacts, normalizes, checks, reviews, merges, remediates, maps compliance, and builds a report.
-5. Findings, evidence, remediations, report, PR comment draft, risk score, and graph progress are persisted.
-6. UI fetches run detail, findings, and report.
-7. User approves or rejects the PR comment draft.
-8. Approved runs can post to GitHub, or return a mock response when credentials are missing.
+4. If repo owner/name/PR number are provided, the API fetches GitHub PR metadata and changed files and stores them as a `github_pr_context` artifact.
+5. LangGraph workflow validates, redacts, normalizes, checks, reviews, merges, remediates, maps compliance, and builds a report.
+6. Findings, evidence, remediations, report, PR comment draft, risk score, and graph progress are persisted.
+7. UI fetches run detail, findings, report, and stored PR context.
+8. User approves or rejects the PR comment draft.
+9. Approved runs can post to GitHub, or return a mock response when credentials are missing.
 
 ## Backend Graph Workflow
 
@@ -60,7 +61,7 @@ Core tables:
 
 - `users`: Dev auth placeholder.
 - `runs`: Mode, status, environment, risk score, summary, report, draft, graph progress, repo context.
-- `artifacts`: Raw and redacted plan references.
+- `artifacts`: Raw and redacted plan references plus GitHub PR context JSON.
 - `findings`: Structured finding metadata and routing fields.
 - `evidence`: JSON path, observed value, expected value, rule id, explanation.
 - `remediations`: Language, snippet, explanation, risk of change.

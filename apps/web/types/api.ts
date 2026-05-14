@@ -17,6 +17,43 @@ export type Remediation = {
   risk_of_change: "low" | "medium" | "high";
 };
 
+export type GitHubPRFile = {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  changes: number;
+  patch: string | null;
+  raw_url: string | null;
+  blob_url: string | null;
+};
+
+export type GitHubPRContext = {
+  available: boolean;
+  mock: boolean;
+  message: string;
+  repo_owner: string | null;
+  repo_name: string | null;
+  repo_full_name: string | null;
+  pull_number: number | null;
+  title: string | null;
+  state: string | null;
+  draft: boolean | null;
+  author: string | null;
+  base_ref: string | null;
+  head_ref: string | null;
+  html_url: string | null;
+  latest_commit_sha: string | null;
+  changed_files_count: number;
+  additions: number;
+  deletions: number;
+  labels: string[];
+  requested_reviewers: string[];
+  files: GitHubPRFile[];
+  terraform_files: GitHubPRFile[];
+  fetched_at: string | null;
+};
+
 export type Finding = {
   id: string;
   title: string;
@@ -70,6 +107,7 @@ export type RunDetail = RunListItem & {
   repo_owner: string | null;
   repo_name: string | null;
   pull_number: number | null;
+  github_pr_context: GitHubPRContext | null;
 };
 
 export type RiskScore = {

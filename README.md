@@ -47,7 +47,8 @@ Screenshots placeholders:
 - Save runs, artifacts, findings, evidence, remediations, approvals, and GitHub comment records.
 - Generate a markdown PR comment draft.
 - Refuse GitHub posting until the run is approved.
-- Return a clear mock GitHub response when credentials or PR metadata are missing.
+- Fetch live GitHub PR metadata and changed files when repo context and `GITHUB_TOKEN` are configured.
+- Return a clear mock/dev GitHub response when credentials or PR metadata are missing.
 
 ## Local Setup
 
@@ -150,12 +151,23 @@ The graph produces a PR comment draft and stops in `approval_pending`. The API e
 - `POST /api/v1/runs/{run_id}/approve`
 - `POST /api/v1/runs/{run_id}/reject`
 - `POST /api/v1/runs/{run_id}/github-comment`
+- `GET /api/v1/github/pr-context`
 
 Only approved runs can call the GitHub comment endpoint.
 
+## GitHub PR Integration
+
+When `repo_owner`, `repo_name`, and `pull_number` are supplied, the backend attempts to fetch:
+
+- PR title, author, state, draft status, labels, reviewers, base/head refs, URL, and latest head SHA.
+- Changed files, additions/deletions, and truncated patches.
+- Terraform-specific files (`.tf`, `.tfvars`, or paths containing `terraform`).
+
+The PR context is saved as a `github_pr_context` artifact and displayed on the run detail page. The New Review page can also preview PR context before submission. If `GITHUB_TOKEN` is missing, the endpoint returns a structured dev placeholder instead of failing the review.
+
 ## Roadmap
 
-- GitHub PR webhook ingestion and diff context.
+- GitHub PR webhook ingestion.
 - Cost estimate integration with Infracost or cloud pricing APIs.
 - OPA/Rego policy execution alongside Python checks.
 - Clerk or Auth.js production auth.

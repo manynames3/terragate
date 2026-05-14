@@ -24,6 +24,8 @@ Use:
 - Policy profile: `default`
 - Optional GitHub owner/repo/PR: `example`, `infra`, `42`
 
+Click Fetch PR context. With a configured `GITHUB_TOKEN`, the page shows live PR title, changed files, Terraform files, and diff size. Without a token, it shows the safe dev placeholder and the review can still run.
+
 ## 3. Show Graph Workflow Progress
 
 Open the run detail page. Point out the named workflow nodes:

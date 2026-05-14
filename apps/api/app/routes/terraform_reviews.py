@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -29,6 +30,7 @@ from app.schemas.review import (
     DecisionResponse,
     Finding,
     GitHubCommentResponse,
+    GitHubPRContext,
     ReportResponse,
     RiskScore,
     RunDetail,
@@ -94,6 +96,37 @@ async def create_terraform_review(
     db.refresh(run)
     db.refresh(raw_artifact)
 
+    input_artifacts = [{"id": raw_artifact.id, "type": raw_artifact.type, "uri": raw_uri}]
+    repo_context = {
+        "repo_owner": repo_owner,
+        "repo_name": repo_name,
+        "pull_number": pull_number,
+    }
+    github_pr_context = await _fetch_and_store_github_context(
+        db,
+        store,
+        run.id,
+        repo_owner,
+        repo_name,
+        pull_number,
+    )
+    if github_pr_context:
+        repo_context["github_pr_context"] = github_pr_context
+        github_artifact = db.scalar(
+            select(ArtifactModel)
+            .where(ArtifactModel.run_id == run.id)
+            .where(ArtifactModel.type == "github_pr_context")
+            .order_by(ArtifactModel.created_at.desc())
+        )
+        if github_artifact:
+            input_artifacts.append(
+                {
+                    "id": github_artifact.id,
+                    "type": github_artifact.type,
+                    "uri": github_artifact.storage_uri,
+                }
+            )
+
     trace_id = configure_langsmith(settings)
     try:
         final_state = run_terraform_review(
@@ -101,12 +134,8 @@ async def create_terraform_review(
                 "run_id": run.id,
                 "user_id": user.id,
                 "mode": "terraform_pr_review",
-                "input_artifacts": [{"id": raw_artifact.id, "type": raw_artifact.type, "uri": raw_uri}],
-                "repo_context": {
-                    "repo_owner": repo_owner,
-                    "repo_name": repo_name,
-                    "pull_number": pull_number,
-                },
+                "input_artifacts": input_artifacts,
+                "repo_context": repo_context,
                 "policy_profile": policy_profile,
                 "environment": environment,
                 "cloud_provider": cloud_provider,
@@ -129,6 +158,21 @@ async def create_terraform_review(
     _persist_final_state(db, run, final_state)
     db.commit()
     return TerraformReviewCreateResponse(run_id=run.id, status=run.status)
+
+
+@router.get("/github/pr-context", response_model=GitHubPRContext)
+async def get_github_pr_context(
+    repo_owner: str = Query(..., min_length=1),
+    repo_name: str = Query(..., min_length=1),
+    pull_number: int = Query(..., ge=1),
+) -> GitHubPRContext:
+    settings = get_settings()
+    context = await GitHubClient(settings.github_token).fetch_pr_context(
+        repo_owner,
+        repo_name,
+        pull_number,
+    )
+    return GitHubPRContext(**context.to_dict())
 
 
 @router.get("/runs", response_model=list[RunListItem])
@@ -330,13 +374,48 @@ def _persist_final_state(db: Session, run: RunModel, final_state: dict[str, Any]
     db.add(run)
 
 
+async def _fetch_and_store_github_context(
+    db: Session,
+    store: FileSystemArtifactStore,
+    run_id: str,
+    repo_owner: str | None,
+    repo_name: str | None,
+    pull_number: int | None,
+) -> dict[str, Any] | None:
+    if not repo_owner or not repo_name or not pull_number:
+        return None
+
+    settings = get_settings()
+    context = await GitHubClient(settings.github_token).fetch_pr_context(
+        repo_owner,
+        repo_name,
+        pull_number,
+    )
+    payload = context.to_dict()
+    storage_uri, sha = store.write_json(run_id, "github-pr-context.json", payload)
+    db.add(
+        ArtifactModel(
+            run_id=run_id,
+            type="github_pr_context",
+            storage_uri=storage_uri,
+            sha256=sha,
+            redacted=True,
+        )
+    )
+    db.commit()
+    return payload
+
+
 def _get_run_or_404(db: Session, run_id: str, with_findings: bool = False) -> RunModel:
     query = select(RunModel).where(RunModel.id == run_id)
     if with_findings:
         query = query.options(
+            selectinload(RunModel.artifacts),
             selectinload(RunModel.findings).selectinload(FindingModel.evidence),
             selectinload(RunModel.findings).selectinload(FindingModel.remediations),
         )
+    else:
+        query = query.options(selectinload(RunModel.artifacts))
     run = db.scalar(query)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found.")
@@ -361,10 +440,42 @@ def _run_detail(run: RunModel) -> RunDetail:
         repo_owner=run.repo_owner,
         repo_name=run.repo_name,
         pull_number=run.pull_number,
+        github_pr_context=_github_context_schema(run),
         created_at=run.created_at,
         completed_at=run.completed_at,
         severity_counts=severity_counts([_finding_dict(finding) for finding in run.findings]),
     )
+
+
+def _github_context_schema(run: RunModel) -> GitHubPRContext | None:
+    artifact = next(
+        (item for item in run.artifacts if item.type == "github_pr_context"),
+        None,
+    )
+    if not artifact:
+        if run.repo_owner and run.repo_name and run.pull_number:
+            return GitHubPRContext(
+                available=False,
+                mock=True,
+                message="GitHub PR context has not been fetched for this run.",
+                repo_owner=run.repo_owner,
+                repo_name=run.repo_name,
+                repo_full_name=f"{run.repo_owner}/{run.repo_name}",
+                pull_number=run.pull_number,
+            )
+        return None
+    try:
+        payload = json.loads(Path(artifact.storage_uri).read_text())
+    except Exception:
+        return GitHubPRContext(
+            available=False,
+            mock=False,
+            message="Stored GitHub PR context artifact could not be read.",
+            repo_owner=run.repo_owner,
+            repo_name=run.repo_name,
+            pull_number=run.pull_number,
+        )
+    return GitHubPRContext(**payload)
 
 
 def _finding_schema(finding: FindingModel) -> Finding:

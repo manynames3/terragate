@@ -35,6 +35,17 @@ Mitigations:
 - Missing credentials or metadata return a mock response.
 - The comment uses redacted evidence and concise remediation snippets.
 
+## GitHub PR Context Risk
+
+Changed file patches can contain sensitive code, secrets, internal paths, and operational details.
+
+Mitigations:
+
+- PR context is stored as a separate artifact so retention and access controls can be tightened independently.
+- File patches are truncated before persistence.
+- PR context is used as review metadata and displayed to the operator; Terraform findings still come from parsed plan JSON and deterministic policy checks.
+- Missing credentials return a dev placeholder rather than encouraging users to paste tokens into the UI.
+
 ## Secret Leakage Risk
 
 Secrets can leak through raw plan uploads, logs, database rows, traces, or PR comments.

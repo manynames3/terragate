@@ -32,9 +32,23 @@ def _build_pr_comment(
         ),
         f"Environment: {state.get('environment', 'dev')}",
         f"Run ID: {state.get('run_id')}",
-        "",
-        "### Top risks",
     ]
+    github_context = (state.get("repo_context") or {}).get("github_pr_context") or {}
+    if github_context:
+        repo = github_context.get("repo_full_name") or _repo_name(state)
+        pull_number = github_context.get("pull_number")
+        title = github_context.get("title")
+        lines.append(
+            f"GitHub PR: {repo}#{pull_number}"
+            if repo and pull_number
+            else "GitHub PR: metadata unavailable"
+        )
+        lines.append(
+            f"PR title: {title}"
+            if title
+            else f"PR context: {github_context.get('message', 'not available')}"
+        )
+    lines.extend(["", "### Top risks"])
     top = findings[:5]
     if not top:
         lines.append("No material risks were detected by deterministic policy checks.")
@@ -108,3 +122,12 @@ def _build_report(
         )
     lines.extend(["## PR comment draft", "", comment])
     return "\n".join(lines)
+
+
+def _repo_name(state: dict[str, Any]) -> str | None:
+    repo_context = state.get("repo_context") or {}
+    owner = repo_context.get("repo_owner")
+    repo = repo_context.get("repo_name")
+    if owner and repo:
+        return f"{owner}/{repo}"
+    return None

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, GitPullRequest, RefreshCcw, ShieldAlert, XCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, GitPullRequest, RefreshCcw, ShieldAlert, XCircle } from "lucide-react";
 import { approveRun, getFindings, getReport, getRun, postGitHubComment, rejectRun } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { Finding, GitHubCommentResponse, Report, RunDetail } from "@/types/api";
@@ -157,6 +157,16 @@ export function RunDetailClient({ runId }: { runId: string }) {
         </div>
 
         <div className="space-y-6">
+          {run.github_pr_context || run.repo_owner ? (
+            <Card className="p-5">
+              <div className="flex items-center gap-2">
+                <GitPullRequest className="h-5 w-5 text-[#6ea8fe]" />
+                <h2 className="text-lg font-semibold text-white">GitHub PR context</h2>
+              </div>
+              <GitHubContextCard run={run} />
+            </Card>
+          ) : null}
+
           <Card className="p-5">
             <h2 className="text-lg font-semibold text-white">Graph progress</h2>
             <div className="mt-5 space-y-3">
@@ -216,6 +226,62 @@ export function RunDetailClient({ runId }: { runId: string }) {
           <EmptyState title="No draft generated" body="The report builder has not produced a PR comment for this run." />
         )}
       </Card>
+    </div>
+  );
+}
+
+function GitHubContextCard({ run }: { run: RunDetail }) {
+  const context = run.github_pr_context;
+  if (!context) {
+    return (
+      <div className="mt-4 rounded-md border border-[#26364d] bg-[#091424] p-4 text-sm text-slate-300">
+        {run.repo_owner}/{run.repo_name}#{run.pull_number}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-4 space-y-4">
+      <div>
+        <p className="text-sm font-semibold text-white">
+          {context.title ?? `${context.repo_full_name ?? "GitHub PR"}#${context.pull_number ?? ""}`}
+        </p>
+        <p className="mt-1 text-xs leading-5 text-slate-400">{context.message}</p>
+        {context.html_url ? (
+          <a href={context.html_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[#43c6ac]">
+            Open pull request <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        ) : null}
+      </div>
+      <div className="grid gap-3 text-sm sm:grid-cols-2">
+        <SmallMetric label="Source" value={context.mock ? "dev placeholder" : "live GitHub"} />
+        <SmallMetric label="Files" value={String(context.changed_files_count)} />
+        <SmallMetric label="Terraform" value={String(context.terraform_files.length)} />
+        <SmallMetric label="Diff" value={`+${context.additions} / -${context.deletions}`} />
+      </div>
+      {context.base_ref || context.head_ref ? (
+        <div className="rounded-md border border-[#26364d] bg-[#091424] p-3 font-mono text-xs text-slate-300">
+          {context.base_ref ?? "base"} {"<-"} {context.head_ref ?? "head"}
+        </div>
+      ) : null}
+      {context.terraform_files.length > 0 ? (
+        <div className="space-y-2">
+          {context.terraform_files.slice(0, 5).map((file) => (
+            <div key={file.filename} className="rounded-md border border-[#26364d] bg-[#091424] p-3">
+              <p className="truncate font-mono text-xs text-slate-200">{file.filename}</p>
+              <p className="mt-1 text-xs text-slate-500">{file.status} / +{file.additions} / -{file.deletions}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SmallMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-[#26364d] bg-[#091424] p-3">
+      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className="mt-1 font-semibold text-white">{value}</p>
     </div>
   );
 }

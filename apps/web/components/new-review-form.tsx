@@ -2,8 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, FileJson, GitPullRequest, UploadCloud } from "lucide-react";
-import { createTerraformReview } from "@/lib/api";
+import { AlertTriangle, ExternalLink, FileJson, GitPullRequest, UploadCloud } from "lucide-react";
+import { createTerraformReview, getGitHubPrContext } from "@/lib/api";
+import type { GitHubPRContext } from "@/types/api";
 import { Button, Card, FieldLabel } from "@/components/ui";
 
 export function NewReviewForm() {
@@ -15,6 +16,8 @@ export function NewReviewForm() {
   const [repoOwner, setRepoOwner] = useState("");
   const [repoName, setRepoName] = useState("");
   const [pullNumber, setPullNumber] = useState("");
+  const [prContext, setPrContext] = useState<GitHubPRContext | null>(null);
+  const [fetchingPr, setFetchingPr] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +45,23 @@ export function NewReviewForm() {
       setError(err instanceof Error ? err.message : "Failed to create review.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function fetchPrContext() {
+    if (!repoOwner || !repoName || !pullNumber) {
+      setError("Enter repo owner, repo name, and pull number before fetching PR context.");
+      return;
+    }
+    setFetchingPr(true);
+    setError(null);
+    setPrContext(null);
+    try {
+      setPrContext(await getGitHubPrContext(repoOwner, repoName, pullNumber));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch GitHub PR context.");
+    } finally {
+      setFetchingPr(false);
     }
   }
 
@@ -112,6 +132,13 @@ export function NewReviewForm() {
               <input value={repoName} onChange={(event) => setRepoName(event.target.value)} placeholder="repo name" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
               <input value={pullNumber} onChange={(event) => setPullNumber(event.target.value)} placeholder="pull number" inputMode="numeric" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
             </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button type="button" variant="secondary" onClick={() => void fetchPrContext()} disabled={fetchingPr}>
+                <GitPullRequest className="h-4 w-4" /> {fetchingPr ? "Fetching PR..." : "Fetch PR context"}
+              </Button>
+              <span className="text-xs text-slate-500">Uses the backend `GITHUB_TOKEN`; falls back to a clear dev placeholder when unset.</span>
+            </div>
+            {prContext ? <GitHubContextPreview context={prContext} /> : null}
           </div>
 
           {error ? <div className="rounded-md border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">{error}</div> : null}
@@ -147,6 +174,52 @@ terraform show -json tfplan.binary > tfplan.json`}
           <p className="mt-2 text-sm leading-6 text-slate-400">Use files in sample-data/terraform-plans for a demo: risky-security-plan.json, risky-cost-plan.json, or destructive-prod-plan.json.</p>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function GitHubContextPreview({ context }: { context: GitHubPRContext }) {
+  const terraformFiles = context.terraform_files.length;
+  return (
+    <div className="mt-4 rounded-lg border border-[#26364d] bg-[#091424] p-4">
+      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+        <div>
+          <p className="text-sm font-semibold text-white">
+            {context.title ?? `${context.repo_full_name ?? "GitHub PR"}#${context.pull_number ?? ""}`}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">{context.message}</p>
+        </div>
+        {context.html_url ? (
+          <a href={context.html_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#43c6ac]">
+            Open PR <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        ) : null}
+      </div>
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-4">
+        <Metric label="Source" value={context.mock ? "dev placeholder" : "live GitHub"} />
+        <Metric label="Files" value={String(context.changed_files_count)} />
+        <Metric label="Terraform files" value={String(terraformFiles)} />
+        <Metric label="Diff" value={`+${context.additions} / -${context.deletions}`} />
+      </div>
+      {context.terraform_files.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          {context.terraform_files.slice(0, 4).map((file) => (
+            <div key={file.filename} className="flex items-center justify-between rounded-md border border-[#26364d] bg-[#07101d] px-3 py-2 text-xs">
+              <span className="font-mono text-slate-200">{file.filename}</span>
+              <span className="text-slate-500">+{file.additions} / -{file.deletions}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-[#26364d] bg-[#07101d] p-3">
+      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className="mt-1 font-semibold text-slate-100">{value}</p>
     </div>
   );
 }

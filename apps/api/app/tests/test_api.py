@@ -3,6 +3,7 @@ from pathlib import Path
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_cloudops_api.db"
 os.environ["ARTIFACT_STORAGE_DIR"] = "./test_artifacts"
+os.environ["GITHUB_TOKEN"] = ""
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -39,6 +40,11 @@ def test_create_review_requires_approval_before_github_post() -> None:
         assert response.status_code == 200, response.text
         run_id = response.json()["run_id"]
 
+        run = client.get(f"/api/v1/runs/{run_id}")
+        assert run.status_code == 200
+        assert run.json()["github_pr_context"]["mock"] is True
+        assert "GITHUB_TOKEN" in run.json()["github_pr_context"]["message"]
+
         blocked = client.post(f"/api/v1/runs/{run_id}/github-comment")
         assert blocked.status_code == 409
 
@@ -49,3 +55,17 @@ def test_create_review_requires_approval_before_github_post() -> None:
         assert posted.status_code == 200
         assert posted.json()["mock"] is True
         assert "GITHUB_TOKEN" in posted.json()["message"]
+
+
+def test_pr_context_preview_returns_clear_dev_placeholder_without_token() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/v1/github/pr-context",
+            params={"repo_owner": "example", "repo_name": "infra", "pull_number": "42"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["available"] is False
+    assert payload["mock"] is True
+    assert payload["repo_full_name"] == "example/infra"

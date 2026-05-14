@@ -1,4 +1,4 @@
-import type { Finding, GitHubCommentResponse, Report, RunDetail, RunListItem } from "@/types/api";
+import type { Finding, GitHubCommentResponse, GitHubPRContext, Report, RunDetail, RunListItem } from "@/types/api";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -40,6 +40,15 @@ export function createTerraformReview(formData: FormData): Promise<{ run_id: str
     method: "POST",
     body: formData
   });
+}
+
+export function getGitHubPrContext(repoOwner: string, repoName: string, pullNumber: string): Promise<GitHubPRContext> {
+  const params = new URLSearchParams({
+    repo_owner: repoOwner,
+    repo_name: repoName,
+    pull_number: pullNumber
+  });
+  return request<GitHubPRContext>(`/api/v1/github/pr-context?${params.toString()}`);
 }
 
 export function approveRun(runId: string, notes: string): Promise<{ run_id: string; decision: string; status: string }> {

@@ -64,6 +64,43 @@ class PlanSummary(BaseModel):
     providers_affected: dict[str, int] = Field(default_factory=dict)
 
 
+class GitHubPRFile(BaseModel):
+    filename: str
+    status: str
+    additions: int
+    deletions: int
+    changes: int
+    patch: str | None = None
+    raw_url: str | None = None
+    blob_url: str | None = None
+
+
+class GitHubPRContext(BaseModel):
+    available: bool
+    mock: bool
+    message: str
+    repo_owner: str | None = None
+    repo_name: str | None = None
+    repo_full_name: str | None = None
+    pull_number: int | None = None
+    title: str | None = None
+    state: str | None = None
+    draft: bool | None = None
+    author: str | None = None
+    base_ref: str | None = None
+    head_ref: str | None = None
+    html_url: str | None = None
+    latest_commit_sha: str | None = None
+    changed_files_count: int = 0
+    additions: int = 0
+    deletions: int = 0
+    labels: list[str] = Field(default_factory=list)
+    requested_reviewers: list[str] = Field(default_factory=list)
+    files: list[GitHubPRFile] = Field(default_factory=list)
+    terraform_files: list[GitHubPRFile] = Field(default_factory=list)
+    fetched_at: str | None = None
+
+
 class TerraformReviewCreateResponse(BaseModel):
     run_id: str
     status: str
@@ -103,6 +140,7 @@ class RunDetail(BaseModel):
     repo_owner: str | None = None
     repo_name: str | None = None
     pull_number: int | None = None
+    github_pr_context: GitHubPRContext | None = None
     created_at: datetime
     completed_at: datetime | None = None
     severity_counts: dict[str, int] = Field(default_factory=dict)
