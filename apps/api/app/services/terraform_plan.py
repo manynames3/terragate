@@ -10,6 +10,16 @@ SENSITIVE_KEY_PATTERN = re.compile(
     re.IGNORECASE,
 )
 REDACTED = "[REDACTED]"
+SENSITIVE_ASSIGNMENT_PATTERN = re.compile(
+    (
+        r"(?P<prefix>(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|"
+        r"private[_-]?key|credential|auth|cert)[^:=\n]*[:=]\s*)(?P<value>.+)"
+    ),
+    re.IGNORECASE,
+)
+HEREDOC_PATTERN = re.compile(r"<<-?\s*(?P<delimiter>[A-Za-z0-9_.-]+|\"[^\"]+\"|'[^']+')")
+PRIVATE_KEY_BLOCK_START_PATTERN = re.compile(r"BEGIN [A-Z ]*PRIVATE KEY", re.IGNORECASE)
+PRIVATE_KEY_BLOCK_END_PATTERN = re.compile(r"END [A-Z ]*PRIVATE KEY", re.IGNORECASE)
 
 
 class TerraformPlanError(ValueError):
@@ -38,6 +48,97 @@ def redact_sensitive_values(value: Any, path: str = "$") -> Any:
     if isinstance(value, list):
         return [redact_sensitive_values(item, f"{path}[{index}]") for index, item in enumerate(value)]
     return value
+
+
+def redact_sensitive_text(value: str) -> str:
+    redacted_lines: list[str] = []
+    heredoc_end: str | None = None
+    redacted_block_open = False
+    private_key_block = False
+    for line in value.splitlines():
+        if heredoc_end:
+            if not redacted_block_open:
+                redacted_lines.append(_redacted_block_line(line, "HEREDOC CONTENT"))
+                redacted_block_open = True
+            if _matches_heredoc_end(line, heredoc_end):
+                heredoc_end = None
+                redacted_block_open = False
+            continue
+
+        if private_key_block:
+            if not redacted_block_open:
+                redacted_lines.append(_redacted_block_line(line, "PRIVATE KEY BLOCK"))
+                redacted_block_open = True
+            if PRIVATE_KEY_BLOCK_END_PATTERN.search(line):
+                private_key_block = False
+                redacted_block_open = False
+            continue
+
+        assignment = SENSITIVE_ASSIGNMENT_PATTERN.search(line)
+        if assignment:
+            redacted_lines.append(SENSITIVE_ASSIGNMENT_PATTERN.sub(_redact_assignment_match, line))
+            heredoc_end = _heredoc_delimiter(assignment.group("value"))
+            continue
+
+        if PRIVATE_KEY_BLOCK_START_PATTERN.search(line):
+            redacted_lines.append(_redacted_block_line(line, "PRIVATE KEY BLOCK"))
+            private_key_block = True
+            redacted_block_open = True
+            continue
+
+        redacted_lines.append(line)
+    return "\n".join(redacted_lines)
+
+
+def _redact_assignment_match(match: re.Match[str]) -> str:
+    value = match.group("value")
+    leading_whitespace = value[: len(value) - len(value.lstrip())]
+    body = value.lstrip()
+    trailing_whitespace = body[len(body.rstrip()) :]
+    stripped = body.rstrip()
+    if not stripped:
+        return f"{match.group('prefix')}{REDACTED}{trailing_whitespace}"
+    if HEREDOC_PATTERN.search(stripped):
+        return f"{match.group('prefix')}{leading_whitespace}{REDACTED}{trailing_whitespace}"
+    if stripped[0] in {"'", '"'}:
+        closing_quote_index = _closing_quote_index(stripped, stripped[0])
+        suffix = stripped[closing_quote_index + 1 :] if closing_quote_index is not None else ""
+        return f"{match.group('prefix')}{leading_whitespace}{REDACTED}{suffix}{trailing_whitespace}"
+    comma_index = stripped.find(",")
+    suffix = stripped[comma_index:] if comma_index >= 0 else ""
+    return f"{match.group('prefix')}{leading_whitespace}{REDACTED}{suffix}{trailing_whitespace}"
+
+
+def _closing_quote_index(value: str, quote: str) -> int | None:
+    escaped = False
+    for index, char in enumerate(value[1:], start=1):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if char == quote:
+            return index
+    return None
+
+
+def _heredoc_delimiter(value: str) -> str | None:
+    match = HEREDOC_PATTERN.search(value)
+    if not match:
+        return None
+    return match.group("delimiter").strip("\"'")
+
+
+def _matches_heredoc_end(line: str, delimiter: str) -> bool:
+    return line.lstrip("+- ").strip() == delimiter
+
+
+def _redacted_block_line(line: str, label: str) -> str:
+    match = re.match(r"^(?P<prefix>[+\- ]?)(?P<indent>\s*)", line)
+    if not match:
+        return f"[REDACTED {label}]"
+    return f"{match.group('prefix')}{match.group('indent')}[REDACTED {label}]"
 
 
 def collect_sensitive_paths(value: Any, path: str = "$") -> list[tuple[str, Any]]:

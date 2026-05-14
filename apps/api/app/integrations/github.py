@@ -4,6 +4,8 @@ from typing import Any
 
 import httpx
 
+from app.services.terraform_plan import redact_sensitive_text
+
 
 @dataclass
 class GitHubPostResult:
@@ -308,9 +310,10 @@ class GitHubClient:
 def _truncate_patch(patch: str | None, limit: int = 4000) -> str | None:
     if not patch:
         return None
-    if len(patch) <= limit:
-        return patch
-    return f"{patch[:limit]}\n... [patch truncated]"
+    redacted_patch = redact_sensitive_text(patch)
+    if len(redacted_patch) <= limit:
+        return redacted_patch
+    return f"{redacted_patch[:limit]}\n... [patch truncated]"
 
 
 def _github_error_message(response: httpx.Response) -> str:

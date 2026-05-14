@@ -35,7 +35,7 @@ async def test_fetch_pr_context_collects_metadata_and_terraform_files() -> None:
                         "additions": 20,
                         "deletions": 2,
                         "changes": 22,
-                        "patch": "@@ terraform patch",
+                        "patch": '@@ terraform patch\n+  password = "super-secret"',
                         "blob_url": "https://github.com/acme/infra/blob/abc/infra/rds.tf",
                     },
                     {
@@ -61,6 +61,8 @@ async def test_fetch_pr_context_collects_metadata_and_terraform_files() -> None:
     assert context.author == "octocat"
     assert context.changed_files_count == 2
     assert [file.filename for file in context.terraform_files] == ["infra/rds.tf"]
+    assert "super-secret" not in (context.terraform_files[0].patch or "")
+    assert "[REDACTED]" in (context.terraform_files[0].patch or "")
 
 
 @pytest.mark.asyncio

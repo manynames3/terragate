@@ -37,6 +37,7 @@ from app.schemas.review import (
     RunListItem,
     TerraformReviewCreateResponse,
 )
+from app.services.github_context import redact_github_patch_context
 from app.services.risk import severity_counts
 from app.services.terraform_plan import TerraformPlanError, validate_terraform_plan
 
@@ -394,7 +395,7 @@ async def _fetch_and_store_github_context(
         repo_name,
         pull_number,
     )
-    payload = context.to_dict()
+    payload = redact_github_patch_context(context.to_dict())
     storage_uri, sha = store.write_json(run_id, "github-pr-context.json", payload)
     db.add(
         ArtifactModel(
