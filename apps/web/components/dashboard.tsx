@@ -37,9 +37,10 @@ const modes = [
   },
   {
     title: "Compliance Check",
-    status: "Coming soon",
-    description: "CIS and NIST-style checklists mapped to deployable evidence.",
-    icon: ClipboardCheck
+    status: "Available",
+    description: "CIS and NIST-style checklist mapped to findings, evidence, and approval state.",
+    icon: ClipboardCheck,
+    href: "/compliance"
   }
 ];
 
@@ -137,7 +138,7 @@ export function Dashboard() {
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-white">Command modes</h2>
-          <Badge tone="info">Terraform reviewer live</Badge>
+          <Badge tone="info">Terraform + compliance live</Badge>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {modes.map((mode) => {

@@ -3,13 +3,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { Activity, CheckCircle2, FileJson, Gauge, Settings, ShieldCheck } from "lucide-react";
+import { Activity, CheckCircle2, ClipboardCheck, FileJson, Gauge, Settings, ShieldCheck } from "lucide-react";
 import { cx } from "@/lib/format";
 
 const nav = [
   { href: "/", label: "Dashboard", icon: Gauge },
   { href: "/reviews/new", label: "New Review", icon: FileJson },
   { href: "/approvals", label: "Approvals", icon: CheckCircle2 },
+  { href: "/compliance", label: "Compliance", icon: ClipboardCheck },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
 
