@@ -6,9 +6,10 @@ os.environ["ARTIFACT_STORAGE_DIR"] = "./test_artifacts"
 os.environ["GITHUB_TOKEN"] = ""
 
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import MetaData  # noqa: E402
 
 from app.db.init_db import init_db  # noqa: E402
-from app.db.session import Base, engine  # noqa: E402
+from app.db.session import engine  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -16,7 +17,9 @@ ROOT = Path(__file__).resolve().parents[4]
 
 
 def setup_module() -> None:
-    Base.metadata.drop_all(bind=engine)
+    metadata = MetaData()
+    metadata.reflect(bind=engine)
+    metadata.drop_all(bind=engine)
     init_db()
 
 
