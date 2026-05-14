@@ -1,0 +1,11 @@
+aws_region      = "us-east-1"
+project_name    = "terragate"
+environment     = "demo"
+git_ref         = "main"
+source_revision = "REPLACE_WITH_GIT_SHA"
+
+cors_origins = [
+  "http://localhost:3000",
+  "http://localhost:3010",
+  "https://terragate.pages.dev"
+]

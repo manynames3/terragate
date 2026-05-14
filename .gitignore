@@ -15,3 +15,9 @@ out/
 dist/
 coverage/
 *.tsbuildinfo
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+
+tfplan
