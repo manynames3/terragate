@@ -24,16 +24,11 @@ const modes = [
     icon: Siren
   },
   {
-    title: "Optimize Cloud Cost",
-    status: "Coming soon",
-    description: "Waste detection, rightsizing candidates, and accountability workflows.",
-    icon: DollarSign
-  },
-  {
     title: "Generate Runbook",
-    status: "Coming soon",
-    description: "Convert cloud architecture and service metadata into operational documentation.",
-    icon: FileText
+    status: "Available",
+    description: "Generate backup, rollback, maintenance, signoff, and validation checklists from review evidence.",
+    icon: FileText,
+    href: "/runbooks"
   },
   {
     title: "Compliance Check",
@@ -41,6 +36,12 @@ const modes = [
     description: "CIS and NIST-style checklist mapped to findings, evidence, and approval state.",
     icon: ClipboardCheck,
     href: "/compliance"
+  },
+  {
+    title: "Optimize Cloud Cost",
+    status: "Coming soon",
+    description: "Waste detection, rightsizing candidates, and accountability workflows.",
+    icon: DollarSign
   }
 ];
 
@@ -66,6 +67,8 @@ export function Dashboard() {
     const high = runs.filter((run) => ["high", "critical"].includes(run.risk_level)).length;
     return { total, pending, high };
   }, [runs]);
+  const availableModes = modes.filter((mode) => mode.status === "Available");
+  const plannedModes = modes.filter((mode) => mode.status !== "Available");
 
   async function launchDemo(sample: string) {
     setLaunchingSample(sample);
@@ -137,40 +140,25 @@ export function Dashboard() {
 
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Command modes</h2>
-          <Badge tone="info">Terraform + compliance live</Badge>
+          <h2 className="text-xl font-semibold text-white">Available command modes</h2>
+          <Badge tone="info">3 live modes</Badge>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {modes.map((mode) => {
-            const Icon = mode.icon;
-            const available = mode.status === "Available";
-            const content = (
-              <Card className="min-h-48 p-5 transition hover:border-[#3e587a]">
-                <div className="flex items-start justify-between gap-4">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-md border border-[#31445f] bg-[#111d31]">
-                    <Icon className="h-5 w-5 text-[#6ea8fe]" />
-                  </span>
-                  <Badge tone={available ? "success" : "neutral"}>{mode.status}</Badge>
-                </div>
-                <h3 className="mt-5 text-lg font-semibold text-white">{mode.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-400">{mode.description}</p>
-                {mode.title === "Review Terraform PR" && lastTerraformRun ? (
-                  <div className="mt-5 rounded-md border border-[#26364d] bg-[#091424] p-3">
-                    <div className="flex items-center justify-between gap-3 text-xs text-slate-400">
-                      <span>Last run</span>
-                      <SeverityBadge severity={lastTerraformRun.risk_level} />
-                    </div>
-                    <p className="mt-2 text-sm text-slate-200">{lastTerraformRun.summary}</p>
-                  </div>
-                ) : null}
-              </Card>
-            );
-            return available && mode.href ? (
-              <Link href={mode.href} key={mode.title}>{content}</Link>
-            ) : (
-              <div key={mode.title}>{content}</div>
-            );
-          })}
+          {availableModes.map((mode) => (
+            <CommandModeCard key={mode.title} mode={mode} lastTerraformRun={lastTerraformRun} />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-white">Coming soon</h2>
+          <Badge tone="neutral">Planned features</Badge>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {plannedModes.map((mode) => (
+            <CommandModeCard key={mode.title} mode={mode} lastTerraformRun={lastTerraformRun} />
+          ))}
         </div>
       </section>
 
@@ -220,5 +208,38 @@ export function Dashboard() {
         </Card>
       </section>
     </div>
+  );
+}
+
+type CommandMode = (typeof modes)[number];
+
+function CommandModeCard({ mode, lastTerraformRun }: { mode: CommandMode; lastTerraformRun: RunListItem | undefined }) {
+  const Icon = mode.icon;
+  const available = mode.status === "Available";
+  const content = (
+    <Card className="min-h-48 p-5 transition hover:border-[#3e587a]">
+      <div className="flex items-start justify-between gap-4">
+        <span className="flex h-11 w-11 items-center justify-center rounded-md border border-[#31445f] bg-[#111d31]">
+          <Icon className="h-5 w-5 text-[#6ea8fe]" />
+        </span>
+        <Badge tone={available ? "success" : "neutral"}>{mode.status}</Badge>
+      </div>
+      <h3 className="mt-5 text-lg font-semibold text-white">{mode.title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-400">{mode.description}</p>
+      {mode.title === "Review Terraform PR" && lastTerraformRun ? (
+        <div className="mt-5 rounded-md border border-[#26364d] bg-[#091424] p-3">
+          <div className="flex items-center justify-between gap-3 text-xs text-slate-400">
+            <span>Last run</span>
+            <SeverityBadge severity={lastTerraformRun.risk_level} />
+          </div>
+          <p className="mt-2 text-sm text-slate-200">{lastTerraformRun.summary}</p>
+        </div>
+      ) : null}
+    </Card>
+  );
+  return available && "href" in mode && mode.href ? (
+    <Link href={mode.href}>{content}</Link>
+  ) : (
+    <div>{content}</div>
   );
 }
