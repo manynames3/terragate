@@ -37,9 +37,9 @@ export function AuthSessionButton({ compact = false }: { compact?: boolean }) {
       <div className={cx("rounded-lg border border-[#26364d] bg-[#0d1728] p-3", compact && "p-2")}>
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-100">
           <UserRound className="h-4 w-4 text-[#6ea8fe]" />
-          Dev auth
+          Demo auth
         </div>
-        {!compact ? <p className="mt-1 text-xs text-slate-400">Local platform-admin fallback is active.</p> : null}
+        {!compact ? <p className="mt-1 text-xs text-slate-400">Public demo platform-admin fallback is active.</p> : null}
       </div>
     );
   }
