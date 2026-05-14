@@ -1,4 +1,17 @@
-import type { Finding, GitHubCommentResponse, GitHubPRContext, Report, RunDetail, RunListItem } from "@/types/api";
+import type {
+  AuthUser,
+  AuditLogEntry,
+  Finding,
+  FixPatch,
+  GitHubCommentResponse,
+  GitHubPRContext,
+  PatchCommitResponse,
+  PolicyPack,
+  Report,
+  RunDetail,
+  RunListItem
+} from "@/types/api";
+import { getAuthHeaders } from "@/lib/auth";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -7,6 +20,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+      ...getAuthHeaders(),
       ...(init?.headers ?? {})
     },
     cache: "no-store"
@@ -17,6 +31,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(payload.detail ?? response.statusText);
   }
   return response.json() as Promise<T>;
+}
+
+export function getCurrentUser(): Promise<AuthUser> {
+  return request<AuthUser>("/api/v1/auth/me");
 }
 
 export function listRuns(): Promise<RunListItem[]> {
@@ -39,6 +57,21 @@ export function createTerraformReview(formData: FormData): Promise<{ run_id: str
   return request<{ run_id: string; status: string }>("/api/v1/terraform-reviews", {
     method: "POST",
     body: formData
+  });
+}
+
+export function listPolicyPacks(): Promise<PolicyPack[]> {
+  return request<PolicyPack[]>("/api/v1/policy-packs");
+}
+
+export function getPolicyPack(name: string): Promise<PolicyPack> {
+  return request<PolicyPack>(`/api/v1/policy-packs/${name}`);
+}
+
+export function updatePolicyPack(name: string, payload: Partial<PolicyPack>): Promise<PolicyPack> {
+  return request<PolicyPack>(`/api/v1/policy-packs/${name}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
   });
 }
 
@@ -69,4 +102,24 @@ export function postGitHubComment(runId: string): Promise<GitHubCommentResponse>
   return request<GitHubCommentResponse>(`/api/v1/runs/${runId}/github-comment`, {
     method: "POST"
   });
+}
+
+export function getFixPatches(runId: string): Promise<FixPatch[]> {
+  return request<FixPatch[]>(`/api/v1/runs/${runId}/fix-patches`);
+}
+
+export function approveFixPatch(runId: string, patchId: string): Promise<FixPatch> {
+  return request<FixPatch>(`/api/v1/runs/${runId}/fix-patches/${patchId}/approve`, {
+    method: "POST"
+  });
+}
+
+export function commitFixPatch(runId: string, patchId: string): Promise<PatchCommitResponse> {
+  return request<PatchCommitResponse>(`/api/v1/runs/${runId}/fix-patches/${patchId}/github-commit`, {
+    method: "POST"
+  });
+}
+
+export function getAuditLog(runId: string): Promise<AuditLogEntry[]> {
+  return request<AuditLogEntry[]>(`/api/v1/runs/${runId}/audit-log`);
 }

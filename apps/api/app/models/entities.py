@@ -48,6 +48,9 @@ class RunModel(Base):
     trace_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     graph_progress: Mapped[list] = mapped_column(JSON, default=list)
     plan_summary: Mapped[dict] = mapped_column(JSON, default=dict)
+    cost_estimate: Mapped[dict] = mapped_column(JSON, default=dict)
+    blast_radius: Mapped[dict] = mapped_column(JSON, default=dict)
+    terraform_execution: Mapped[dict] = mapped_column(JSON, default=dict)
     approval_status: Mapped[str] = mapped_column(String(30), default="pending")
     report_markdown: Mapped[str] = mapped_column(Text, default="")
     pr_comment_draft: Mapped[str] = mapped_column(Text, default="")
@@ -66,6 +69,18 @@ class RunModel(Base):
         back_populates="run", cascade="all, delete-orphan"
     )
     github_comments: Mapped[list[GitHubCommentModel]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+    jobs: Mapped[list[ReviewJobModel]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+    github_checks: Mapped[list[GitHubCheckModel]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+    fix_patches: Mapped[list[FixPatchModel]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+    audit_logs: Mapped[list[AuditLogModel]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
 
@@ -107,6 +122,7 @@ class FindingModel(Base):
     pr_file_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     pr_file_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     pr_patch: Mapped[str | None] = mapped_column(Text, nullable=True)
+    runbook_checklist: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     run: Mapped[RunModel] = relationship(back_populates="findings")
@@ -170,3 +186,72 @@ class GitHubCommentModel(Base):
     posted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     run: Mapped[RunModel] = relationship(back_populates="github_comments")
+
+
+class ReviewJobModel(Base):
+    __tablename__ = "review_jobs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("job"))
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
+    status: Mapped[str] = mapped_column(String(40), default="queued", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    queued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    worker_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    run: Mapped[RunModel] = relationship(back_populates="jobs")
+
+
+class GitHubCheckModel(Base):
+    __tablename__ = "github_checks"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("chk"))
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120), default="CloudOps AI Terraform Review")
+    status: Mapped[str] = mapped_column(String(40), default="queued")
+    conclusion: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    external_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    check_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    message: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    run: Mapped[RunModel] = relationship(back_populates="github_checks")
+
+
+class FixPatchModel(Base):
+    __tablename__ = "fix_patches"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("fix"))
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
+    finding_id: Mapped[str | None] = mapped_column(ForeignKey("findings.id"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(40), default="draft", index=True)
+    pr_file_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    diff: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    commit_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    committed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    run: Mapped[RunModel] = relationship(back_populates="fix_patches")
+
+
+class AuditLogModel(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("aud"))
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("runs.id"), nullable=True, index=True)
+    actor_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    actor_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    action: Mapped[str] = mapped_column(String(120), index=True)
+    target_type: Mapped[str] = mapped_column(String(80), default="run")
+    target_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+
+    run: Mapped[RunModel | None] = relationship(back_populates="audit_logs")

@@ -10,6 +10,7 @@ from app.graph.terraform_review.nodes.common import (
     mark_node,
     resource_json_path,
 )
+from app.services.policy_packs import PolicyPack, load_policy_pack
 from app.services.terraform_plan import get_attr, get_tags, is_create_or_update, is_delete_or_replace
 
 
@@ -35,15 +36,18 @@ RESTRICTED_PROFILE_ALLOWLIST = {
 
 
 def deterministic_policy_checks(state: dict[str, Any]) -> dict[str, Any]:
+    policy_pack = load_policy_pack(state.get("policy_profile", "default"))
     findings = run_policy_checks(
         state.get("resource_changes", []),
         environment=state.get("environment", "dev"),
         policy_profile=state.get("policy_profile", "default"),
+        policy_pack=policy_pack,
         sensitive_paths=state.get("sensitive_paths", []),
     )
     return {
         **mark_node(state, "deterministic_policy_checks"),
         "deterministic_results": findings,
+        "policy_pack": policy_pack.to_dict(),
     }
 
 
@@ -52,8 +56,10 @@ def run_policy_checks(
     *,
     environment: str,
     policy_profile: str,
+    policy_pack: PolicyPack | None = None,
     sensitive_paths: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
+    policy_pack = policy_pack or load_policy_pack(policy_profile)
     findings: list[dict[str, Any]] = []
     s3_buckets = {
         _bucket_name(get_attr(resource, "bucket")) or resource.get("name"): resource
@@ -72,10 +78,10 @@ def run_policy_checks(
     }
 
     for resource in resource_changes:
-        findings.extend(_security_checks(resource))
-        findings.extend(_cost_checks(resource, environment))
-        findings.extend(_reliability_checks(resource, environment))
-        findings.extend(_governance_checks(resource, environment, policy_profile))
+        findings.extend(_security_checks(resource, policy_pack))
+        findings.extend(_cost_checks(resource, environment, policy_pack))
+        findings.extend(_reliability_checks(resource, environment, policy_pack))
+        findings.extend(_governance_checks(resource, environment, policy_profile, policy_pack))
 
     for bucket_name, bucket in s3_buckets.items():
         if bucket_name and bucket_name not in public_access_blocks:
@@ -150,17 +156,17 @@ def run_policy_checks(
     return findings
 
 
-def _security_checks(resource: dict[str, Any]) -> list[dict[str, Any]]:
+def _security_checks(resource: dict[str, Any], policy_pack: PolicyPack) -> list[dict[str, Any]]:
     resource_type = resource.get("type")
     findings: list[dict[str, Any]] = []
     if not is_create_or_update(resource):
         return findings
 
-    if resource_type == "aws_security_group":
+    if resource_type == "aws_security_group" and policy_pack.block_public_admin_ingress:
         for index, ingress in enumerate(get_attr(resource, "ingress") or []):
             findings.extend(_check_ingress(resource, ingress, f"change.after.ingress[{index}]"))
 
-    if resource_type == "aws_vpc_security_group_ingress_rule":
+    if resource_type == "aws_vpc_security_group_ingress_rule" and policy_pack.block_public_admin_ingress:
         ingress = {
             "from_port": get_attr(resource, "from_port"),
             "to_port": get_attr(resource, "to_port"),
@@ -275,7 +281,7 @@ def _security_checks(resource: dict[str, Any]) -> list[dict[str, Any]]:
     return findings
 
 
-def _cost_checks(resource: dict[str, Any], environment: str) -> list[dict[str, Any]]:
+def _cost_checks(resource: dict[str, Any], environment: str, policy_pack: PolicyPack) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     if not is_create_or_update(resource):
         return findings
@@ -284,6 +290,29 @@ def _cost_checks(resource: dict[str, Any], environment: str) -> list[dict[str, A
     tags = get_tags(resource)
     if resource_type == "aws_instance":
         instance_type = get_attr(resource, "instance_type")
+        family = str(instance_type).split(".")[0] if instance_type else ""
+        if policy_pack.allowed_instance_families and family and family not in policy_pack.allowed_instance_families:
+            findings.append(
+                make_finding(
+                    title="Instance family outside policy pack",
+                    description="The EC2 instance family is not allowed by the selected policy pack.",
+                    severity="medium",
+                    category="cost",
+                    resource=resource,
+                    evidence=[
+                        make_evidence(
+                            resource_json_path(resource, "change.after.instance_type"),
+                            instance_type,
+                            sorted(policy_pack.allowed_instance_families),
+                            "COST-EC2-002",
+                            "Policy packs can limit instance families to keep spend and operational support predictable.",
+                        )
+                    ],
+                    impact="Unsupported instance families can create avoidable cost or support burden.",
+                    recommendation="Use an approved instance family or request a documented policy exception.",
+                    requires_human_review=True,
+                )
+            )
         if environment in {"dev", "staging"} and _large_instance(instance_type):
             findings.append(
                 make_finding(
@@ -419,7 +448,7 @@ def _cost_checks(resource: dict[str, Any], environment: str) -> list[dict[str, A
             )
         )
 
-    if is_create_or_update(resource) and tags is not None and not tags.get("cost_center"):
+    if policy_pack.require_cost_center and is_create_or_update(resource) and tags is not None and not tags.get("cost_center"):
         findings.append(
             make_finding(
                 title="Missing cost_center tag",
@@ -444,7 +473,7 @@ def _cost_checks(resource: dict[str, Any], environment: str) -> list[dict[str, A
     return findings
 
 
-def _reliability_checks(resource: dict[str, Any], environment: str) -> list[dict[str, Any]]:
+def _reliability_checks(resource: dict[str, Any], environment: str, policy_pack: PolicyPack) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     resource_type = resource.get("type")
     actions = resource.get("change", {}).get("actions", [])
@@ -495,11 +524,39 @@ def _reliability_checks(resource: dict[str, Any], environment: str) -> list[dict
             )
         )
 
+    if (
+        environment == "prod"
+        and policy_pack.block_production_stateful_deletes
+        and resource_type in STATEFUL_TYPES
+        and "delete" in actions
+    ):
+        findings.append(
+            make_finding(
+                title="Production stateful deletion blocked by policy",
+                description="The selected policy pack blocks production deletion or replacement of stateful resources without an exception.",
+                severity="critical",
+                category="reliability",
+                resource=resource,
+                evidence=[
+                    make_evidence(
+                        resource_json_path(resource, "change.actions"),
+                        actions,
+                        "No production stateful deletes without break-glass approval",
+                        "REL-STATEFUL-002",
+                        "Production stateful deletes carry outage and data-loss risk.",
+                    )
+                ],
+                impact="This change can remove persistent data or force an outage in production.",
+                recommendation="Stop the apply until backup verification, rollback plan, owner signoff, and a maintenance window are recorded.",
+                requires_human_review=True,
+            )
+        )
+
     if resource_type == "aws_db_instance" and environment == "prod":
         backup_retention = get_attr(resource, "backup_retention_period")
         deletion_protection = get_attr(resource, "deletion_protection")
         multi_az = get_attr(resource, "multi_az")
-        if backup_retention in {None, 0}:
+        if backup_retention is None or int(backup_retention or 0) < policy_pack.min_prod_backup_retention_days:
             findings.append(
                 make_finding(
                     title="Production RDS backup retention missing",
@@ -511,16 +568,16 @@ def _reliability_checks(resource: dict[str, Any], environment: str) -> list[dict
                         make_evidence(
                             resource_json_path(resource, "change.after.backup_retention_period"),
                             backup_retention,
-                            ">= 7",
+                            f">= {policy_pack.min_prod_backup_retention_days}",
                             "REL-RDS-002",
                             "Production databases should retain automated backups.",
                         )
                     ],
                     impact="Recovery point objectives may not be achievable after data corruption or accidental deletion.",
-                    recommendation="Set backup_retention_period to at least 7 days for production databases.",
+                    recommendation=f"Set backup_retention_period to at least {policy_pack.min_prod_backup_retention_days} days for production databases.",
                 )
             )
-        if deletion_protection is False:
+        if policy_pack.require_deletion_protection_in_prod and deletion_protection is False:
             findings.append(
                 make_finding(
                     title="Production RDS deletion protection disabled",
@@ -591,14 +648,14 @@ def _reliability_checks(resource: dict[str, Any], environment: str) -> list[dict
 
 
 def _governance_checks(
-    resource: dict[str, Any], environment: str, policy_profile: str
+    resource: dict[str, Any], environment: str, policy_profile: str, policy_pack: PolicyPack
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     if not is_create_or_update(resource):
         return findings
 
     tags = get_tags(resource)
-    missing = sorted(tag for tag in REQUIRED_TAGS if tag not in tags or not tags.get(tag))
+    missing = sorted(tag for tag in policy_pack.required_tags if tag not in tags or not tags.get(tag))
     if missing:
         findings.append(
             make_finding(
@@ -611,7 +668,7 @@ def _governance_checks(
                     make_evidence(
                         resource_json_path(resource, "change.after.tags"),
                         tags,
-                        sorted(REQUIRED_TAGS),
+                        sorted(policy_pack.required_tags),
                         "GOV-TAG-001",
                         f"Missing tags: {', '.join(missing)}.",
                     )
@@ -645,7 +702,7 @@ def _governance_checks(
         )
 
     region = get_attr(resource, "region")
-    if region and region not in ALLOWED_REGIONS:
+    if region and region not in policy_pack.allowed_regions:
         findings.append(
             make_finding(
                 title="Region outside allowed list",
@@ -657,7 +714,7 @@ def _governance_checks(
                     make_evidence(
                         resource_json_path(resource, "change.after.region"),
                         region,
-                        sorted(ALLOWED_REGIONS),
+                            sorted(policy_pack.allowed_regions),
                         "GOV-REGION-001",
                         "Region controls support data residency and operational coverage.",
                     )
@@ -667,7 +724,8 @@ def _governance_checks(
             )
         )
 
-    if policy_profile == "restricted" and resource.get("type") not in RESTRICTED_PROFILE_ALLOWLIST:
+    restricted_allowlist = policy_pack.restricted_allowlist or RESTRICTED_PROFILE_ALLOWLIST
+    if policy_profile == "restricted" and resource.get("type") not in restricted_allowlist:
         findings.append(
             make_finding(
                 title="Resource type outside restricted policy profile",
@@ -679,7 +737,7 @@ def _governance_checks(
                     make_evidence(
                         resource_json_path(resource, "type"),
                         resource.get("type"),
-                        sorted(RESTRICTED_PROFILE_ALLOWLIST),
+                            sorted(restricted_allowlist),
                         "GOV-PROFILE-001",
                         "Restricted profiles require explicit allowlisting.",
                     )

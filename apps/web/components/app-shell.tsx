@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Activity, CheckCircle2, FileJson, Gauge, Settings, ShieldCheck } from "lucide-react";
 import { cx } from "@/lib/format";
+import { AuthSessionButton } from "@/components/auth-session-button";
 
 const nav = [
   { href: "/", label: "Dashboard", icon: Gauge },
@@ -46,18 +47,24 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        <div className="absolute bottom-6 left-5 right-5 rounded-lg border border-[#26364d] bg-[#0d1728] p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-            <Activity className="h-4 w-4 text-[#6ea8fe]" />
-            Deterministic first
+        <div className="absolute bottom-6 left-5 right-5 space-y-3">
+          <AuthSessionButton />
+          <div className="rounded-lg border border-[#26364d] bg-[#0d1728] p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+              <Activity className="h-4 w-4 text-[#6ea8fe]" />
+              Deterministic first
+            </div>
+            <p className="mt-2 text-xs leading-5 text-slate-400">Policy checks produce evidence before AI explains, ranks, or drafts a comment.</p>
           </div>
-          <p className="mt-2 text-xs leading-5 text-slate-400">Policy checks produce evidence before AI explains, ranks, or drafts a comment.</p>
         </div>
       </aside>
       <header className="border-b border-[#24324a] bg-[#081120]/90 px-4 py-4 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between">
           <Link href="/" className="font-semibold text-white">CloudOps AI</Link>
-          <Link href="/reviews/new" className="rounded-md bg-[#43c6ac] px-3 py-2 text-sm font-semibold text-[#07111f]">New Review</Link>
+          <div className="flex items-center gap-2">
+            <AuthSessionButton compact />
+            <Link href="/reviews/new" className="rounded-md bg-[#43c6ac] px-3 py-2 text-sm font-semibold text-[#07111f]">New Review</Link>
+          </div>
         </div>
       </header>
       <main className="lg:pl-72">

@@ -1,11 +1,12 @@
 import { KeyRound, Lock, RadioTower, ShieldCheck } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
+import { PolicyPackSettings } from "@/components/policy-pack-settings";
 
 const settings = [
   {
     title: "Auth provider",
-    status: "Dev stub",
-    body: "The API uses a lightweight dev user today. Clerk or Auth.js can replace the stub at the route dependency boundary.",
+    status: "Cognito ready",
+    body: "Use AUTH_MODE=cognito with a Cognito user pool for JWT validation, group-based roles, and bearer-token API access. Dev header auth remains available locally.",
     icon: Lock
   },
   {
@@ -17,13 +18,13 @@ const settings = [
   {
     title: "GitHub posting",
     status: "Approval gated",
-    body: "Set GITHUB_TOKEN and include PR metadata to post approved comments to pull requests.",
+    body: "Set GITHUB_TOKEN or GitHub App credentials to post approved comments, checks, and committed fix patches to pull requests.",
     icon: KeyRound
   },
   {
     title: "Policy packs",
-    status: "Local rules",
-    body: "Python checks are active. Rego policy files are included as placeholders for OPA integration.",
+    status: "Team editable",
+    body: "Policy packs drive deterministic checks for tags, regions, public ingress, deletion rules, allowed resources, and monthly cost thresholds.",
     icon: ShieldCheck
   }
 ];
@@ -53,6 +54,7 @@ export default function SettingsPage() {
           );
         })}
       </div>
+      <PolicyPackSettings />
     </div>
   );
 }

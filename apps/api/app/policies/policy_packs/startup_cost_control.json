@@ -1,0 +1,14 @@
+{
+  "name": "startup_cost_control",
+  "description": "Aggressive cost controls for small teams and non-production accounts.",
+  "required_tags": ["owner", "environment", "service", "cost_center"],
+  "allowed_regions": ["us-east-1", "us-west-2"],
+  "allowed_instance_families": ["t3", "t4g", "m7i"],
+  "restricted_allowlist": [],
+  "max_monthly_delta": 100,
+  "block_public_admin_ingress": true,
+  "require_cost_center": true,
+  "block_production_stateful_deletes": true,
+  "require_deletion_protection_in_prod": true,
+  "min_prod_backup_retention_days": 7
+}

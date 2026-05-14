@@ -61,9 +61,12 @@ def _build_pr_comment(
                 _pr_file_line(finding),
                 f"   - Evidence: {evidence.get('explanation', 'See finding evidence.')}",
                 f"   - Recommendation: {finding.get('recommendation')}",
-                "",
             ]
         )
+        checklist = finding.get("runbook_checklist") or []
+        if checklist:
+            lines.extend(["   - Runbook checklist:"] + [f"     - {item}" for item in checklist[:4]])
+        lines.append("")
 
     remediation_lines = []
     for finding in findings:
@@ -82,6 +85,9 @@ def _build_pr_comment(
 
     if remediation_lines:
         lines.extend(["### Suggested remediation", *remediation_lines])
+    runbook_lines = _runbook_lines(findings)
+    if runbook_lines:
+        lines.extend(["", "### Operational checklist", *runbook_lines])
     lines.append("")
     lines.append("Human approval required before posting.")
     return "\n".join(lines)
@@ -122,8 +128,25 @@ def _build_report(
                 "",
             ]
         )
+        checklist = finding.get("runbook_checklist") or []
+        if checklist:
+            lines.extend(["Runbook checklist:", *[f"- {item}" for item in checklist], ""])
     lines.extend(["## PR comment draft", "", comment])
     return "\n".join(lines)
+
+
+def _runbook_lines(findings: list[dict[str, Any]]) -> list[str]:
+    seen: set[str] = set()
+    lines: list[str] = []
+    for finding in findings:
+        for item in finding.get("runbook_checklist") or []:
+            if item in seen:
+                continue
+            seen.add(item)
+            lines.append(f"- {item}")
+        if len(lines) >= 8:
+            break
+    return lines
 
 
 def _repo_name(state: dict[str, Any]) -> str | None:

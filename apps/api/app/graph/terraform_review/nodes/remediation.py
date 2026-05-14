@@ -8,9 +8,12 @@ def generate_remediations(state: dict[str, Any]) -> dict[str, Any]:
     remediations = []
     for finding in state.get("merged_findings", []):
         remediation = _remediation_for(finding)
+        runbook_checklist = _runbook_checklist_for(finding)
         if remediation:
             finding = {**finding, "remediation": remediation}
             remediations.append({"finding_id": finding["id"], **remediation})
+        if runbook_checklist:
+            finding = {**finding, "runbook_checklist": runbook_checklist}
         findings.append(finding)
     summary = f"Generated {len(remediations)} Terraform remediation snippets for review."
     return {
@@ -125,3 +128,44 @@ def _remediation_for(finding: dict[str, Any]) -> dict[str, Any] | None:
             "risk_of_change": "medium",
         }
     return None
+
+
+def _runbook_checklist_for(finding: dict[str, Any]) -> list[str]:
+    severity = finding.get("severity", "info")
+    actions = set(finding.get("change_actions") or [])
+    resource_type = finding.get("resource_type")
+    title = str(finding.get("title", "")).lower()
+    if severity not in {"critical", "high"} and "delete" not in actions:
+        return []
+
+    checklist = [
+        "Confirm named owner is accountable for the change window.",
+        "Record approval or exception for the selected policy pack.",
+        "Define validation checks that prove the service is healthy after apply.",
+    ]
+    if resource_type in {"aws_db_instance", "aws_ebs_volume", "aws_efs_file_system", "aws_dynamodb_table", "aws_s3_bucket", "aws_opensearch_domain"} or "stateful" in title:
+        checklist = [
+            "Backup verified and restore point recorded.",
+            "Maintenance window scheduled and communicated.",
+            "Rollback plan documented with owner and time limit.",
+            "Downstream dependencies and consumers identified.",
+            "Owner signoff captured before apply.",
+            "Post-apply data validation and smoke tests defined.",
+        ]
+    elif "public ingress" in title or "publicly accessible" in title:
+        checklist.extend(
+            [
+                "Confirm approved source CIDR or private access path.",
+                "Validate emergency access path such as SSM or VPN.",
+                "Schedule post-change external exposure scan.",
+            ]
+        )
+    elif "wildcard" in title:
+        checklist.extend(
+            [
+                "Identify exact actions used by the workload.",
+                "Test least-privilege policy in non-production.",
+                "Confirm rollback path for permission-denied production impact.",
+            ]
+        )
+    return checklist

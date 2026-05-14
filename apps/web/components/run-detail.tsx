@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ExternalLink, GitPullRequest, RefreshCcw, ShieldAlert, XCircle } from "lucide-react";
-import { approveRun, getFindings, getReport, getRun, postGitHubComment, rejectRun } from "@/lib/api";
+import { Activity, CheckCircle2, DollarSign, ExternalLink, FileDiff, GitPullRequest, History, RefreshCcw, ShieldAlert, XCircle } from "lucide-react";
+import { approveFixPatch, approveRun, commitFixPatch, getAuditLog, getFindings, getFixPatches, getReport, getRun, postGitHubComment, rejectRun } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import type { Finding, GitHubCommentResponse, Report, RunDetail } from "@/types/api";
+import type { AuditLogEntry, Finding, FixPatch, GitHubCommentResponse, Report, RunDetail } from "@/types/api";
 import { Badge, Button, Card, EmptyState, SeverityBadge } from "@/components/ui";
 import { FindingsTable } from "@/components/findings-table";
 
@@ -12,6 +12,8 @@ export function RunDetailClient({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunDetail | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [report, setReport] = useState<Report | null>(null);
+  const [fixPatches, setFixPatches] = useState<FixPatch[]>([]);
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,10 +24,18 @@ export function RunDetailClient({ runId }: { runId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [runData, findingData, reportData] = await Promise.all([getRun(runId), getFindings(runId), getReport(runId)]);
+      const [runData, findingData, reportData, patchData, auditData] = await Promise.all([
+        getRun(runId),
+        getFindings(runId),
+        getReport(runId),
+        getFixPatches(runId),
+        getAuditLog(runId)
+      ]);
       setRun(runData);
       setFindings(findingData);
       setReport(reportData);
+      setFixPatches(patchData);
+      setAuditLog(auditData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load run.");
     } finally {
@@ -36,6 +46,14 @@ export function RunDetailClient({ runId }: { runId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const runStatus = run?.status;
+
+  useEffect(() => {
+    if (!runStatus || !["queued", "running"].includes(runStatus)) return;
+    const interval = window.setInterval(() => void load(), 2500);
+    return () => window.clearInterval(interval);
+  }, [load, runStatus]);
 
   const categoryCounts = useMemo(() => {
     return findings.reduce<Record<string, number>>((acc, finding) => {
@@ -63,6 +81,34 @@ export function RunDetailClient({ runId }: { runId: string }) {
       await load();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Action failed.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function approvePatch(patchId: string) {
+    setActionLoading(true);
+    setMessage(null);
+    try {
+      await approveFixPatch(runId, patchId);
+      setMessage("Suggested patch approved for implementation.");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Patch approval failed.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function commitPatch(patchId: string) {
+    setActionLoading(true);
+    setMessage(null);
+    try {
+      const result = await commitFixPatch(runId, patchId);
+      setMessage(result.commit_url ? `Committed patch to PR branch: ${result.commit_url}` : result.message);
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Patch commit failed.");
     } finally {
       setActionLoading(false);
     }
@@ -150,6 +196,54 @@ export function RunDetailClient({ runId }: { runId: string }) {
             </div>
           </Card>
 
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-[#43c6ac]" />
+                <h2 className="text-lg font-semibold text-white">Cost delta</h2>
+              </div>
+              <p className="text-3xl font-semibold text-white">
+                ${Number(run.cost_estimate.monthly_delta ?? 0).toFixed(2)}
+                <span className="ml-2 text-sm font-normal text-slate-400">/ mo</span>
+              </p>
+              <p className="mt-2 text-sm text-slate-400">{run.cost_estimate.message ?? "No cost estimate generated yet."}</p>
+              <div className="mt-4 space-y-2">
+                {(run.cost_estimate.line_items ?? []).slice(0, 4).map((item) => (
+                  <div key={`${item.resource_address}-${item.description}`} className="flex items-center justify-between gap-3 rounded-md border border-[#26364d] bg-[#091424] px-3 py-2 text-xs">
+                    <span className="truncate font-mono text-slate-200">{item.resource_address ?? item.description}</span>
+                    <span className="shrink-0 text-slate-300">${Number(item.monthly_delta ?? 0).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <Activity className="h-5 w-5 text-[#6ea8fe]" />
+                <h2 className="text-lg font-semibold text-white">Blast radius</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <SeverityBadge severity={run.blast_radius.level ?? "low"} />
+                <span className="text-3xl font-semibold text-white">{run.blast_radius.score ?? 0}</span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-400">{run.blast_radius.summary ?? "No destructive stateful changes detected."}</p>
+              {(run.blast_radius.stateful_changes ?? []).slice(0, 3).map((item) => (
+                <div key={`${item.resource_address}-${item.resource_type}`} className="mt-3 rounded-md border border-[#26364d] bg-[#091424] p-3">
+                  <p className="font-mono text-xs text-slate-200">{item.resource_address}</p>
+                  <p className="mt-1 text-xs text-slate-500">{(item.factors ?? []).join(" / ")}</p>
+                  <p className="mt-2 text-xs text-slate-300">{item.replacement_risk ?? "replacement risk not classified"} / {item.backup_status ?? "backup unknown"}</p>
+                  {(item.required_runbook ?? []).length ? (
+                    <ul className="mt-2 space-y-1 text-xs text-slate-400">
+                      {(item.required_runbook ?? []).slice(0, 3).map((step) => (
+                        <li key={step}>- {step}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ))}
+            </Card>
+          </div>
+
           <section>
             <h2 className="mb-4 text-lg font-semibold text-white">Findings</h2>
             <FindingsTable findings={findings} />
@@ -179,6 +273,20 @@ export function RunDetailClient({ runId }: { runId: string }) {
                   </div>
                 </div>
               ))}
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <h2 className="text-lg font-semibold text-white">Execution status</h2>
+            <div className="mt-4 grid gap-3">
+              <SmallMetric label="Job" value={run.job ? `${run.job.status} / attempt ${run.job.attempts}` : "not queued"} />
+              <SmallMetric label="Plan source" value={run.terraform_execution.mode ?? "uploaded_plan"} />
+              <SmallMetric label="GitHub check" value={run.github_check ? `${run.github_check.state} / ${run.github_check.status}` : "not created"} />
+              {run.github_check?.check_url ? (
+                <a href={run.github_check.check_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#43c6ac]">
+                  Open check run <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : null}
             </div>
           </Card>
 
@@ -226,6 +334,65 @@ export function RunDetailClient({ runId }: { runId: string }) {
           <EmptyState title="No draft generated" body="The report builder has not produced a PR comment for this run." />
         )}
       </Card>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <FileDiff className="h-5 w-5 text-[#43c6ac]" />
+            <h2 className="text-lg font-semibold text-white">Suggested fix workflow</h2>
+          </div>
+          {fixPatches.length ? (
+            <div className="space-y-4">
+              {fixPatches.slice(0, 4).map((patch) => (
+                <div key={patch.id} className="rounded-md border border-[#26364d] bg-[#091424] p-4">
+                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+                    <div>
+                      <Badge tone={patch.status === "approved" || patch.status === "committed" ? "success" : "neutral"}>{patch.status}</Badge>
+                      <p className="mt-2 text-sm font-semibold text-white">{patch.summary}</p>
+                      <p className="mt-1 font-mono text-xs text-slate-500">{patch.pr_file_path}</p>
+                      {patch.commit_url ? (
+                        <a href={patch.commit_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#43c6ac]">
+                          Open commit <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button variant="secondary" disabled={actionLoading || patch.status === "approved" || patch.status === "committed"} onClick={() => void approvePatch(patch.id)}>
+                        <CheckCircle2 className="h-4 w-4" /> Approve patch
+                      </Button>
+                      <Button disabled={actionLoading || patch.status !== "approved"} onClick={() => void commitPatch(patch.id)}>
+                        <GitPullRequest className="h-4 w-4" /> Commit to PR
+                      </Button>
+                    </div>
+                  </div>
+                  <pre className="mt-3 max-h-52 overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-3 text-xs leading-5 text-slate-200">{patch.diff}</pre>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="No suggested patches" body="Remediation snippets will appear here as PR-ready patch drafts when findings include enough context." />
+          )}
+        </Card>
+
+        <Card className="p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <History className="h-5 w-5 text-[#6ea8fe]" />
+            <h2 className="text-lg font-semibold text-white">Audit log</h2>
+          </div>
+          {auditLog.length ? (
+            <div className="space-y-3">
+              {auditLog.slice(0, 10).map((entry) => (
+                <div key={entry.id} className="rounded-md border border-[#26364d] bg-[#091424] p-3">
+                  <p className="text-sm font-medium text-slate-100">{entry.action}</p>
+                  <p className="mt-1 text-xs text-slate-500">{entry.actor_email ?? "system"} / {formatDate(entry.created_at)}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="No audit events" body="Worker, approval, GitHub, and patch events will be recorded here." />
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

@@ -1,9 +1,13 @@
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import RetryPolicy
 
+from app.config import get_settings
 from app.graph.terraform_review.nodes.approval import human_approval_gate
+from app.graph.terraform_review.nodes.blast_radius import blast_radius_analyzer
 from app.graph.terraform_review.nodes.compliance import compliance_mapper
+from app.graph.terraform_review.nodes.cost_estimator import estimate_cost_delta_node
 from app.graph.terraform_review.nodes.cost_reviewer import cost_reviewer
 from app.graph.terraform_review.nodes.github import github_comment_writer
 from app.graph.terraform_review.nodes.governance_reviewer import governance_reviewer
@@ -21,29 +25,35 @@ from app.graph.terraform_review.state import TerraformReviewState
 
 
 def build_terraform_review_graph():
+    settings = get_settings()
+    retry_policy = RetryPolicy(max_attempts=max(1, settings.review_node_max_attempts))
     builder = StateGraph(TerraformReviewState)
-    builder.add_node("ingest_plan", ingest_plan)
-    builder.add_node("validate_and_redact", validate_and_redact)
-    builder.add_node("normalize_resource_changes", normalize_resource_changes)
-    builder.add_node("deterministic_policy_checks", deterministic_policy_checks)
-    builder.add_node("security_reviewer", security_reviewer)
-    builder.add_node("cost_reviewer", cost_reviewer)
-    builder.add_node("reliability_reviewer", reliability_reviewer)
-    builder.add_node("governance_reviewer", governance_reviewer)
-    builder.add_node("merge_findings", merge_findings)
-    builder.add_node("deduplicate_and_rank", deduplicate_and_rank)
-    builder.add_node("map_github_pr_context", map_github_pr_context)
-    builder.add_node("generate_remediations", generate_remediations)
-    builder.add_node("compliance_mapper", compliance_mapper)
-    builder.add_node("report_builder", report_builder)
-    builder.add_node("human_approval_gate", human_approval_gate)
-    builder.add_node("github_comment_writer", github_comment_writer)
+    builder.add_node("ingest_plan", ingest_plan, retry_policy=retry_policy)
+    builder.add_node("validate_and_redact", validate_and_redact, retry_policy=retry_policy)
+    builder.add_node("normalize_resource_changes", normalize_resource_changes, retry_policy=retry_policy)
+    builder.add_node("deterministic_policy_checks", deterministic_policy_checks, retry_policy=retry_policy)
+    builder.add_node("estimate_cost_delta", estimate_cost_delta_node, retry_policy=retry_policy)
+    builder.add_node("blast_radius_analyzer", blast_radius_analyzer, retry_policy=retry_policy)
+    builder.add_node("security_reviewer", security_reviewer, retry_policy=retry_policy)
+    builder.add_node("cost_reviewer", cost_reviewer, retry_policy=retry_policy)
+    builder.add_node("reliability_reviewer", reliability_reviewer, retry_policy=retry_policy)
+    builder.add_node("governance_reviewer", governance_reviewer, retry_policy=retry_policy)
+    builder.add_node("merge_findings", merge_findings, retry_policy=retry_policy)
+    builder.add_node("deduplicate_and_rank", deduplicate_and_rank, retry_policy=retry_policy)
+    builder.add_node("map_github_pr_context", map_github_pr_context, retry_policy=retry_policy)
+    builder.add_node("generate_remediations", generate_remediations, retry_policy=retry_policy)
+    builder.add_node("compliance_mapper", compliance_mapper, retry_policy=retry_policy)
+    builder.add_node("report_builder", report_builder, retry_policy=retry_policy)
+    builder.add_node("human_approval_gate", human_approval_gate, retry_policy=retry_policy)
+    builder.add_node("github_comment_writer", github_comment_writer, retry_policy=retry_policy)
 
     builder.add_edge(START, "ingest_plan")
     builder.add_edge("ingest_plan", "validate_and_redact")
     builder.add_edge("validate_and_redact", "normalize_resource_changes")
     builder.add_edge("normalize_resource_changes", "deterministic_policy_checks")
-    builder.add_edge("deterministic_policy_checks", "security_reviewer")
+    builder.add_edge("deterministic_policy_checks", "estimate_cost_delta")
+    builder.add_edge("estimate_cost_delta", "blast_radius_analyzer")
+    builder.add_edge("blast_radius_analyzer", "security_reviewer")
     builder.add_edge("security_reviewer", "cost_reviewer")
     builder.add_edge("cost_reviewer", "reliability_reviewer")
     builder.add_edge("reliability_reviewer", "governance_reviewer")
@@ -62,3 +72,8 @@ def build_terraform_review_graph():
 def run_terraform_review(initial_state: dict[str, Any]) -> dict[str, Any]:
     graph = build_terraform_review_graph()
     return graph.invoke(initial_state)
+
+
+def stream_terraform_review(initial_state: dict[str, Any]):
+    graph = build_terraform_review_graph()
+    yield from graph.stream(initial_state, stream_mode="values")

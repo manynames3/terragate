@@ -26,6 +26,10 @@ Use:
 
 Click Fetch PR context. With a configured `GITHUB_TOKEN`, the page shows live PR title, changed files, Terraform files, and diff size. Without a token, it shows the safe dev placeholder and the review can still run.
 
+Leave Plan source as Upload existing plan JSON for the standard demo. Sandbox Terraform plan is available only when `TERRAFORM_SANDBOX_ENABLED=true` and code is under the configured sandbox root.
+
+For a PR-native demo, configure a GitHub App webhook to `POST /api/v1/github/webhook`, set `GITHUB_WEBHOOK_SECRET`, and set `GITHUB_WEBHOOK_TERRAFORM_WORKING_DIR` to the local sandbox checkout path template. Opening or synchronizing a PR then queues the same review without manual upload.
+
 ## 3. Show Graph Workflow Progress
 
 Open the run detail page. Point out the named workflow nodes:
@@ -33,6 +37,8 @@ Open the run detail page. Point out the named workflow nodes:
 - Redaction
 - Normalization
 - Deterministic checks
+- Cost delta estimate
+- Blast-radius analysis
 - Security/cost/reliability/governance reviewers
 - Remediation
 - Compliance mapping
@@ -64,7 +70,15 @@ Click View on a finding. Show:
 
 Open remediation snippets in the drawer or PR comment draft. Explain that snippets are generated from structured findings and should be reviewed before applying.
 
-## 7. Approve PR Comment
+## 7. Show Cost, Blast Radius, and Fix Drafts
+
+Use `risky-cost-plan.json` to show cost delta and policy threshold behavior. Use `destructive-prod-plan.json` to show stateful destructive blast radius and required runbook steps.
+
+On any risky run, open Suggested fix workflow and show that remediation snippets become draft patches. Try Commit to PR before approval to show the API block, then approve the patch. With GitHub credentials on a same-repository PR branch, Commit to PR writes the approved patch block to the branch. Without credentials or on a fork PR, the API returns a clear mock response.
+
+Open a high-risk finding and show Operational checklist. For destructive/stateful resources, point out backup verification, maintenance window, rollback plan, dependency review, owner signoff, and post-apply validation.
+
+## 8. Approve PR Comment
 
 Add a note such as:
 
@@ -74,10 +88,16 @@ Approved for demo after validating public ingress and RDS findings.
 
 Click Approve GitHub comment.
 
-## 8. Post or Mock Post to GitHub
+## 9. Post or Mock Post to GitHub
 
 Click Post to GitHub. If `GITHUB_TOKEN` is not configured, the API returns a mock response explaining what would have been posted. This shows the integration path without requiring live credentials.
 
-## 9. Show Run History
+If live GitHub credentials and a PR head SHA are configured, also show the GitHub check status card. Otherwise, point out the stored mock check event.
+
+## 10. Show Run History
 
 Return to the dashboard and show recent runs, risk levels, pending approvals, and mode cards for planned platform expansion.
+
+## 11. Show Team Policy Tuning
+
+Open Settings and show Policy pack workflow. Edit a threshold or required tag in JSON, save it, then explain that future deterministic checks use the updated pack and the audit log records policy updates.

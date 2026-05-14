@@ -170,6 +170,18 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
               <p className="mt-3 text-xs text-slate-500">Risk of change: {finding.remediation.risk_of_change}</p>
             </DetailBlock>
           ) : null}
+          {finding.runbook_checklist.length ? (
+            <DetailBlock title="Operational checklist">
+              <ul className="space-y-2 text-sm text-slate-200">
+                {finding.runbook_checklist.map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-[#43c6ac]" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </DetailBlock>
+          ) : null}
           <DetailBlock title="Compliance references" body={finding.compliance_refs.join(", ") || "Internal CloudOps Policy"} />
           <DetailBlock title="Review metadata" body={`${finding.source.replaceAll("_", " ")} via ${finding.reviewer_node}. Human review: ${finding.requires_human_review ? "required" : "not required"}.`} />
         </div>

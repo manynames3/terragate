@@ -1,10 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ExternalLink, FileJson, GitPullRequest, UploadCloud } from "lucide-react";
-import { createTerraformReview, getGitHubPrContext } from "@/lib/api";
-import type { GitHubPRContext } from "@/types/api";
+import { createTerraformReview, getGitHubPrContext, listPolicyPacks } from "@/lib/api";
+import type { GitHubPRContext, PolicyPack } from "@/types/api";
 import { Button, Card, FieldLabel } from "@/components/ui";
 
 export function NewReviewForm() {
@@ -13,6 +13,14 @@ export function NewReviewForm() {
   const [environment, setEnvironment] = useState("dev");
   const [cloudProvider, setCloudProvider] = useState("aws");
   const [policyProfile, setPolicyProfile] = useState("default");
+  const [policyPacks, setPolicyPacks] = useState<PolicyPack[]>([]);
+  const [executionMode, setExecutionMode] = useState("uploaded_plan");
+  const [terraformWorkingDir, setTerraformWorkingDir] = useState("");
+  const [terraformWorkspace, setTerraformWorkspace] = useState("");
+  const [terraformVarFile, setTerraformVarFile] = useState("");
+  const [terraformBackendEnabled, setTerraformBackendEnabled] = useState(false);
+  const [terraformEnvVarsJson, setTerraformEnvVarsJson] = useState("");
+  const [terraformBackendConfigJson, setTerraformBackendConfigJson] = useState("");
   const [repoOwner, setRepoOwner] = useState("");
   const [repoName, setRepoName] = useState("");
   const [pullNumber, setPullNumber] = useState("");
@@ -21,19 +29,32 @@ export function NewReviewForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    listPolicyPacks()
+      .then(setPolicyPacks)
+      .catch(() => setPolicyPacks([]));
+  }, []);
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!file) {
+    if (executionMode === "uploaded_plan" && !file) {
       setError("Choose a Terraform plan JSON file.");
       return;
     }
     setSubmitting(true);
     setError(null);
     const formData = new FormData();
-    formData.append("file", file);
+    if (file) formData.append("file", file);
     formData.append("environment", environment);
     formData.append("cloud_provider", cloudProvider);
     formData.append("policy_profile", policyProfile);
+    formData.append("execution_mode", executionMode);
+    if (terraformWorkingDir) formData.append("terraform_working_dir", terraformWorkingDir);
+    if (terraformWorkspace) formData.append("terraform_workspace", terraformWorkspace);
+    if (terraformVarFile) formData.append("terraform_var_file", terraformVarFile);
+    if (terraformEnvVarsJson) formData.append("terraform_env_vars_json", terraformEnvVarsJson);
+    if (terraformBackendConfigJson) formData.append("terraform_backend_config_json", terraformBackendConfigJson);
+    formData.append("terraform_backend_enabled", String(terraformBackendEnabled));
     if (repoOwner) formData.append("repo_owner", repoOwner);
     if (repoName) formData.append("repo_name", repoName);
     if (pullNumber) formData.append("pull_number", pullNumber);
@@ -94,6 +115,70 @@ export function NewReviewForm() {
             </label>
           </div>
 
+          <div className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
+            <FieldLabel>Plan source</FieldLabel>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setExecutionMode("uploaded_plan")}
+                className={`rounded-md border px-4 py-3 text-left text-sm ${executionMode === "uploaded_plan" ? "border-[#43c6ac] bg-[#102033] text-white" : "border-[#26364d] bg-[#091424] text-slate-300"}`}
+              >
+                Upload existing plan JSON
+                <span className="mt-1 block text-xs text-slate-500">Default demo path; deterministic parser reads the uploaded artifact.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setExecutionMode("sandbox_plan")}
+                className={`rounded-md border px-4 py-3 text-left text-sm ${executionMode === "sandbox_plan" ? "border-[#43c6ac] bg-[#102033] text-white" : "border-[#26364d] bg-[#091424] text-slate-300"}`}
+              >
+                Sandbox Terraform plan
+                <span className="mt-1 block text-xs text-slate-500">Opt-in backend mode; runs only under TERRAFORM_SANDBOX_ROOT.</span>
+              </button>
+            </div>
+            {executionMode === "sandbox_plan" ? (
+              <div className="mt-4 grid gap-3">
+                <input
+                  value={terraformWorkingDir}
+                  onChange={(event) => setTerraformWorkingDir(event.target.value)}
+                  placeholder="relative path under sandbox root, e.g. demo-infra"
+                  className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <input
+                    value={terraformWorkspace}
+                    onChange={(event) => setTerraformWorkspace(event.target.value)}
+                    placeholder="workspace, optional"
+                    className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                  />
+                  <input
+                    value={terraformVarFile}
+                    onChange={(event) => setTerraformVarFile(event.target.value)}
+                    placeholder="var file, optional"
+                    className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                  />
+                </div>
+                <textarea
+                  value={terraformEnvVarsJson}
+                  onChange={(event) => setTerraformEnvVarsJson(event.target.value)}
+                  placeholder='env vars JSON, e.g. {"TF_VAR_region":"us-east-1"}'
+                  className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500"
+                />
+                <label className="flex items-center gap-2 text-sm text-slate-300">
+                  <input type="checkbox" checked={terraformBackendEnabled} onChange={(event) => setTerraformBackendEnabled(event.target.checked)} />
+                  Enable backend config for sandbox init
+                </label>
+                {terraformBackendEnabled ? (
+                  <textarea
+                    value={terraformBackendConfigJson}
+                    onChange={(event) => setTerraformBackendConfigJson(event.target.value)}
+                    placeholder='backend config JSON, e.g. {"bucket":"tf-state-demo"}'
+                    className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500"
+                  />
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
             <label className="space-y-2">
               <FieldLabel>Environment</FieldLabel>
@@ -115,9 +200,9 @@ export function NewReviewForm() {
             <label className="space-y-2">
               <FieldLabel>Policy profile</FieldLabel>
               <select value={policyProfile} onChange={(event) => setPolicyProfile(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
-                <option value="default">default</option>
-                <option value="restricted">restricted</option>
-                <option value="production-strict">production-strict</option>
+                {(policyPacks.length ? policyPacks : [{ name: "default" }, { name: "restricted" }, { name: "startup_cost_control" }] as PolicyPack[]).map((pack) => (
+                  <option key={pack.name} value={pack.name}>{pack.name}</option>
+                ))}
               </select>
             </label>
           </div>

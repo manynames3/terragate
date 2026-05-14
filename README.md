@@ -1,56 +1,95 @@
 # CloudOps AI Command Center
 
-A production-style AI CloudOps platform for reviewing infrastructure changes before they land. The v1 implementation focuses on a functional Terraform PR Reviewer: upload a Terraform plan JSON file, run a LangGraph workflow, get deterministic infrastructure risk findings, review remediation snippets, approve the generated PR comment, and optionally post it to GitHub.
+CloudOps AI Command Center is a production-style AI CloudOps dashboard for reviewing Terraform pull requests before infrastructure changes merge. It parses Terraform plan JSON, redacts sensitive values, runs deterministic security/cost/reliability/governance checks, uses a LangGraph workflow to enrich and rank findings, persists review history, drafts a GitHub PR comment, and requires human approval before posting or committing suggested fixes.
 
-This is intentionally not a toy chatbot. The system parses Terraform plan JSON, redacts sensitive values, runs deterministic policy checks first, and only uses AI as an explanation/remediation layer when `OPENAI_API_KEY` is configured. Without credentials, the app still works locally with deterministic fallback behavior.
+## TL;DR
 
-## Why It Matters
+- **What it is:** An AI-assisted Terraform PR reviewer for cloud/platform teams.
+- **What it does:** Turns Terraform plan JSON or sandbox-generated plans into evidence-backed risk findings, remediation guidance, check status, and approval-gated GitHub comments.
+- **Why it is credible:** It uses deterministic policy checks first, redacts artifacts before AI review, persists runs/findings/evidence, has Alembic migrations, tests, CI, Docker Compose, GitHub integration, and Cognito-ready auth.
+- **Live demo:** No public hosted demo is configured in this repo. The project is demoable locally with Docker Compose and included Terraform plan fixtures.
 
-Cloud infrastructure reviews are high-risk because Terraform plans can destroy stateful resources, expose databases, create large recurring costs, or leak secrets through plan artifacts. A useful AI CloudOps tool needs evidence and guardrails before language generation.
+## About
 
-This project demonstrates:
+This project is built for platform engineers, SREs, DevOps teams, and security reviewers who need faster infrastructure change review without trusting an LLM to guess from raw files. The working v1 focuses on the **Review Terraform PR** mode. Other command-center modes are represented in the UI as planned expansion areas.
 
-- Deterministic policy checks before LLM reasoning.
-- Sensitive value redaction before any AI call.
-- Transparent risk scoring.
-- Human approval before external GitHub posting.
-- Persistent run history, findings, evidence, remediations, and approvals.
-- Clean adapters for GitHub, LangSmith, local artifact storage, and future vector search.
+The core product philosophy is deterministic first, AI second:
+
+1. Parse Terraform plan JSON.
+2. Redact sensitive values.
+3. Extract normalized resource changes.
+4. Run deterministic policy checks.
+5. Use reviewer nodes to explain, prioritize, and generate remediation from structured evidence.
+6. Require human approval before GitHub writes.
+
+## Tech Stack
+
+| Area | Technology |
+| --- | --- |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS, lucide-react |
+| Backend API | FastAPI, Pydantic, SQLAlchemy |
+| Agent workflow | LangGraph, LangChain, optional OpenAI model calls |
+| Database | PostgreSQL in Docker Compose, SQLite fallback for local/manual runs |
+| Migrations | Alembic |
+| Auth | Dev role-header fallback, Amazon Cognito JWT/Hosted UI integration path |
+| Artifact storage | Local filesystem adapter for dev, structured for future object storage |
+| GitHub | PR metadata, webhook endpoint, check runs, comments, approved patch commits, mock fallback |
+| Cost | Optional Infracost CLI, deterministic heuristic fallback |
+| Observability | Optional LangSmith tracing, audit log records in the database |
+| Local dev/deploy | Docker Compose, API/web Dockerfiles, GitHub Actions CI |
+
+## Engineering Highlights
+
+- **Terraform-aware parser:** Validates `terraform show -json` output, extracts `resource_changes`, actions, providers, before/after state, and plan summary metrics.
+- **Sensitive-data guardrails:** Redacts secret-like keys and PR patch snippets before AI review or artifact display.
+- **Deterministic policy engine:** Implements security, cost, reliability, governance, and compliance-style checks with JSON-path evidence.
+- **LangGraph workflow:** Runs named review nodes for ingestion, redaction, normalization, policy checks, cost estimate, blast-radius analysis, reviewer enrichment, merge/dedupe, PR mapping, remediation, compliance mapping, reporting, and approval gating.
+- **Human-in-the-loop GitHub actions:** PR comments and suggested patch commits are blocked until approved.
+- **Production-style persistence:** Stores runs, artifacts, findings, evidence, remediations, approvals, GitHub checks/comments, fix patches, review jobs, and audit events.
+- **Async-capable execution:** Supports inline execution, FastAPI background tasks, and a worker process that claims queued review jobs from the database.
+- **Operational risk analysis:** Detects destructive stateful changes and generates runbook-grade checklists for backup, maintenance window, rollback, owner signoff, and post-apply validation.
+- **Recruiter-visible engineering hygiene:** TypeScript checks, ESLint, pytest suite, Docker Compose, Alembic migrations, sample data, API contract docs, threat model, and ADRs.
 
 ## Architecture
 
-```text
-apps/web       Next.js dashboard, upload flow, findings table, approval center
-apps/api       FastAPI backend, SQLAlchemy/Alembic persistence, LangGraph workflow
-postgres       Run history, findings, evidence, approvals, GitHub comments
-artifacts      Raw/redacted Terraform plans on local filesystem for dev
-LangSmith      Optional tracing through environment variables
-GitHub API     Optional approved PR comment posting
-```
+The system is a monorepo with a Next.js dashboard and a FastAPI backend. The backend owns Terraform parsing, redaction, policy checks, LangGraph orchestration, persistence, and integrations. The frontend focuses on review intake, run detail, findings, approvals, policy-pack editing, and GitHub action controls.
 
-Screenshots placeholders:
+Architecture docs:
 
-- Home dashboard: command modes and recent run history.
-- New Terraform review: upload form with sensitive data warning.
-- Run detail: risk score, graph progress, findings, evidence, remediation.
-- Approval center: generated PR comment with approve/reject/post controls.
+- [Architecture overview and C4-style diagram](docs/architecture.md)
+- [Architecture Decision Records](docs/adrs/README.md)
+- [API contract](docs/api-contract.md)
+- [Threat model](docs/threat-model.md)
+- [Demo script](docs/demo-script.md)
 
-## Implemented V1
+## What Works Today
 
 - Upload Terraform plan JSON.
-- Parse `resource_changes` from `terraform show -json`.
-- Redact keys containing `password`, `secret`, `token`, `api_key`, `access_key`, `private_key`, `credential`, `auth`, and `cert`.
-- Extract plan summary: creates, updates, deletes, replacements, resource types, providers.
-- Run named LangGraph nodes:
-  `ingest_plan`, `validate_and_redact`, `normalize_resource_changes`, `deterministic_policy_checks`, `security_reviewer`, `cost_reviewer`, `reliability_reviewer`, `governance_reviewer`, `merge_findings`, `deduplicate_and_rank`, `map_github_pr_context`, `generate_remediations`, `compliance_mapper`, `report_builder`, `human_approval_gate`, `github_comment_writer`.
-- Produce structured findings with severity, category, resource, evidence, recommendation, remediation, compliance refs, source, reviewer node, confidence, and human-review flag.
-- Map findings to changed Terraform PR files and redacted patch excerpts when live GitHub context is available.
-- Save runs, artifacts, findings, evidence, remediations, approvals, and GitHub comment records.
-- Manage schema changes with Alembic migrations instead of `create_all()`.
-- Generate a markdown PR comment draft.
-- Refuse GitHub posting until the run is approved.
-- Fetch live GitHub PR metadata and changed files when repo context and `GITHUB_TOKEN` are configured.
-- Return a clear mock/dev GitHub response when credentials or PR metadata are missing.
+- Optionally run Terraform plan generation from a configured sandbox directory.
+- Fetch GitHub PR metadata and changed files when credentials are configured.
+- Accept GitHub pull request webhooks for PR-native review triggers.
+- Parse and summarize Terraform resource changes.
+- Redact raw plan values and GitHub patch context.
+- Run deterministic security, cost, reliability, governance, and compliance checks.
+- Estimate cost with Infracost when configured, or a labeled heuristic fallback.
+- Analyze blast radius for destructive stateful changes.
+- Generate structured findings, evidence, remediations, compliance refs, and runbook checklist items.
+- Generate a markdown GitHub PR comment draft.
+- Require approval before posting comments or committing suggested fixes.
+- Persist review history, audit log events, and graph progress.
+- Run locally without OpenAI or GitHub credentials using deterministic and mock fallbacks.
+
+## Project Structure
+
+```text
+apps/
+  api/      FastAPI API, LangGraph workflow, persistence, integrations, tests
+  web/      Next.js dashboard, review form, run detail, approvals, settings
+docs/       Architecture, ADRs, API contract, threat model, demo script
+infra/      Dockerfiles and Docker Compose
+sample-data/terraform-plans/
+            Safe, risky security, risky cost, and destructive prod plan fixtures
+```
 
 ## Local Setup
 
@@ -64,10 +103,12 @@ docker compose -f infra/docker-compose.yml up --build
 
 Open:
 
-- Web: http://localhost:3000
-- API docs: http://localhost:8000/docs
+- Web: `http://localhost:3000`
+- API docs: `http://localhost:8000/docs`
 
-### Option B: Run Services Manually
+Docker Compose runs PostgreSQL, the API, the worker, and the web app. Optional Redis and Qdrant services are defined behind Compose profiles for future expansion.
+
+### Option B: Manual Local Run
 
 Backend:
 
@@ -87,37 +128,11 @@ npm install
 npm run dev
 ```
 
-Manual mode defaults to SQLite if `DATABASE_URL` is empty. Docker Compose uses PostgreSQL. The API runs Alembic migrations on startup; you can also run them manually from `apps/api` with `alembic upgrade head`.
+Manual mode defaults to SQLite if `DATABASE_URL` is empty. Docker Compose uses PostgreSQL. The API runs Alembic migrations on startup; migrations can also be run manually from `apps/api` with `alembic upgrade head`.
 
-## Environment Variables
+## Demo Flow
 
-See `.env.example`.
-
-```bash
-DATABASE_URL=
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5.4-mini
-LANGSMITH_API_KEY=
-LANGSMITH_PROJECT=cloudops-ai-command-center
-LANGSMITH_TRACING=true
-GITHUB_TOKEN=
-ARTIFACT_STORAGE_DIR=./artifacts
-APP_ENV=development
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-```
-
-## Generate Terraform Plan JSON
-
-```bash
-terraform plan -out=tfplan.binary
-terraform show -json tfplan.binary > tfplan.json
-```
-
-Terraform plan JSON can expose secrets and provider-generated values. Treat it as sensitive.
-
-## Demo
-
-Use the included sample data:
+Use the included sample plans:
 
 ```text
 sample-data/terraform-plans/safe-plan.json
@@ -126,55 +141,98 @@ sample-data/terraform-plans/risky-cost-plan.json
 sample-data/terraform-plans/destructive-prod-plan.json
 ```
 
-Recommended demo path:
+Suggested walkthrough:
 
 1. Start the app.
-2. Go to New Review.
+2. Open New Review.
 3. Upload `sample-data/terraform-plans/risky-security-plan.json`.
-4. Select `prod`, AWS, default policy.
-5. Show graph progress, risk score, findings table, evidence drawer, remediation snippets, and PR comment draft.
-6. Try posting to GitHub before approval to see the block.
+4. Select `prod`, AWS, and the `default` policy profile.
+5. Show graph progress, plan summary, severity breakdown, findings, evidence, remediation, and PR comment draft.
+6. Try posting to GitHub before approval to show the approval gate.
 7. Approve the draft.
-8. Post to GitHub. Without `GITHUB_TOKEN`, the API returns a mock response explaining what would have been posted.
+8. Post to GitHub. Without credentials, the API returns a clear mock response.
 
-## Security Guardrails
+## Environment
 
-- Full raw plans are never sent to the LLM.
-- Suspicious keys are redacted before AI review.
-- GitHub PR patch snippets are redacted and truncated before persistence.
-- Deterministic findings include concrete JSON-path evidence.
-- LLM reviewers are instructed not to invent findings and only operate on reduced evidence summaries.
-- GitHub posting is impossible unless `approval_status == approved`.
-- Missing GitHub credentials produce a safe mock response instead of failing the demo.
+Copy `.env.example` to `.env`. Important variables:
 
-## Human Approval Workflow
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string; SQLite fallback when empty in manual mode |
+| `OPENAI_API_KEY` | Enables optional LLM reviewer enrichment |
+| `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` | Optional LangSmith tracing |
+| `GITHUB_TOKEN` or GitHub App variables | Enables live PR metadata, checks, comments, and approved patch commits |
+| `INFRACOST_API_KEY` | Enables stronger Infracost-backed cost estimation |
+| `AUTH_MODE` | `dev` or `cognito` |
+| `COGNITO_*` and `NEXT_PUBLIC_COGNITO_*` | Cognito JWT validation and Hosted UI login |
+| `TERRAFORM_SANDBOX_*` | Optional Terraform plan execution sandbox settings |
+| `REVIEW_EXECUTION_MODE` | `inline`, `background`, or worker-backed execution |
 
-The graph produces a PR comment draft and stops in `approval_pending`. The API exposes:
+For Cognito, create a public app client without a client secret, enable authorization-code + PKCE, add `http://localhost:3000/auth/callback` as an allowed callback URL, and add `http://localhost:3000` as an allowed sign-out URL. Groups map to app roles by default: `cloudops-admins`, `cloudops-reviewers`, and `cloudops-viewers`.
 
-- `POST /api/v1/runs/{run_id}/approve`
-- `POST /api/v1/runs/{run_id}/reject`
-- `POST /api/v1/runs/{run_id}/github-comment`
-- `GET /api/v1/github/pr-context`
+## Generating Terraform Plan JSON
 
-Only approved runs can call the GitHub comment endpoint.
+```bash
+terraform plan -out=tfplan.binary
+terraform show -json tfplan.binary > tfplan.json
+```
 
-## GitHub PR Integration
+Terraform plan JSON can expose secrets and provider-generated values. Treat it as sensitive. The app redacts sensitive content before review nodes and before storing GitHub patch context, but raw uploaded artifacts should still be handled as sensitive data.
 
-When `repo_owner`, `repo_name`, and `pull_number` are supplied, the backend attempts to fetch:
+## Security And Privacy Guardrails
 
-- PR title, author, state, draft status, labels, reviewers, base/head refs, URL, and latest head SHA.
-- Changed files, additions/deletions, and truncated patches.
-- Terraform-specific files (`.tf`, `.tfvars`, or paths containing `terraform`).
+- Raw Terraform plans are never sent to the LLM.
+- LLM reviewer nodes receive reduced evidence summaries, not full raw plans.
+- Secret-like keys and PR patch snippets are redacted.
+- Deterministic findings include concrete evidence and rule IDs.
+- Low-confidence or high-risk findings can require human review.
+- GitHub comments and suggested patch commits are approval-gated.
+- Missing external credentials return mock/dev responses instead of failing the demo.
+- Cognito mode validates signed JWTs and maps groups/custom claims to platform roles.
 
-The PR context is saved as a redacted `github_pr_context` artifact and displayed on the run detail page. During review, `map_github_pr_context` heuristically links each finding to the changed Terraform file and patch excerpt that best matches its resource address/type. The New Review page can also preview PR context before submission. If `GITHUB_TOKEN` is missing, the endpoint returns a structured dev placeholder instead of failing the review.
+## GitHub Integration
+
+When `repo_owner`, `repo_name`, and `pull_number` are supplied, the backend can fetch PR title, author, state, labels, reviewers, refs, latest head SHA, changed files, and Terraform file patches. Findings are heuristically mapped back to changed Terraform files when context is available.
+
+The app can create GitHub check-run records, draft a single PR comment, post the approved comment, and commit approved suggested patches to same-repository PR branches. If credentials or safe PR metadata are missing, it records mock events and returns clear messages.
+
+## Tests And CI
+
+Backend:
+
+```bash
+cd apps/api
+source .venv/bin/activate
+python -m pytest
+```
+
+Frontend:
+
+```bash
+cd apps/web
+npm run typecheck
+npm run lint
+npm run build
+```
+
+GitHub Actions runs backend pytest plus frontend typecheck, lint, and build.
+
+## Known Limits
+
+- The worker is database-polling, not a durable queue system such as SQS, Celery, or Temporal.
+- Terraform sandboxing is useful for demos and trusted local environments, but it is not a hardened multi-tenant SaaS isolation boundary.
+- Cost estimates are strongest when Infracost is installed and configured; fallback estimates are intentionally labeled heuristic.
+- Suggested patches are reviewable drafts and may need human editing before commit.
+- Policy packs are editable JSON files, not yet a full approval/versioning workflow.
+- Cognito auth is wired for JWT validation and Hosted UI, but persisted org membership and row-level authorization are future work.
 
 ## Roadmap
 
-- GitHub PR webhook ingestion.
-- Cost estimate integration with Infracost or cloud pricing APIs.
-- OPA/Rego policy execution alongside Python checks.
-- Clerk or Auth.js production auth.
+- Durable queue backend with leases, heartbeats, and node-level retry recovery.
+- Tenant-isolated Terraform execution with short-lived cloud credentials.
+- Policy-pack approval/versioning workflow.
 - S3 artifact storage adapter.
+- OPA/Rego policy execution alongside Python checks.
 - Chroma/Qdrant runbook retrieval for incident investigation and remediation context.
 - LangSmith trace links in the UI.
 - AWS ECS/Lambda or Azure Container Apps deployment templates.

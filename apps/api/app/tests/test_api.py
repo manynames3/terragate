@@ -23,6 +23,40 @@ def setup_module() -> None:
     init_db()
 
 
+def test_auth_me_uses_dev_header_identity() -> None:
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/v1/auth/me",
+            headers={
+                "X-CloudOps-User-Email": "reviewer@example.com",
+                "X-CloudOps-User-Name": "Review Lead",
+                "X-CloudOps-Role": "reviewer",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": "reviewer@example.com",
+        "email": "reviewer@example.com",
+        "name": "Review Lead",
+        "role": "reviewer",
+        "org_id": "dev",
+        "groups": ["reviewer"],
+        "auth_provider": "dev",
+    }
+
+
+def test_review_creation_is_role_gated() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/terraform-reviews",
+            headers={"X-CloudOps-Role": "viewer"},
+            data={"environment": "dev", "cloud_provider": "aws"},
+        )
+
+    assert response.status_code == 403
+
+
 def test_create_review_requires_approval_before_github_post() -> None:
     plan_path = ROOT / "sample-data" / "terraform-plans" / "risky-security-plan.json"
     with TestClient(app) as client:
@@ -47,6 +81,9 @@ def test_create_review_requires_approval_before_github_post() -> None:
         assert run.status_code == 200
         assert run.json()["github_pr_context"]["mock"] is True
         assert "GITHUB_TOKEN" in run.json()["github_pr_context"]["message"]
+        assert run.json()["job"]["status"] == "completed"
+        assert run.json()["github_check"]["status"] == "completed"
+        assert run.json()["audit_event_count"] >= 3
 
         blocked = client.post(f"/api/v1/runs/{run_id}/github-comment")
         assert blocked.status_code == 409
@@ -58,6 +95,28 @@ def test_create_review_requires_approval_before_github_post() -> None:
         assert posted.status_code == 200
         assert posted.json()["mock"] is True
         assert "GITHUB_TOKEN" in posted.json()["message"]
+
+        patches = client.get(f"/api/v1/runs/{run_id}/fix-patches")
+        assert patches.status_code == 200
+        assert patches.json()
+        patch_id = patches.json()[0]["id"]
+
+        blocked_patch_commit = client.post(f"/api/v1/runs/{run_id}/fix-patches/{patch_id}/github-commit")
+        assert blocked_patch_commit.status_code == 409
+
+        patch_approval = client.post(f"/api/v1/runs/{run_id}/fix-patches/{patch_id}/approve")
+        assert patch_approval.status_code == 200
+        assert patch_approval.json()["status"] == "approved"
+
+        patch_commit = client.post(f"/api/v1/runs/{run_id}/fix-patches/{patch_id}/github-commit")
+        assert patch_commit.status_code == 200
+        assert patch_commit.json()["mock"] is True
+        assert "GITHUB_TOKEN" in patch_commit.json()["message"]
+
+        audit = client.get(f"/api/v1/runs/{run_id}/audit-log")
+        assert audit.status_code == 200
+        assert any(entry["action"] == "approval.approved" for entry in audit.json())
+        assert any(entry["action"] == "fix_patch.commit_mocked" for entry in audit.json())
 
 
 def test_pr_context_preview_returns_clear_dev_placeholder_without_token() -> None:
@@ -72,3 +131,56 @@ def test_pr_context_preview_returns_clear_dev_placeholder_without_token() -> Non
     assert payload["available"] is False
     assert payload["mock"] is True
     assert payload["repo_full_name"] == "example/infra"
+
+
+def test_sandbox_execution_is_explicitly_opt_in() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/terraform-reviews",
+            data={
+                "execution_mode": "sandbox_plan",
+                "terraform_working_dir": "demo-infra",
+            },
+        )
+
+    assert response.status_code == 400
+    assert "TERRAFORM_SANDBOX_ENABLED" in response.json()["detail"]
+
+
+def test_github_webhook_requires_plan_execution_configuration() -> None:
+    payload = {
+        "action": "opened",
+        "repository": {
+            "name": "infra",
+            "full_name": "example/infra",
+            "owner": {"login": "example"},
+        },
+        "pull_request": {
+            "number": 42,
+            "head": {"sha": "abc123"},
+        },
+    }
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/github/webhook",
+            headers={"X-GitHub-Event": "pull_request"},
+            json=payload,
+        )
+
+    assert response.status_code == 202
+    assert response.json()["accepted"] is False
+    assert "GITHUB_WEBHOOK_TERRAFORM_WORKING_DIR" in response.json()["reason"]
+
+
+def test_policy_pack_update_is_role_gated() -> None:
+    with TestClient(app) as client:
+        blocked = client.put(
+            "/api/v1/policy-packs/default",
+            headers={"X-CloudOps-Role": "viewer"},
+            json={"max_monthly_delta": 900},
+        )
+        allowed = client.get("/api/v1/policy-packs/default")
+
+    assert blocked.status_code == 403
+    assert allowed.status_code == 200
+    assert allowed.json()["name"] == "default"
