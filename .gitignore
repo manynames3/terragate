@@ -1,0 +1,17 @@
+.env
+.DS_Store
+artifacts/
+test_artifacts/
+*.db
+*.sqlite
+*.sqlite3
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo

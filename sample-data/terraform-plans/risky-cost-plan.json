@@ -1,0 +1,92 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "resource_changes": [
+    {
+      "address": "aws_instance.worker",
+      "mode": "managed",
+      "type": "aws_instance",
+      "name": "worker",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "ami": "ami-1234567890",
+          "instance_type": "m7i.2xlarge",
+          "tags": {
+            "owner": "data",
+            "environment": "dev",
+            "service": "batch"
+          }
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_nat_gateway.egress",
+      "mode": "managed",
+      "type": "aws_nat_gateway",
+      "name": "egress",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "allocation_id": "eipalloc-123",
+          "subnet_id": "subnet-abc",
+          "tags": {
+            "owner": "network",
+            "environment": "dev",
+            "service": "egress"
+          }
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_ebs_volume.analytics",
+      "mode": "managed",
+      "type": "aws_ebs_volume",
+      "name": "analytics",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "availability_zone": "us-east-1a",
+          "size": 2000,
+          "type": "io2",
+          "iops": 16000,
+          "tags": {
+            "owner": "data",
+            "environment": "dev",
+            "service": "analytics"
+          }
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_opensearch_domain.search",
+      "mode": "managed",
+      "type": "aws_opensearch_domain",
+      "name": "search",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "domain_name": "dev-search",
+          "engine_version": "OpenSearch_2.11",
+          "tags": {
+            "owner": "search",
+            "environment": "dev",
+            "service": "catalog"
+          }
+        },
+        "after_unknown": {}
+      }
+    }
+  ]
+}

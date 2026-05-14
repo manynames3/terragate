@@ -1,0 +1,78 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "resource_changes": [
+    {
+      "address": "aws_db_instance.primary",
+      "mode": "managed",
+      "type": "aws_db_instance",
+      "name": "primary",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["delete", "create"],
+        "before": {
+          "identifier": "orders-prod-db",
+          "engine": "postgres",
+          "storage_encrypted": true,
+          "backup_retention_period": 7,
+          "deletion_protection": true,
+          "multi_az": true,
+          "tags": {
+            "owner": "orders",
+            "environment": "prod",
+            "service": "orders",
+            "cost_center": "cc-7000"
+          }
+        },
+        "after": {
+          "identifier": "orders-prod-db-v2",
+          "engine": "postgres",
+          "instance_class": "db.r7g.2xlarge",
+          "publicly_accessible": false,
+          "storage_encrypted": true,
+          "backup_retention_period": 0,
+          "deletion_protection": false,
+          "multi_az": false,
+          "tags": {
+            "owner": "orders",
+            "environment": "prod",
+            "service": "orders",
+            "cost_center": "cc-7000"
+          }
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_efs_file_system.shared",
+      "mode": "managed",
+      "type": "aws_efs_file_system",
+      "name": "shared",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["delete", "create"],
+        "before": {
+          "creation_token": "orders-prod-shared",
+          "encrypted": true,
+          "tags": {
+            "owner": "orders",
+            "environment": "prod",
+            "service": "orders",
+            "cost_center": "cc-7000"
+          }
+        },
+        "after": {
+          "creation_token": "orders-prod-shared-replacement",
+          "encrypted": true,
+          "tags": {
+            "owner": "orders",
+            "environment": "prod",
+            "service": "orders",
+            "cost_center": "cc-7000"
+          }
+        },
+        "after_unknown": {}
+      }
+    }
+  ]
+}

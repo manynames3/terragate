@@ -1,0 +1,87 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.5",
+  "resource_changes": [
+    {
+      "address": "aws_security_group.web",
+      "mode": "managed",
+      "type": "aws_security_group",
+      "name": "web",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "web-prod-sg",
+          "ingress": [
+            {
+              "description": "temporary ssh",
+              "from_port": 22,
+              "to_port": 22,
+              "protocol": "tcp",
+              "cidr_blocks": ["0.0.0.0/0"]
+            }
+          ],
+          "tags": {
+            "owner": "platform",
+            "environment": "prod",
+            "service": "web",
+            "cost_center": "cc-8800"
+          }
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_db_instance.main",
+      "mode": "managed",
+      "type": "aws_db_instance",
+      "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "identifier": "main-prod-db",
+          "engine": "postgres",
+          "instance_class": "db.m6g.large",
+          "publicly_accessible": true,
+          "storage_encrypted": false,
+          "backup_retention_period": 7,
+          "deletion_protection": true,
+          "multi_az": true,
+          "master_password": "super-secret-password",
+          "tags": {
+            "owner": "platform",
+            "environment": "prod",
+            "service": "orders",
+            "cost_center": "cc-8800"
+          }
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_iam_policy.admin",
+      "mode": "managed",
+      "type": "aws_iam_policy",
+      "name": "admin",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "admin-policy",
+          "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"*\"}]}",
+          "tags": {
+            "owner": "platform",
+            "environment": "prod",
+            "service": "identity",
+            "cost_center": "cc-8800"
+          }
+        },
+        "after_unknown": {}
+      }
+    }
+  ]
+}

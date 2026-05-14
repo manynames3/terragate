@@ -1,0 +1,110 @@
+from collections import Counter
+from typing import Any
+
+from app.graph.terraform_review.nodes.common import mark_node
+from app.services.risk import score_risk
+
+
+def report_builder(state: dict[str, Any]) -> dict[str, Any]:
+    findings = state.get("merged_findings", [])
+    risk_score = score_risk(findings, state.get("environment", "dev"))
+    comment = _build_pr_comment(state, findings, risk_score)
+    report = _build_report(state, findings, risk_score, comment)
+    return {
+        **mark_node(state, "report_builder"),
+        "risk_score": risk_score,
+        "pr_comment_draft": comment,
+        "report_markdown": report,
+    }
+
+
+def _build_pr_comment(
+    state: dict[str, Any], findings: list[dict[str, Any]], risk_score: dict[str, Any]
+) -> str:
+    counts = Counter(finding.get("severity", "info") for finding in findings)
+    lines = [
+        "## CloudOps AI Review",
+        "",
+        f"Overall risk: {risk_score['risk_level'].title()} ({risk_score['overall_score']}/100)",
+        (
+            f"Findings: {counts.get('critical', 0)} critical, {counts.get('high', 0)} high, "
+            f"{counts.get('medium', 0)} medium, {counts.get('low', 0)} low"
+        ),
+        f"Environment: {state.get('environment', 'dev')}",
+        f"Run ID: {state.get('run_id')}",
+        "",
+        "### Top risks",
+    ]
+    top = findings[:5]
+    if not top:
+        lines.append("No material risks were detected by deterministic policy checks.")
+    for index, finding in enumerate(top, start=1):
+        evidence = finding.get("evidence", [{}])[0]
+        lines.extend(
+            [
+                f"{index}. {finding.get('severity', 'info').title()} - {finding.get('title')}",
+                f"   - Resource: {finding.get('resource_address') or 'n/a'}",
+                f"   - Evidence: {evidence.get('explanation', 'See finding evidence.')}",
+                f"   - Recommendation: {finding.get('recommendation')}",
+                "",
+            ]
+        )
+
+    remediation_lines = []
+    for finding in findings:
+        remediation = finding.get("remediation")
+        if remediation:
+            remediation_lines.extend(
+                [
+                    f"#### {finding.get('title')}",
+                    "```hcl",
+                    remediation["snippet"],
+                    "```",
+                ]
+            )
+        if len(remediation_lines) > 18:
+            break
+
+    if remediation_lines:
+        lines.extend(["### Suggested remediation", *remediation_lines])
+    lines.append("")
+    lines.append("Human approval required before posting.")
+    return "\n".join(lines)
+
+
+def _build_report(
+    state: dict[str, Any],
+    findings: list[dict[str, Any]],
+    risk_score: dict[str, Any],
+    comment: str,
+) -> str:
+    plan_summary = state.get("plan_summary", {})
+    lines = [
+        "# Terraform PR Review Report",
+        "",
+        f"Risk level: **{risk_score['risk_level'].title()}**",
+        f"Risk score: **{risk_score['overall_score']}/100**",
+        "",
+        "## Plan summary",
+        f"- Resources changed: {plan_summary.get('total_resource_changes', 0)}",
+        f"- Creates: {plan_summary.get('creates', 0)}",
+        f"- Updates: {plan_summary.get('updates', 0)}",
+        f"- Deletes: {plan_summary.get('deletes', 0)}",
+        f"- Replacements: {plan_summary.get('replacements', 0)}",
+        "",
+        "## Findings",
+    ]
+    if not findings:
+        lines.append("No findings.")
+    for finding in findings:
+        lines.extend(
+            [
+                f"### {finding.get('severity', 'info').title()} - {finding.get('title')}",
+                finding.get("description", ""),
+                f"Resource: `{finding.get('resource_address')}`",
+                f"Recommendation: {finding.get('recommendation')}",
+                "",
+            ]
+        )
+    lines.extend(["## PR comment draft", "", comment])
+    return "\n".join(lines)
