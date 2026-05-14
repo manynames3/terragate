@@ -31,7 +31,8 @@ def _alembic_config() -> Config:
     api_root = Path(__file__).resolve().parents[2]
     config = Config(str(api_root / "alembic.ini"))
     config.set_main_option("script_location", str(api_root / "alembic"))
-    config.set_main_option("sqlalchemy.url", engine.url.render_as_string(hide_password=False))
+    database_url = engine.url.render_as_string(hide_password=False).replace("%", "%%")
+    config.set_main_option("sqlalchemy.url", database_url)
     return config
 
 
