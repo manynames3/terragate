@@ -1,6 +1,7 @@
 import { KeyRound, Lock, RadioTower, ShieldCheck } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
 import { PolicyPackSettings } from "@/components/policy-pack-settings";
+import { DeploymentStatusPanel } from "@/components/deployment-status-panel";
 
 const settings = [
   {
@@ -37,6 +38,7 @@ export default function SettingsPage() {
         <h1 className="mt-3 text-3xl font-semibold text-white">Settings</h1>
         <p className="mt-2 text-sm text-slate-400">Production integrations are cleanly isolated behind environment variables and adapters.</p>
       </div>
+      <DeploymentStatusPanel />
       <div className="grid gap-4 md:grid-cols-2">
         {settings.map((item) => {
           const Icon = item.icon;

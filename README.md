@@ -8,6 +8,7 @@ TerraGate is a production-style Terraform PR risk gate for reviewing infrastruct
 - **What it does:** Turns Terraform plan JSON or sandbox-generated plans into evidence-backed risk findings, remediation guidance, check status, and approval-gated GitHub comments.
 - **Why it is credible:** It uses deterministic policy checks first, redacts artifacts before AI review, persists runs/findings/evidence, has Alembic migrations, tests, CI, Docker Compose, GitHub integration, and Cognito-ready auth.
 - **Live demo:** [https://terragate.hangi87.workers.dev](https://terragate.hangi87.workers.dev)
+- **Example run:** [Critical risky-security review](https://terragate.hangi87.workers.dev/runs/run_8182267f6ba84b629a)
 
 ## About
 

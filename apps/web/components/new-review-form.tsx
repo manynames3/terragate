@@ -6,6 +6,33 @@ import { AlertTriangle, ExternalLink, FileJson, GitPullRequest, Play, UploadClou
 import { createDemoTerraformReview, createTerraformReview, getGitHubPrContext, listPolicyPacks } from "@/lib/api";
 import type { GitHubPRContext, PolicyPack } from "@/types/api";
 import { Button, Card, FieldLabel } from "@/components/ui";
+import { DeploymentStatusPanel } from "@/components/deployment-status-panel";
+
+const sampleReviews = [
+  {
+    sample: "risky-security",
+    title: "Security risk review",
+    description: "Public SSH, public RDS, and wildcard IAM policy findings.",
+    cta: "Launch security review",
+    badge: "Best first demo"
+  },
+  {
+    sample: "destructive-prod",
+    title: "Production blast radius",
+    description: "Stateful replacement risk with rollback and approval checklist.",
+    cta: "Launch prod review",
+    badge: "Operational risk"
+  },
+  {
+    sample: "risky-cost",
+    title: "Cost spike review",
+    description: "Large compute, NAT gateway, cost-center, and policy threshold checks.",
+    cta: "Launch cost review",
+    badge: "Cost control"
+  }
+];
+
+const showSandboxControls = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").includes("localhost");
 
 export function NewReviewForm() {
   const router = useRouter();
@@ -31,6 +58,7 @@ export function NewReviewForm() {
   const [launchingSample, setLaunchingSample] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     listPolicyPacks()
@@ -49,6 +77,7 @@ export function NewReviewForm() {
     setSubmitting(true);
     setError(null);
     setUploadError(null);
+    setStatusMessage("Uploading Terraform plan and creating the review run...");
     const formData = new FormData();
     if (file) formData.append("file", file);
     formData.append("environment", environment);
@@ -72,6 +101,7 @@ export function NewReviewForm() {
       setError(err instanceof Error ? err.message : "Failed to create review.");
     } finally {
       setSubmitting(false);
+      setStatusMessage(null);
     }
   }
 
@@ -95,6 +125,7 @@ export function NewReviewForm() {
   async function launchDemoSample(sample: string) {
     setLaunchingSample(sample);
     setError(null);
+    setStatusMessage("Creating hosted sample review...");
     try {
       const result = await createDemoTerraformReview(sample);
       router.push(`/runs/${result.run_id}`);
@@ -102,208 +133,242 @@ export function NewReviewForm() {
       setError(err instanceof Error ? err.message : "Failed to launch demo sample.");
     } finally {
       setLaunchingSample(null);
+      setStatusMessage(null);
     }
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <Card className="p-6">
-        <div className="mb-6 flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-md border border-[#31445f] bg-[#111d31]">
-            <FileJson className="h-5 w-5 text-[#43c6ac]" />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold text-white">New Terraform PR review</h1>
-            <p className="mt-1 text-sm text-slate-400">Upload a plan JSON file and run the LangGraph review workflow.</p>
-          </div>
+    <div className="space-y-6">
+      <div className="border-b border-[#24324a] pb-6">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">New review</p>
+        <h1 className="mt-3 text-3xl font-semibold text-white">Review Terraform risk</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+          Start with a hosted sample to see the workflow immediately, or upload your own `terraform show -json` plan for a real review.
+        </p>
+      </div>
+
+      {statusMessage ? (
+        <div className="rounded-lg border border-[#43c6ac]/40 bg-[#43c6ac]/10 px-4 py-3 text-sm text-[#baf4e9]" role="status">
+          {statusMessage}
         </div>
+      ) : null}
+      {error ? <div className="rounded-lg border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">{error}</div> : null}
 
-        <form onSubmit={onSubmit} className="space-y-6">
-          <div ref={uploadSectionRef}>
-            <FieldLabel>Terraform plan JSON</FieldLabel>
-            <label className={`mt-2 flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-[#091424] px-6 py-8 text-center transition hover:border-[#43c6ac] ${uploadError ? "border-red-300/70 ring-2 ring-red-400/20" : "border-[#3a506d]"}`}>
-              <UploadCloud className="h-8 w-8 text-[#6ea8fe]" />
-              <span className="mt-3 text-sm font-medium text-white">{file ? file.name : "Drop or choose tfplan.json"}</span>
-              <span className="mt-2 max-w-xl text-xs leading-5 text-slate-400">Generated from terraform show -json. The backend stores raw and redacted artifacts, but only reduced redacted evidence is eligible for AI explanation.</span>
-              <input
-                type="file"
-                accept="application/json,.json"
-                className="sr-only"
-                aria-invalid={Boolean(uploadError)}
-                onChange={(event) => {
-                  setFile(event.target.files?.[0] ?? null);
-                  setUploadError(null);
-                  setError(null);
-                }}
-              />
-            </label>
-            {uploadError ? (
-              <div className="mt-3 rounded-md border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100" role="alert">
-                {uploadError}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
-            <FieldLabel>Plan source</FieldLabel>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setExecutionMode("uploaded_plan");
-                  setUploadError(null);
-                }}
-                className={`rounded-md border px-4 py-3 text-left text-sm ${executionMode === "uploaded_plan" ? "border-[#43c6ac] bg-[#102033] text-white" : "border-[#26364d] bg-[#091424] text-slate-300"}`}
-              >
-                Upload existing plan JSON
-                <span className="mt-1 block text-xs text-slate-500">Default demo path; deterministic parser reads the uploaded artifact.</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setExecutionMode("sandbox_plan");
-                  setUploadError(null);
-                }}
-                className={`rounded-md border px-4 py-3 text-left text-sm ${executionMode === "sandbox_plan" ? "border-[#43c6ac] bg-[#102033] text-white" : "border-[#26364d] bg-[#091424] text-slate-300"}`}
-              >
-                Sandbox Terraform plan
-                <span className="mt-1 block text-xs text-slate-500">Opt-in backend mode; runs only under TERRAFORM_SANDBOX_ROOT.</span>
-              </button>
-            </div>
-            {executionMode === "sandbox_plan" ? (
-              <div className="mt-4 grid gap-3">
-                <input
-                  value={terraformWorkingDir}
-                  onChange={(event) => setTerraformWorkingDir(event.target.value)}
-                  placeholder="relative path under sandbox root, e.g. demo-infra"
-                  className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
-                />
-                <div className="grid gap-3 md:grid-cols-2">
-                  <input
-                    value={terraformWorkspace}
-                    onChange={(event) => setTerraformWorkspace(event.target.value)}
-                    placeholder="workspace, optional"
-                    className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
-                  />
-                  <input
-                    value={terraformVarFile}
-                    onChange={(event) => setTerraformVarFile(event.target.value)}
-                    placeholder="var file, optional"
-                    className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
-                  />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="space-y-6">
+          <Card className="p-6">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#43c6ac]/40 bg-[#43c6ac]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#9aeadc]">
+                  <Play className="h-3.5 w-3.5" />
+                  Fastest path
                 </div>
-                <textarea
-                  value={terraformEnvVarsJson}
-                  onChange={(event) => setTerraformEnvVarsJson(event.target.value)}
-                  placeholder='env vars JSON, e.g. {"TF_VAR_region":"us-east-1"}'
-                  className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500"
-                />
-                <label className="flex items-center gap-2 text-sm text-slate-300">
-                  <input type="checkbox" checked={terraformBackendEnabled} onChange={(event) => setTerraformBackendEnabled(event.target.checked)} />
-                  Enable backend config for sandbox init
-                </label>
-                {terraformBackendEnabled ? (
-                  <textarea
-                    value={terraformBackendConfigJson}
-                    onChange={(event) => setTerraformBackendConfigJson(event.target.value)}
-                    placeholder='backend config JSON, e.g. {"bucket":"tf-state-demo"}'
-                    className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500"
+                <h2 className="mt-4 text-xl font-semibold text-white">Try a hosted sample review</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                  See risk score, graph progress, evidence, remediation, approval gates, and mock GitHub actions without uploading anything sensitive.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3 lg:grid-cols-3">
+              {sampleReviews.map((sample) => (
+                <div key={sample.sample} className="rounded-lg border border-[#26364d] bg-[#091424] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6ea8fe]">{sample.badge}</p>
+                  <h3 className="mt-3 text-base font-semibold text-white">{sample.title}</h3>
+                  <p className="mt-2 min-h-16 text-sm leading-6 text-slate-400">{sample.description}</p>
+                  <Button
+                    type="button"
+                    className="mt-4 w-full"
+                    variant={sample.sample === "risky-security" ? "primary" : "secondary"}
+                    onClick={() => void launchDemoSample(sample.sample)}
+                    disabled={launchingSample !== null || submitting}
+                  >
+                    <Play className="h-4 w-4" />
+                    {launchingSample === sample.sample ? "Creating review..." : sample.cta}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="mb-6 flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-md border border-[#31445f] bg-[#111d31]">
+                <FileJson className="h-5 w-5 text-[#43c6ac]" />
+              </span>
+              <div>
+                <h2 className="text-xl font-semibold text-white">Upload your own plan</h2>
+                <p className="mt-1 text-sm text-slate-400">Use this path when you already have a Terraform plan JSON file.</p>
+              </div>
+            </div>
+
+            <form onSubmit={onSubmit} className="space-y-6">
+              <div ref={uploadSectionRef}>
+                <FieldLabel>Terraform plan JSON</FieldLabel>
+                <label className={`mt-2 flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-[#091424] px-6 py-8 text-center transition hover:border-[#43c6ac] ${uploadError ? "border-red-300/70 ring-2 ring-red-400/20" : "border-[#3a506d]"}`}>
+                  <UploadCloud className="h-8 w-8 text-[#6ea8fe]" />
+                  <span className="mt-3 text-sm font-medium text-white">{file ? file.name : "Choose tfplan.json"}</span>
+                  <span className="mt-2 max-w-xl text-xs leading-5 text-slate-400">
+                    The app parses the plan, redacts sensitive values, and sends only reduced evidence to AI-assisted review nodes.
+                  </span>
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="sr-only"
+                    aria-invalid={Boolean(uploadError)}
+                    onChange={(event) => {
+                      setFile(event.target.files?.[0] ?? null);
+                      setExecutionMode("uploaded_plan");
+                      setUploadError(null);
+                      setError(null);
+                    }}
                   />
+                </label>
+                {uploadError ? (
+                  <div className="mt-3 rounded-md border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100" role="alert">
+                    {uploadError}
+                  </div>
                 ) : null}
               </div>
-            ) : null}
-          </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="space-y-2">
-              <FieldLabel>Environment</FieldLabel>
-              <select value={environment} onChange={(event) => setEnvironment(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
-                <option value="dev">dev</option>
-                <option value="staging">staging</option>
-                <option value="prod">prod</option>
-              </select>
-            </label>
-            <label className="space-y-2">
-              <FieldLabel>Cloud provider</FieldLabel>
-              <select value={cloudProvider} onChange={(event) => setCloudProvider(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
-                <option value="aws">AWS</option>
-                <option value="azure">Azure</option>
-                <option value="gcp">GCP</option>
-                <option value="unknown">Unknown</option>
-              </select>
-            </label>
-            <label className="space-y-2">
-              <FieldLabel>Policy profile</FieldLabel>
-              <select value={policyProfile} onChange={(event) => setPolicyProfile(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
-                {(policyPacks.length ? policyPacks : [{ name: "default" }, { name: "restricted" }, { name: "startup_cost_control" }] as PolicyPack[]).map((pack) => (
-                  <option key={pack.name} value={pack.name}>{pack.name}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+              {showSandboxControls ? (
+                <details className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-100">Advanced: sandbox Terraform plan</summary>
+                  <div className="mt-4 grid gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExecutionMode(executionMode === "sandbox_plan" ? "uploaded_plan" : "sandbox_plan");
+                        setUploadError(null);
+                      }}
+                      className={`rounded-md border px-4 py-3 text-left text-sm ${executionMode === "sandbox_plan" ? "border-[#43c6ac] bg-[#102033] text-white" : "border-[#26364d] bg-[#091424] text-slate-300"}`}
+                    >
+                      {executionMode === "sandbox_plan" ? "Sandbox plan selected" : "Use sandbox plan source"}
+                      <span className="mt-1 block text-xs text-slate-500">Local/dev-only path under TERRAFORM_SANDBOX_ROOT.</span>
+                    </button>
+                    {executionMode === "sandbox_plan" ? (
+                      <>
+                        <input
+                          value={terraformWorkingDir}
+                          onChange={(event) => setTerraformWorkingDir(event.target.value)}
+                          placeholder="relative path under sandbox root, e.g. demo-infra"
+                          className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                        />
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <input
+                            value={terraformWorkspace}
+                            onChange={(event) => setTerraformWorkspace(event.target.value)}
+                            placeholder="workspace, optional"
+                            className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                          />
+                          <input
+                            value={terraformVarFile}
+                            onChange={(event) => setTerraformVarFile(event.target.value)}
+                            placeholder="var file, optional"
+                            className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                          />
+                        </div>
+                        <textarea
+                          value={terraformEnvVarsJson}
+                          onChange={(event) => setTerraformEnvVarsJson(event.target.value)}
+                          placeholder='env vars JSON, e.g. {"TF_VAR_region":"us-east-1"}'
+                          className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500"
+                        />
+                        <label className="flex items-center gap-2 text-sm text-slate-300">
+                          <input type="checkbox" checked={terraformBackendEnabled} onChange={(event) => setTerraformBackendEnabled(event.target.checked)} />
+                          Enable backend config for sandbox init
+                        </label>
+                        {terraformBackendEnabled ? (
+                          <textarea
+                            value={terraformBackendConfigJson}
+                            onChange={(event) => setTerraformBackendConfigJson(event.target.value)}
+                            placeholder='backend config JSON, e.g. {"bucket":"tf-state-demo"}'
+                            className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500"
+                          />
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
 
-          <div className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
-            <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-100">
-              <GitPullRequest className="h-4 w-4 text-[#6ea8fe]" />
-              Optional GitHub PR context
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="space-y-2">
+                  <FieldLabel>Environment</FieldLabel>
+                  <select value={environment} onChange={(event) => setEnvironment(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
+                    <option value="dev">dev</option>
+                    <option value="staging">staging</option>
+                    <option value="prod">prod</option>
+                  </select>
+                </label>
+                <label className="space-y-2">
+                  <FieldLabel>Cloud provider</FieldLabel>
+                  <select value={cloudProvider} onChange={(event) => setCloudProvider(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
+                    <option value="aws">AWS</option>
+                    <option value="azure">Azure</option>
+                    <option value="gcp">GCP</option>
+                    <option value="unknown">Unknown</option>
+                  </select>
+                </label>
+                <label className="space-y-2">
+                  <FieldLabel>Policy profile</FieldLabel>
+                  <select value={policyProfile} onChange={(event) => setPolicyProfile(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
+                    {(policyPacks.length ? policyPacks : [{ name: "default" }, { name: "restricted" }, { name: "startup_cost_control" }] as PolicyPack[]).map((pack) => (
+                      <option key={pack.name} value={pack.name}>{pack.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
+                <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-100">
+                  <GitPullRequest className="h-4 w-4 text-[#6ea8fe]" />
+                  Optional GitHub PR context
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <input value={repoOwner} onChange={(event) => setRepoOwner(event.target.value)} placeholder="repo owner" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                  <input value={repoName} onChange={(event) => setRepoName(event.target.value)} placeholder="repo name" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                  <input value={pullNumber} onChange={(event) => setPullNumber(event.target.value)} placeholder="pull number" inputMode="numeric" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <Button type="button" variant="secondary" onClick={() => void fetchPrContext()} disabled={fetchingPr}>
+                    <GitPullRequest className="h-4 w-4" /> {fetchingPr ? "Fetching PR..." : "Fetch PR context"}
+                  </Button>
+                  <span className="text-xs text-slate-500">Uses the backend `GITHUB_TOKEN`; falls back to a clear dev placeholder when unset.</span>
+                </div>
+                {prContext ? <GitHubContextPreview context={prContext} /> : null}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="submit" disabled={submitting || launchingSample !== null}>
+                  {submitting ? "Creating review..." : "Run uploaded plan review"}
+                </Button>
+                <span className="text-xs text-slate-500">{file || executionMode === "sandbox_plan" ? "Runs usually complete in a few seconds." : "Choose a plan JSON first."}</span>
+              </div>
+            </form>
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          <Card className="p-5">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-1 h-5 w-5 text-amber-300" />
+              <div>
+                <h2 className="text-base font-semibold text-white">Plan privacy</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Terraform plans can expose secrets and provider-generated values. Public demo samples are safest for a quick trial; uploaded plans are redacted before AI review.
+                </p>
+              </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <input value={repoOwner} onChange={(event) => setRepoOwner(event.target.value)} placeholder="repo owner" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
-              <input value={repoName} onChange={(event) => setRepoName(event.target.value)} placeholder="repo name" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
-              <input value={pullNumber} onChange={(event) => setPullNumber(event.target.value)} placeholder="pull number" inputMode="numeric" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Button type="button" variant="secondary" onClick={() => void fetchPrContext()} disabled={fetchingPr}>
-                <GitPullRequest className="h-4 w-4" /> {fetchingPr ? "Fetching PR..." : "Fetch PR context"}
-              </Button>
-              <span className="text-xs text-slate-500">Uses the backend `GITHUB_TOKEN`; falls back to a clear dev placeholder when unset.</span>
-            </div>
-            {prContext ? <GitHubContextPreview context={prContext} /> : null}
-          </div>
-
-          {error ? <div className="rounded-md border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">{error}</div> : null}
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Running review..." : "Run LangGraph review"}
-            </Button>
-            <span className="text-xs text-slate-500">{file || executionMode === "sandbox_plan" ? "Runs usually complete in a few seconds for sample plans." : "Upload a plan JSON first, or use a hosted sample on the right."}</span>
-          </div>
-        </form>
-      </Card>
-
-      <div className="space-y-4">
-        <Card className="p-5">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-1 h-5 w-5 text-amber-300" />
-            <div>
-              <h2 className="text-base font-semibold text-white">Sensitive data warning</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">Terraform plan JSON can expose provider outputs, generated passwords, access keys, and connection strings. This app redacts suspicious keys before AI review, but raw artifacts should still be treated as sensitive.</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-5">
-          <h2 className="text-base font-semibold text-white">Generate a plan file</h2>
-          <pre className="mt-4 overflow-x-auto rounded-md border border-[#25364d] bg-[#07101d] p-4 text-xs leading-6 text-slate-200">
+          </Card>
+          <Card className="p-5">
+            <h2 className="text-base font-semibold text-white">Generate a plan file</h2>
+            <pre className="mt-4 overflow-x-auto rounded-md border border-[#25364d] bg-[#07101d] p-4 text-xs leading-6 text-slate-200">
 {`terraform plan -out=tfplan.binary
 terraform show -json tfplan.binary > tfplan.json`}
-          </pre>
-        </Card>
-        <Card className="p-5">
-          <h2 className="text-base font-semibold text-white">Sample plans</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">Use files in sample-data/terraform-plans, or launch a hosted-safe sample without uploading anything.</p>
-          <div className="mt-4 grid gap-2">
-            <Button type="button" variant="secondary" onClick={() => void launchDemoSample("risky-security")} disabled={launchingSample !== null}>
-              <Play className="h-4 w-4" /> {launchingSample === "risky-security" ? "Launching..." : "Security risk sample"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => void launchDemoSample("risky-cost")} disabled={launchingSample !== null}>
-              <Play className="h-4 w-4" /> {launchingSample === "risky-cost" ? "Launching..." : "Cost spike sample"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => void launchDemoSample("destructive-prod")} disabled={launchingSample !== null}>
-              <Play className="h-4 w-4" /> {launchingSample === "destructive-prod" ? "Launching..." : "Destructive prod sample"}
-            </Button>
-          </div>
-        </Card>
+            </pre>
+          </Card>
+          <DeploymentStatusPanel />
+        </div>
       </div>
     </div>
   );
