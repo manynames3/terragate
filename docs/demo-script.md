@@ -58,6 +58,7 @@ Click View on a finding. Show:
 - Expected value.
 - Rule ID.
 - Explanation.
+- Linked PR file and redacted patch excerpt when a live GitHub PR context is available.
 
 ## 6. Show Remediation
 

@@ -21,7 +21,7 @@ Browser
 2. API validates the upload and creates a run record.
 3. Raw artifact is stored locally and recorded in `artifacts`.
 4. If repo owner/name/PR number are provided, the API fetches GitHub PR metadata and changed files and stores them as a `github_pr_context` artifact.
-5. LangGraph workflow validates, redacts, normalizes, checks, reviews, merges, remediates, maps compliance, and builds a report.
+5. LangGraph workflow validates, redacts, normalizes, checks, reviews, merges, maps findings to PR file patches, remediates, maps compliance, and builds a report.
 6. Findings, evidence, remediations, report, PR comment draft, risk score, and graph progress are persisted.
 7. UI fetches run detail, findings, report, and stored PR context.
 8. User approves or rejects the PR comment draft.
@@ -41,6 +41,7 @@ Graph nodes:
 - `governance_reviewer`: Explains tagging, region, profile, and naming findings.
 - `merge_findings`: Combines reviewer outputs.
 - `deduplicate_and_rank`: Removes duplicates and sorts by severity.
+- `map_github_pr_context`: Links findings to changed Terraform files and redacted patch excerpts from stored GitHub PR context.
 - `generate_remediations`: Adds Terraform snippets.
 - `compliance_mapper`: Maps findings to CIS/NIST-style references.
 - `report_builder`: Computes risk score and builds the PR comment draft.
@@ -62,8 +63,10 @@ Core tables:
 - `users`: Dev auth placeholder.
 - `runs`: Mode, status, environment, risk score, summary, report, draft, graph progress, repo context.
 - `artifacts`: Raw and redacted plan references plus GitHub PR context JSON.
-- `findings`: Structured finding metadata and routing fields.
+- `findings`: Structured finding metadata, routing fields, and optional PR file path/URL/patch excerpt.
 - `evidence`: JSON path, observed value, expected value, rule id, explanation.
 - `remediations`: Language, snippet, explanation, risk of change.
 - `approvals`: Decision and notes.
 - `github_comments`: Posted or mock-posted comment records.
+
+Schema changes are versioned with Alembic in `apps/api/alembic`. Startup runs `alembic upgrade head`; existing unversioned demo databases are stamped at the initial baseline before newer migrations run.

@@ -42,7 +42,7 @@ Changed file patches can contain sensitive code, secrets, internal paths, and op
 Mitigations:
 
 - PR context is stored as a separate artifact so retention and access controls can be tightened independently.
-- File patches are truncated before persistence.
+- File patches are redacted for sensitive assignments and truncated before persistence.
 - PR context is used as review metadata and displayed to the operator; Terraform findings still come from parsed plan JSON and deterministic policy checks.
 - Missing credentials return a dev placeholder rather than encouraging users to paste tokens into the UI.
 

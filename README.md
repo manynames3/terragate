@@ -21,7 +21,7 @@ This project demonstrates:
 
 ```text
 apps/web       Next.js dashboard, upload flow, findings table, approval center
-apps/api       FastAPI backend, SQLAlchemy persistence, LangGraph workflow
+apps/api       FastAPI backend, SQLAlchemy/Alembic persistence, LangGraph workflow
 postgres       Run history, findings, evidence, approvals, GitHub comments
 artifacts      Raw/redacted Terraform plans on local filesystem for dev
 LangSmith      Optional tracing through environment variables
@@ -42,9 +42,11 @@ Screenshots placeholders:
 - Redact keys containing `password`, `secret`, `token`, `api_key`, `access_key`, `private_key`, `credential`, `auth`, and `cert`.
 - Extract plan summary: creates, updates, deletes, replacements, resource types, providers.
 - Run named LangGraph nodes:
-  `ingest_plan`, `validate_and_redact`, `normalize_resource_changes`, `deterministic_policy_checks`, `security_reviewer`, `cost_reviewer`, `reliability_reviewer`, `governance_reviewer`, `merge_findings`, `deduplicate_and_rank`, `generate_remediations`, `compliance_mapper`, `report_builder`, `human_approval_gate`, `github_comment_writer`.
+  `ingest_plan`, `validate_and_redact`, `normalize_resource_changes`, `deterministic_policy_checks`, `security_reviewer`, `cost_reviewer`, `reliability_reviewer`, `governance_reviewer`, `merge_findings`, `deduplicate_and_rank`, `map_github_pr_context`, `generate_remediations`, `compliance_mapper`, `report_builder`, `human_approval_gate`, `github_comment_writer`.
 - Produce structured findings with severity, category, resource, evidence, recommendation, remediation, compliance refs, source, reviewer node, confidence, and human-review flag.
+- Map findings to changed Terraform PR files and redacted patch excerpts when live GitHub context is available.
 - Save runs, artifacts, findings, evidence, remediations, approvals, and GitHub comment records.
+- Manage schema changes with Alembic migrations instead of `create_all()`.
 - Generate a markdown PR comment draft.
 - Refuse GitHub posting until the run is approved.
 - Fetch live GitHub PR metadata and changed files when repo context and `GITHUB_TOKEN` are configured.
@@ -85,7 +87,7 @@ npm install
 npm run dev
 ```
 
-Manual mode defaults to SQLite if `DATABASE_URL` is empty. Docker Compose uses PostgreSQL.
+Manual mode defaults to SQLite if `DATABASE_URL` is empty. Docker Compose uses PostgreSQL. The API runs Alembic migrations on startup; you can also run them manually from `apps/api` with `alembic upgrade head`.
 
 ## Environment Variables
 
@@ -139,6 +141,7 @@ Recommended demo path:
 
 - Full raw plans are never sent to the LLM.
 - Suspicious keys are redacted before AI review.
+- GitHub PR patch snippets are redacted and truncated before persistence.
 - Deterministic findings include concrete JSON-path evidence.
 - LLM reviewers are instructed not to invent findings and only operate on reduced evidence summaries.
 - GitHub posting is impossible unless `approval_status == approved`.
@@ -163,7 +166,7 @@ When `repo_owner`, `repo_name`, and `pull_number` are supplied, the backend atte
 - Changed files, additions/deletions, and truncated patches.
 - Terraform-specific files (`.tf`, `.tfvars`, or paths containing `terraform`).
 
-The PR context is saved as a `github_pr_context` artifact and displayed on the run detail page. The New Review page can also preview PR context before submission. If `GITHUB_TOKEN` is missing, the endpoint returns a structured dev placeholder instead of failing the review.
+The PR context is saved as a redacted `github_pr_context` artifact and displayed on the run detail page. During review, `map_github_pr_context` heuristically links each finding to the changed Terraform file and patch excerpt that best matches its resource address/type. The New Review page can also preview PR context before submission. If `GITHUB_TOKEN` is missing, the endpoint returns a structured dev placeholder instead of failing the review.
 
 ## Roadmap
 

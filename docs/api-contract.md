@@ -84,6 +84,9 @@ Returns structured findings:
   "category": "security",
   "resource_address": "aws_security_group.web",
   "change_actions": ["create"],
+  "pr_file_path": "infra/security-groups.tf",
+  "pr_file_url": "https://github.com/example/infra/blob/abc123/infra/security-groups.tf",
+  "pr_patch": "@@ -1,3 +1,12 @@\n+resource \"aws_security_group\" \"web\" { ... }",
   "evidence": [
     {
       "json_path": "$.resource_changes[0].change.after.ingress[0]",
