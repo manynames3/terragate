@@ -7,7 +7,7 @@ TerraGate is a production-style Terraform PR risk gate for reviewing infrastruct
 - **What it is:** An AI-assisted Terraform PR reviewer for cloud/platform teams.
 - **What it does:** Turns Terraform plan JSON or sandbox-generated plans into evidence-backed risk findings, remediation guidance, check status, and approval-gated GitHub comments.
 - **Why it is credible:** It uses deterministic policy checks first, redacts artifacts before AI review, persists runs/findings/evidence, has Alembic migrations, tests, CI, Docker Compose, GitHub integration, and Cognito-ready auth.
-- **Live demo:** Public demo mode is implemented for a low-cost Cloudflare + AWS deployment path. Add the hosted URL here after deployment.
+- **Live demo:** [https://terragate.hangi87.workers.dev](https://terragate.hangi87.workers.dev)
 
 ## About
 
@@ -37,7 +37,7 @@ The core product philosophy is deterministic first, AI second:
 | Cost | Optional Infracost CLI, deterministic heuristic fallback |
 | Observability | Optional LangSmith tracing, audit log records in the database |
 | Local dev/deploy | Docker Compose, API/web Dockerfiles, GitHub Actions CI |
-| Public demo hosting | Cloudflare Pages frontend, AWS API Gateway + Lambda/Mangum backend path |
+| Public demo hosting | Cloudflare Workers/OpenNext frontend, AWS API Gateway + Lambda/Mangum backend path |
 
 ## Engineering Highlights
 
@@ -126,7 +126,7 @@ PUBLIC_DEMO_ALLOW_LIVE_GITHUB_READS=false
 REVIEW_EXECUTION_MODE=inline
 ```
 
-This keeps the full review workflow functional for bundled sample plans and optional capped uploads, while blocking expensive or risky actions such as Terraform sandbox execution and live GitHub writes. See [docs/public-demo.md](docs/public-demo.md) for the Cloudflare Pages + AWS API Gateway/Lambda deployment shape.
+This keeps the full review workflow functional for bundled sample plans and optional capped uploads, while blocking expensive or risky actions such as Terraform sandbox execution and live GitHub writes. See [docs/public-demo.md](docs/public-demo.md) for the Cloudflare Workers + AWS API Gateway/Lambda deployment shape.
 
 ### Option B: Manual Local Run
 

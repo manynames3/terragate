@@ -1,9 +1,11 @@
 import nextVitals from "eslint-config-next/core-web-vitals";
 
 const config = [
+  {
+    ignores: [".next/**", ".open-next/**", "next-env.d.ts"]
+  },
   ...nextVitals,
   {
-    ignores: [".next/**", "next-env.d.ts"],
     rules: {
       "react-hooks/set-state-in-effect": "off"
     }

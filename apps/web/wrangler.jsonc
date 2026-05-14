@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "terragate",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-05-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "NEXT_PUBLIC_API_BASE_URL": "https://hwnk8hnyk1.execute-api.us-east-1.amazonaws.com",
+    "NEXT_PUBLIC_AUTH_PROVIDER": "dev"
+  }
+}

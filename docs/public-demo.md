@@ -2,13 +2,15 @@
 
 ## TL;DR
 
-The cheapest useful hosted demo is Cloudflare Pages for the Next.js UI plus AWS API Gateway and Lambda for the FastAPI API. Public demo mode keeps the product demoable without exposing expensive or risky controls: visitors can launch bundled Terraform reviews, optionally upload small plan JSON files, approve draft comments, and see mock GitHub write behavior.
+The cheapest useful hosted demo is Cloudflare Workers with OpenNext for the Next.js UI plus AWS API Gateway and Lambda for the FastAPI API. Public demo mode keeps the product demoable without exposing expensive or risky controls: visitors can launch bundled Terraform reviews, optionally upload small plan JSON files, approve draft comments, and see mock GitHub write behavior.
+
+Live demo: [https://terragate.hangi87.workers.dev](https://terragate.hangi87.workers.dev)
 
 ## Target Shape
 
 ```mermaid
 flowchart LR
-  visitor["Visitor"] --> pages["Cloudflare Pages\nNext.js UI"]
+  visitor["Visitor"] --> pages["Cloudflare Workers + OpenNext\nNext.js UI"]
   pages --> gateway["AWS API Gateway\nHTTP API"]
   github["GitHub Webhooks\noptional"] --> gateway
   gateway --> lambda["AWS Lambda\nFastAPI + Mangum"]
@@ -22,7 +24,7 @@ flowchart LR
 
 This deployment maximizes end-user appeal per dollar:
 
-- Cloudflare Pages keeps the dashboard fast and nearly free at idle.
+- Cloudflare Workers with OpenNext keeps the dashboard fast and nearly free at idle while supporting the dynamic Next.js run-detail route.
 - API Gateway and Lambda cost approximately nothing when nobody is using the demo.
 - RDS can be stopped outside demos to keep idle cost very low.
 - SSM Parameter Store is enough for non-rotating demo configuration and avoids Secrets Manager per-secret charges.
@@ -62,12 +64,12 @@ REVIEW_EXECUTION_MODE=inline
 AUTH_MODE=dev
 DATABASE_URL=postgresql+psycopg://...
 ARTIFACT_STORAGE_DIR=/tmp/artifacts
-CORS_ORIGINS=https://your-cloudflare-pages-domain.pages.dev
+CORS_ORIGINS=https://your-cloudflare-workers-subdomain.workers.dev
 ```
 
 `REVIEW_EXECUTION_MODE=inline` is intentional for the cheapest public demo. Lambda background tasks are not a durable queue, and a separate always-on worker would defeat the idle-cost goal. A production SaaS version should replace this with SQS, Step Functions, Celery, or Temporal.
 
-## Cloudflare Pages UI
+## Cloudflare Workers UI
 
 The frontend is a client-fetching Next.js app and can point at the Lambda API with:
 
@@ -76,7 +78,16 @@ NEXT_PUBLIC_API_BASE_URL=https://your-api-id.execute-api.us-east-1.amazonaws.com
 NEXT_PUBLIC_AUTH_PROVIDER=dev
 ```
 
-Use Cloudflare's current Next.js Pages adapter or OpenNext flow for the deployment. The repo keeps the local/Docker build as standard Next.js `standalone` output so local review remains simple.
+Use Cloudflare's current Next.js SSR path with `@opennextjs/cloudflare` and Wrangler:
+
+```bash
+cd apps/web
+NEXT_PUBLIC_API_BASE_URL=https://your-api-id.execute-api.us-east-1.amazonaws.com \
+NEXT_PUBLIC_AUTH_PROVIDER=dev \
+npm run deploy:cloudflare
+```
+
+The repo keeps the local/Docker build as standard Next.js `standalone` output so local review remains simple, while the Cloudflare deployment converts that build output through OpenNext.
 
 For a public portfolio demo, keep Cognito off unless login is part of the demo. Cognito is still the right next step for private org/user permissions.
 

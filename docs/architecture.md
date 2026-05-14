@@ -88,7 +88,7 @@ Manual local mode:
 
 Low-cost public demo mode:
 
-- Cloudflare Pages serves the Next.js dashboard.
+- Cloudflare Workers serves the Next.js dashboard through the OpenNext adapter.
 - AWS API Gateway invokes the FastAPI app through Mangum on Lambda.
 - `REVIEW_EXECUTION_MODE=inline` is used for bundled sample reviews to avoid running an idle worker.
 - `PUBLIC_DEMO_MODE=true` enables upload limits, read-only policy packs, mock GitHub writes, and sandbox disablement.

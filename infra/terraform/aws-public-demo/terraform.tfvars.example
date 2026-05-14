@@ -7,5 +7,5 @@ source_revision = "REPLACE_WITH_GIT_SHA"
 cors_origins = [
   "http://localhost:3000",
   "http://localhost:3010",
-  "https://terragate.pages.dev"
+  "https://terragate.hangi87.workers.dev"
 ]

@@ -19,7 +19,7 @@ Add `PUBLIC_DEMO_MODE` with explicit guardrails:
 - GitHub checks, comments, and patch commits mocked by default after approval.
 - Live GitHub reads disabled by default.
 
-Use Cloudflare Pages for the frontend and API Gateway + Lambda/Mangum for the cheapest hosted API path.
+Use Cloudflare Workers with OpenNext for the frontend and API Gateway + Lambda/Mangum for the cheapest hosted API path. Workers are used instead of static Pages because the dashboard includes a dynamic Next.js run-detail route.
 
 ## Consequences
 
