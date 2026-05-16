@@ -10,6 +10,7 @@ from app.models.entities import (
     RemediationModel,
     ReviewJobModel,
     RunModel,
+    RunbookProgressModel,
     UserModel,
 )
 
@@ -25,5 +26,6 @@ __all__ = [
     "RemediationModel",
     "ReviewJobModel",
     "RunModel",
+    "RunbookProgressModel",
     "UserModel",
 ]

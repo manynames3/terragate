@@ -52,6 +52,7 @@ export function NewReviewForm() {
   const [repoOwner, setRepoOwner] = useState("");
   const [repoName, setRepoName] = useState("");
   const [pullNumber, setPullNumber] = useState("");
+  const [prUrl, setPrUrl] = useState("");
   const [prContext, setPrContext] = useState<GitHubPRContext | null>(null);
   const [fetchingPr, setFetchingPr] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -122,6 +123,18 @@ export function NewReviewForm() {
     }
   }
 
+  function parsePrUrl() {
+    const parsed = parseGitHubPrUrl(prUrl);
+    if (!parsed) {
+      setError("Paste a GitHub pull request URL like https://github.com/acme/infra/pull/42.");
+      return;
+    }
+    setRepoOwner(parsed.owner);
+    setRepoName(parsed.repo);
+    setPullNumber(String(parsed.pullNumber));
+    setError(null);
+  }
+
   async function launchDemoSample(sample: string) {
     setLaunchingSample(sample);
     setError(null);
@@ -143,7 +156,7 @@ export function NewReviewForm() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">New review</p>
         <h1 className="mt-3 text-3xl font-semibold text-white">Review Terraform risk</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-          Start with a hosted sample to see the workflow immediately, or upload your own `terraform show -json` plan for a real review.
+          The production path is PR-native: connect GitHub, let webhooks start reviews, and require approval before comments or patch commits. Uploads and samples stay available for demos.
         </p>
       </div>
 
@@ -156,6 +169,44 @@ export function NewReviewForm() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
         <div className="space-y-6">
+          <Card className="p-6">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#6ea8fe]/40 bg-[#6ea8fe]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#bdd6ff]">
+                  <GitPullRequest className="h-3.5 w-3.5" />
+                  Primary workflow
+                </div>
+                <h2 className="mt-4 text-xl font-semibold text-white">Start from a GitHub PR</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                  Paste a PR URL to fetch changed Terraform files and attach file/patch context to findings. In production, configure the webhook below so PR opens and updates run automatically.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+              <input
+                value={prUrl}
+                onChange={(event) => setPrUrl(event.target.value)}
+                placeholder="https://github.com/org/repo/pull/123"
+                className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+              />
+              <Button type="button" variant="secondary" onClick={parsePrUrl}>
+                Parse PR URL
+              </Button>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <input value={repoOwner} onChange={(event) => setRepoOwner(event.target.value)} placeholder="repo owner" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+              <input value={repoName} onChange={(event) => setRepoName(event.target.value)} placeholder="repo name" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+              <input value={pullNumber} onChange={(event) => setPullNumber(event.target.value)} placeholder="pull number" inputMode="numeric" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button type="button" onClick={() => void fetchPrContext()} disabled={fetchingPr}>
+                <GitPullRequest className="h-4 w-4" /> {fetchingPr ? "Fetching PR..." : "Fetch PR context"}
+              </Button>
+              <span className="text-xs text-slate-500">Webhook endpoint: {webhookUrl()}</span>
+            </div>
+            {prContext ? <GitHubContextPreview context={prContext} /> : null}
+          </Card>
+
           <Card className="p-6">
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
               <div>
@@ -322,7 +373,7 @@ export function NewReviewForm() {
               <div className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
                 <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-100">
                   <GitPullRequest className="h-4 w-4 text-[#6ea8fe]" />
-                  Optional GitHub PR context
+                  GitHub PR context attached to this review
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
                   <input value={repoOwner} onChange={(event) => setRepoOwner(event.target.value)} placeholder="repo owner" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
@@ -335,7 +386,7 @@ export function NewReviewForm() {
                   </Button>
                   <span className="text-xs text-slate-500">Uses the backend `GITHUB_TOKEN`; falls back to a clear dev placeholder when unset.</span>
                 </div>
-                {prContext ? <GitHubContextPreview context={prContext} /> : null}
+                {prContext ? <p className="mt-4 text-xs text-[#9aeadc]">PR context fetched above and will be saved with this review.</p> : null}
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -372,6 +423,25 @@ terraform show -json tfplan.binary > tfplan.json`}
       </div>
     </div>
   );
+}
+
+function parseGitHubPrUrl(value: string): { owner: string; repo: string; pullNumber: number } | null {
+  try {
+    const url = new URL(value.trim());
+    if (url.hostname !== "github.com") return null;
+    const [owner, repo, pullLiteral, pullNumber] = url.pathname.split("/").filter(Boolean);
+    if (!owner || !repo || pullLiteral !== "pull" || !pullNumber) return null;
+    const parsedPull = Number(pullNumber);
+    if (!Number.isFinite(parsedPull)) return null;
+    return { owner, repo, pullNumber: parsedPull };
+  } catch {
+    return null;
+  }
+}
+
+function webhookUrl(): string {
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+  return `${apiBase.replace(/\/$/, "")}/api/v1/github/webhook`;
 }
 
 function GitHubContextPreview({ context }: { context: GitHubPRContext }) {

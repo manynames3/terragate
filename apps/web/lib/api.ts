@@ -10,6 +10,7 @@ import type {
   PolicyPack,
   Report,
   RunDetail,
+  RunbookProgressEntry,
   RunListItem
 } from "@/types/api";
 import { getAuthHeaders } from "@/lib/auth";
@@ -168,4 +169,15 @@ export function commitFixPatch(runId: string, patchId: string): Promise<PatchCom
 
 export function getAuditLog(runId: string): Promise<AuditLogEntry[]> {
   return request<AuditLogEntry[]>(`/api/v1/runs/${runId}/audit-log`);
+}
+
+export function getRunbookProgress(runId: string): Promise<RunbookProgressEntry[]> {
+  return request<RunbookProgressEntry[]>(`/api/v1/runs/${runId}/runbook-progress`);
+}
+
+export function updateRunbookProgress(runId: string, stepId: string, checked: boolean, sectionId?: string): Promise<RunbookProgressEntry> {
+  return request<RunbookProgressEntry>(`/api/v1/runs/${runId}/runbook-progress/${encodeURIComponent(stepId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ checked, section_id: sectionId ?? null })
+  });
 }

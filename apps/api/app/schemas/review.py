@@ -195,6 +195,27 @@ class AuditLogEntry(BaseModel):
     created_at: datetime
 
 
+class ArtifactSummary(BaseModel):
+    id: str
+    type: str
+    sha256: str
+    redacted: bool
+    created_at: datetime
+
+
+class RunbookProgressEntry(BaseModel):
+    step_id: str
+    section_id: str | None = None
+    checked: bool
+    actor_email: str | None = None
+    updated_at: datetime
+
+
+class RunbookProgressUpdate(BaseModel):
+    checked: bool
+    section_id: str | None = None
+
+
 class RunListItem(BaseModel):
     id: str
     mode: str
@@ -237,6 +258,7 @@ class RunDetail(BaseModel):
     github_check: GitHubCheck | None = None
     fix_patch_count: int = 0
     audit_event_count: int = 0
+    artifacts: list[ArtifactSummary] = Field(default_factory=list)
     created_at: datetime
     completed_at: datetime | None = None
     severity_counts: dict[str, int] = Field(default_factory=dict)

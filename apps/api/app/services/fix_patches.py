@@ -15,11 +15,18 @@ def suggested_fix_patches(findings: list[dict[str, Any]]) -> list[dict[str, Any]
             {
                 "finding_id": finding.get("id"),
                 "pr_file_path": path,
-                "summary": f"{finding.get('title')}: {remediation.get('explanation', '')}",
+                "summary": _summary_for(finding, remediation, path),
                 "diff": diff,
             }
         )
     return patches
+
+
+def _summary_for(finding: dict[str, Any], remediation: dict[str, Any], path: str) -> str:
+    severity = str(finding.get("severity") or "risk").upper()
+    resource = finding.get("resource_address") or finding.get("resource_type") or "Terraform resource"
+    explanation = remediation.get("explanation") or "Apply the suggested Terraform remediation."
+    return f"{severity} fix for {resource} in {path}: {explanation}"
 
 
 def _fallback_path(finding: dict[str, Any]) -> str:
@@ -32,6 +39,7 @@ def _diff_for(path: str, finding: dict[str, Any], remediation: dict[str, Any]) -
     title = finding.get("title", "TerraGate suggested fix")
     resource = finding.get("resource_address") or "unknown resource"
     patch_context = _patch_context(finding.get("pr_patch"))
+    evidence = _evidence_comment(finding)
     added = "\n".join(f"+{line}" if line else "+" for line in snippet.splitlines())
     lines = [
         f"diff --git a/{path} b/{path}",
@@ -45,11 +53,28 @@ def _diff_for(path: str, finding: dict[str, Any], remediation: dict[str, Any]) -
         [
             f"+# TerraGate suggested fix: {title}",
             f"+# Resource: {resource}",
+            *evidence,
+            "+# Review and adapt this draft before committing; it is generated from finding evidence.",
             added,
             "",
         ]
     )
     return "\n".join(lines)
+
+
+def _evidence_comment(finding: dict[str, Any]) -> list[str]:
+    evidence = finding.get("evidence") or []
+    if not evidence:
+        return []
+    first = evidence[0]
+    json_path = first.get("json_path") if isinstance(first, dict) else None
+    rule_id = first.get("rule_id") if isinstance(first, dict) else None
+    comments: list[str] = []
+    if rule_id:
+        comments.append(f"+# Rule: {rule_id}")
+    if json_path:
+        comments.append(f"+# Evidence: {json_path}")
+    return comments
 
 
 def _patch_context(patch: str | None) -> list[str]:

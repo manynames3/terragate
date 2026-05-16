@@ -36,10 +36,12 @@ from app.models import (
     RemediationModel,
     ReviewJobModel,
     RunModel,
+    RunbookProgressModel,
     UserModel,
 )
 from app.schemas.review import (
     ApprovalRequest,
+    ArtifactSummary,
     AuthUser,
     AuditLogEntry,
     DemoSamplePlan,
@@ -54,6 +56,8 @@ from app.schemas.review import (
     RiskScore,
     RunDetail,
     RunListItem,
+    RunbookProgressEntry,
+    RunbookProgressUpdate,
     TerraformReviewCreateResponse,
     UploadedTerraformReviewRequest,
 )
@@ -658,6 +662,72 @@ def get_audit_log(
     ]
 
 
+@router.get("/runs/{run_id}/runbook-progress", response_model=list[RunbookProgressEntry])
+def get_runbook_progress(
+    run_id: str,
+    db: Session = Depends(get_db),
+    _user: DevUser = Depends(get_current_user),
+) -> list[RunbookProgressEntry]:
+    _get_run_or_404(db, run_id)
+    entries = db.scalars(
+        select(RunbookProgressModel)
+        .where(RunbookProgressModel.run_id == run_id)
+        .order_by(RunbookProgressModel.updated_at.asc())
+    ).all()
+    return [
+        RunbookProgressEntry(
+            step_id=entry.step_id,
+            section_id=entry.section_id,
+            checked=entry.checked,
+            actor_email=entry.actor_email,
+            updated_at=entry.updated_at,
+        )
+        for entry in entries
+    ]
+
+
+@router.put("/runs/{run_id}/runbook-progress/{step_id}", response_model=RunbookProgressEntry)
+def update_runbook_progress(
+    run_id: str,
+    step_id: str,
+    request: RunbookProgressUpdate,
+    db: Session = Depends(get_db),
+    user: DevUser = Depends(get_current_user),
+) -> RunbookProgressEntry:
+    require_role(user, {"reviewer", "platform-admin"})
+    _get_run_or_404(db, run_id)
+    entry = db.scalar(
+        select(RunbookProgressModel)
+        .where(RunbookProgressModel.run_id == run_id)
+        .where(RunbookProgressModel.step_id == step_id)
+    )
+    if not entry:
+        entry = RunbookProgressModel(run_id=run_id, step_id=step_id)
+    entry.checked = request.checked
+    entry.section_id = request.section_id
+    entry.actor_email = user.email
+    entry.updated_at = datetime.now(timezone.utc)
+    db.add(entry)
+    _record_audit(
+        db,
+        action="runbook.step_checked" if request.checked else "runbook.step_unchecked",
+        run_id=run_id,
+        actor=user,
+        target_type="runbook_step",
+        target_id=step_id,
+        metadata={"section_id": request.section_id, "checked": request.checked},
+    )
+    db.commit()
+    db.refresh(entry)
+    return RunbookProgressEntry(
+        step_id=entry.step_id,
+        section_id=entry.section_id,
+        checked=entry.checked,
+        actor_email=entry.actor_email,
+        updated_at=entry.updated_at,
+    )
+
+
 @router.get("/runs/{run_id}/fix-patches", response_model=list[FixPatch])
 def get_fix_patches(
     run_id: str,
@@ -1199,6 +1269,7 @@ def _get_run_or_404(db: Session, run_id: str, with_findings: bool = False) -> Ru
             selectinload(RunModel.github_checks),
             selectinload(RunModel.fix_patches),
             selectinload(RunModel.audit_logs),
+            selectinload(RunModel.runbook_progress),
         )
     else:
         query = query.options(
@@ -1207,6 +1278,7 @@ def _get_run_or_404(db: Session, run_id: str, with_findings: bool = False) -> Ru
             selectinload(RunModel.github_checks),
             selectinload(RunModel.fix_patches),
             selectinload(RunModel.audit_logs),
+            selectinload(RunModel.runbook_progress),
         )
     run = db.scalar(query)
     if not run:
@@ -1243,6 +1315,16 @@ def _run_detail(run: RunModel) -> RunDetail:
         github_check=_latest_check_schema(run),
         fix_patch_count=len(run.fix_patches or []),
         audit_event_count=len(run.audit_logs or []),
+        artifacts=[
+            ArtifactSummary(
+                id=artifact.id,
+                type=artifact.type,
+                sha256=artifact.sha256,
+                redacted=artifact.redacted,
+                created_at=artifact.created_at,
+            )
+            for artifact in sorted(run.artifacts or [], key=lambda item: item.created_at)
+        ],
     )
 
 

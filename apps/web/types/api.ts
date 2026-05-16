@@ -181,6 +181,7 @@ export type RunDetail = RunListItem & {
   github_check: GitHubCheck | null;
   fix_patch_count: number;
   audit_event_count: number;
+  artifacts: ArtifactSummary[];
 };
 
 export type ReviewJob = {
@@ -225,6 +226,22 @@ export type AuditLogEntry = {
   target_id: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
+};
+
+export type ArtifactSummary = {
+  id: string;
+  type: string;
+  sha256: string;
+  redacted: boolean;
+  created_at: string;
+};
+
+export type RunbookProgressEntry = {
+  step_id: string;
+  section_id: string | null;
+  checked: boolean;
+  actor_email: string | null;
+  updated_at: string;
 };
 
 export type PolicyPack = {

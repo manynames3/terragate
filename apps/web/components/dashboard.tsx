@@ -123,7 +123,7 @@ export function Dashboard() {
               <h2 className="text-base font-semibold text-white">Public demo path</h2>
             </div>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-              Launch a preloaded review without uploading sensitive Terraform data. Demo mode keeps approvals real but mocks external GitHub writes.
+              Launch a preloaded review without uploading sensitive Terraform data, then open the generated runbook or compliance checklist from the same run.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -133,6 +133,19 @@ export function Dashboard() {
             <Button type="button" variant="secondary" onClick={() => void launchDemo("destructive-prod")} disabled={launchingSample !== null}>
               {launchingSample === "destructive-prod" ? "Launching..." : "Try prod blast radius"}
             </Button>
+            <Button type="button" variant="secondary" onClick={() => void launchDemo("risky-cost")} disabled={launchingSample !== null}>
+              {launchingSample === "risky-cost" ? "Launching..." : "Try cost spike"}
+            </Button>
+            {lastTerraformRun ? (
+              <>
+                <Link href={`/runbooks?run=${lastTerraformRun.id}`}>
+                  <Button type="button" variant="ghost">Open runbook</Button>
+                </Link>
+                <Link href={`/compliance?run=${lastTerraformRun.id}`}>
+                  <Button type="button" variant="ghost">Open compliance</Button>
+                </Link>
+              </>
+            ) : null}
           </div>
         </div>
         {demoError ? <p className="mt-3 text-sm text-red-200">{demoError}</p> : null}

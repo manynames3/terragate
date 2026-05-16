@@ -102,6 +102,23 @@ def test_create_review_requires_approval_before_github_post() -> None:
         assert patches.status_code == 200
         assert patches.json()
         patch_id = patches.json()[0]["id"]
+        assert "Evidence:" in patches.json()[0]["diff"]
+
+        progress_empty = client.get(f"/api/v1/runs/{run_id}/runbook-progress")
+        assert progress_empty.status_code == 200
+        assert progress_empty.json() == []
+
+        progress_update = client.put(
+            f"/api/v1/runs/{run_id}/runbook-progress/backup-1",
+            json={"checked": True, "section_id": "backup"},
+        )
+        assert progress_update.status_code == 200
+        assert progress_update.json()["checked"] is True
+        assert progress_update.json()["section_id"] == "backup"
+
+        progress_saved = client.get(f"/api/v1/runs/{run_id}/runbook-progress")
+        assert progress_saved.status_code == 200
+        assert progress_saved.json()[0]["step_id"] == "backup-1"
 
         blocked_patch_commit = client.post(f"/api/v1/runs/{run_id}/fix-patches/{patch_id}/github-commit")
         assert blocked_patch_commit.status_code == 409
@@ -119,6 +136,7 @@ def test_create_review_requires_approval_before_github_post() -> None:
         assert audit.status_code == 200
         assert any(entry["action"] == "approval.approved" for entry in audit.json())
         assert any(entry["action"] == "fix_patch.commit_mocked" for entry in audit.json())
+        assert any(entry["action"] == "runbook.step_checked" for entry in audit.json())
 
 
 def test_pr_context_preview_returns_clear_dev_placeholder_without_token() -> None:

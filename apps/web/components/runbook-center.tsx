@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   UserCheck
 } from "lucide-react";
-import { createDemoTerraformReview, getFindings, getRun, listRuns } from "@/lib/api";
+import { createDemoTerraformReview, getFindings, getRun, getRunbookProgress, listRuns, updateRunbookProgress } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { Finding, RunDetail, RunListItem, Severity } from "@/types/api";
 import { Badge, Button, Card, EmptyState, SeverityBadge } from "@/components/ui";
@@ -70,6 +70,7 @@ export function RunbookCenter() {
   const [loadingRun, setLoadingRun] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
 
   useEffect(() => {
     listRuns()
@@ -91,11 +92,11 @@ export function RunbookCenter() {
     }
     setLoadingRun(true);
     setError(null);
-    Promise.all([getRun(selectedRunId), getFindings(selectedRunId)])
-      .then(([runData, findingData]) => {
+    Promise.all([getRun(selectedRunId), getFindings(selectedRunId), getRunbookProgress(selectedRunId)])
+      .then(([runData, findingData, progressData]) => {
         setRun(runData);
         setFindings(findingData);
-        setCheckedSteps({});
+        setCheckedSteps(Object.fromEntries(progressData.map((entry) => [entry.step_id, entry.checked])));
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoadingRun(false));
@@ -145,6 +146,20 @@ export function RunbookCenter() {
     URL.revokeObjectURL(url);
   }
 
+  async function toggleStep(sectionId: string, stepId: string) {
+    if (!run) return;
+    const nextChecked = !checkedSteps[stepId];
+    setCheckedSteps((current) => ({ ...current, [stepId]: nextChecked }));
+    setProgressMessage(null);
+    try {
+      await updateRunbookProgress(run.id, stepId, nextChecked, sectionId);
+      setProgressMessage(nextChecked ? "Checklist step saved." : "Checklist step reopened.");
+    } catch (err) {
+      setCheckedSteps((current) => ({ ...current, [stepId]: !nextChecked }));
+      setError(err instanceof Error ? err.message : "Failed to save checklist progress.");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 border-b border-[#24324a] pb-6 lg:flex-row lg:items-end">
@@ -166,6 +181,7 @@ export function RunbookCenter() {
       </div>
 
       {error ? <div className="rounded-lg border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">{error}</div> : null}
+      {progressMessage ? <div className="rounded-lg border border-[#43c6ac]/35 bg-[#43c6ac]/10 px-4 py-3 text-sm text-[#baf4e9]">{progressMessage}</div> : null}
 
       <Card className="p-5">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
@@ -210,7 +226,7 @@ export function RunbookCenter() {
       {run ? (
         <>
           <div className="grid gap-4 md:grid-cols-4">
-            <MetricCard label="Checklist steps" value={String(totalSteps)} detail={`${completedSteps} checked locally`} />
+            <MetricCard label="Checklist steps" value={String(totalSteps)} detail={`${completedSteps} saved as complete`} />
             <MetricCard label="Required steps" value={String(runbook.requiredCount)} detail="Must complete before apply" tone="warn" />
             <MetricCard label="Source findings" value={String(runbook.sourceFindingCount)} detail="High-risk or manual-review inputs" />
             <MetricCard label="Stateful changes" value={String(run.blast_radius.stateful_changes?.length ?? 0)} detail={run.blast_radius.summary ?? "No stateful blast radius"} />
@@ -223,7 +239,7 @@ export function RunbookCenter() {
                   key={section.id}
                   section={section}
                   checkedSteps={checkedSteps}
-                  onToggle={(stepId) => setCheckedSteps((current) => ({ ...current, [stepId]: !current[stepId] }))}
+                  onToggle={(stepId) => void toggleStep(section.id, stepId)}
                 />
               ))}
             </div>

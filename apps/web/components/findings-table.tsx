@@ -114,6 +114,17 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
         </div>
 
         <div className="mt-6 grid gap-4">
+          <DetailBlock title="Why this matters">
+            <div className="grid gap-3 text-sm md:grid-cols-2">
+              <ImpactMetric label="Resource" value={finding.resource_address ?? "resource not mapped"} mono />
+              <ImpactMetric label="Terraform action" value={finding.change_actions.join(", ") || "not reported"} />
+              <ImpactMetric label="Changed file" value={finding.pr_file_path ?? "not mapped to a PR file"} mono />
+              <ImpactMetric label="Primary evidence" value={evidence?.json_path ?? "no JSON path"} mono />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              {finding.impact || "This finding is tied to deployable Terraform evidence and should be reviewed before apply."}
+            </p>
+          </DetailBlock>
           <DetailBlock title="Impact" body={finding.impact} />
           <DetailBlock title="Recommendation" body={finding.recommendation} />
           <DetailBlock title="Evidence">
@@ -186,6 +197,15 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
           <DetailBlock title="Review metadata" body={`${finding.source.replaceAll("_", " ")} via ${finding.reviewer_node}. Human review: ${finding.requires_human_review ? "required" : "not required"}.`} />
         </div>
       </aside>
+    </div>
+  );
+}
+
+function ImpactMetric({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="rounded-md border border-[#26364d] bg-[#07101d] p-3">
+      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className={mono ? "mt-1 truncate font-mono text-xs text-slate-100" : "mt-1 truncate text-sm font-medium text-slate-100"}>{value}</p>
     </div>
   );
 }

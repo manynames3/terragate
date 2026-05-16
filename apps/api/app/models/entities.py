@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -81,6 +81,9 @@ class RunModel(Base):
         back_populates="run", cascade="all, delete-orphan"
     )
     audit_logs: Mapped[list[AuditLogModel]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+    runbook_progress: Mapped[list[RunbookProgressModel]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
 
@@ -255,3 +258,17 @@ class AuditLogModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
 
     run: Mapped[RunModel | None] = relationship(back_populates="audit_logs")
+
+
+class RunbookProgressModel(Base):
+    __tablename__ = "runbook_progress"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("rbp"))
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
+    step_id: Mapped[str] = mapped_column(String(255), index=True)
+    section_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    checked: Mapped[bool] = mapped_column(Boolean, default=False)
+    actor_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    run: Mapped[RunModel] = relationship(back_populates="runbook_progress")

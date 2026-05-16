@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, CheckCircle2, DollarSign, ExternalLink, FileDiff, GitPullRequest, History, RefreshCcw, ShieldAlert, XCircle } from "lucide-react";
+import { Activity, CheckCircle2, DollarSign, ExternalLink, FileDiff, GitPullRequest, History, LockKeyhole, RefreshCcw, ShieldAlert, XCircle } from "lucide-react";
 import { approveFixPatch, approveRun, commitFixPatch, getAuditLog, getFindings, getFixPatches, getReport, getRun, postGitHubComment, rejectRun } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { AuditLogEntry, Finding, FixPatch, GitHubCommentResponse, Report, RunDetail } from "@/types/api";
@@ -206,7 +206,13 @@ export function RunDetailClient({ runId }: { runId: string }) {
                 ${Number(run.cost_estimate.monthly_delta ?? 0).toFixed(2)}
                 <span className="ml-2 text-sm font-normal text-slate-400">/ mo</span>
               </p>
-              <p className="mt-2 text-sm text-slate-400">{run.cost_estimate.message ?? "No cost estimate generated yet."}</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <SmallMetric label="Annual" value={`$${Number(run.cost_estimate.annual_delta ?? Number(run.cost_estimate.monthly_delta ?? 0) * 12).toFixed(2)}`} />
+                <SmallMetric label="Threshold" value={`$${Number(run.cost_estimate.threshold ?? 0).toFixed(2)}/mo`} />
+                <SmallMetric label="Source" value={run.cost_estimate.source ?? "heuristic"} />
+              </div>
+              <p className="mt-3 text-sm text-slate-400">{run.cost_estimate.message ?? "No cost estimate generated yet."}</p>
+              {run.cost_estimate.over_threshold ? <p className="mt-2 text-sm font-medium text-amber-100">This cost delta exceeds the selected policy threshold and needs approval.</p> : null}
               <div className="mt-4 space-y-2">
                 {(run.cost_estimate.line_items ?? []).slice(0, 4).map((item) => (
                   <div key={`${item.resource_address}-${item.description}`} className="flex items-center justify-between gap-3 rounded-md border border-[#26364d] bg-[#091424] px-3 py-2 text-xs">
@@ -289,6 +295,8 @@ export function RunDetailClient({ runId }: { runId: string }) {
               ) : null}
             </div>
           </Card>
+
+          <DataHandlingCard run={run} />
 
           <Card className="p-5">
             <h2 className="text-lg font-semibold text-white">Category mix</h2>
@@ -450,5 +458,41 @@ function SmallMetric({ label, value }: { label: string; value: string }) {
       <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p>
       <p className="mt-1 font-semibold text-white">{value}</p>
     </div>
+  );
+}
+
+function DataHandlingCard({ run }: { run: RunDetail }) {
+  const artifacts = run.artifacts ?? [];
+  const rawArtifacts = artifacts.filter((artifact) => !artifact.redacted);
+  const redactedArtifacts = artifacts.filter((artifact) => artifact.redacted);
+  return (
+    <Card className="p-5">
+      <div className="flex items-center gap-2">
+        <LockKeyhole className="h-5 w-5 text-[#43c6ac]" />
+        <h2 className="text-lg font-semibold text-white">Data handling</h2>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-slate-400">
+        Raw Terraform artifacts are stored for audit history. AI-assisted review receives redacted, reduced evidence; GitHub writes stay blocked until approval.
+      </p>
+      <div className="mt-4 grid gap-3">
+        <SmallMetric label="Raw artifacts" value={String(rawArtifacts.length)} />
+        <SmallMetric label="Redacted artifacts" value={String(redactedArtifacts.length)} />
+        <SmallMetric label="GitHub patch context" value={run.github_pr_context ? "redacted + truncated" : "not attached"} />
+        <SmallMetric label="Policy version" value={run.policy_profile} />
+      </div>
+      {artifacts.length ? (
+        <div className="mt-4 space-y-2">
+          {artifacts.slice(0, 5).map((artifact) => (
+            <div key={artifact.id} className="rounded-md border border-[#26364d] bg-[#091424] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-xs text-slate-200">{artifact.type}</span>
+                <Badge tone={artifact.redacted ? "success" : "warn"}>{artifact.redacted ? "redacted" : "raw"}</Badge>
+              </div>
+              <p className="mt-1 truncate font-mono text-xs text-slate-500">sha256:{artifact.sha256}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </Card>
   );
 }
