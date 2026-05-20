@@ -8,6 +8,7 @@ os.environ["GITHUB_TOKEN"] = ""
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import MetaData  # noqa: E402
 
+from app.auth.dev import DevUser, ROLE_PLATFORM_ADMIN, get_current_user  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.db.init_db import init_db  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
@@ -137,6 +138,58 @@ def test_create_review_requires_approval_before_github_post() -> None:
         assert any(entry["action"] == "approval.approved" for entry in audit.json())
         assert any(entry["action"] == "fix_patch.commit_mocked" for entry in audit.json())
         assert any(entry["action"] == "runbook.step_checked" for entry in audit.json())
+
+
+def test_runs_are_scoped_to_authenticated_org() -> None:
+    plan_path = ROOT / "sample-data" / "terraform-plans" / "safe-plan.json"
+    alpha_user = DevUser(
+        id="alpha-admin",
+        email="alpha@example.com",
+        name="Alpha Admin",
+        role=ROLE_PLATFORM_ADMIN,
+        org_id="alpha",
+        groups=[ROLE_PLATFORM_ADMIN],
+        auth_provider="dev",
+    )
+    beta_user = DevUser(
+        id="beta-admin",
+        email="beta@example.com",
+        name="Beta Admin",
+        role=ROLE_PLATFORM_ADMIN,
+        org_id="beta",
+        groups=[ROLE_PLATFORM_ADMIN],
+        auth_provider="dev",
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: alpha_user
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/terraform-reviews/json",
+                json={
+                    "file_name": "safe-plan.json",
+                    "plan_json_text": plan_path.read_text(),
+                    "environment": "dev",
+                    "cloud_provider": "aws",
+                    "policy_profile": "default",
+                },
+            )
+            assert response.status_code == 200, response.text
+            run_id = response.json()["run_id"]
+
+            alpha_run = client.get(f"/api/v1/runs/{run_id}")
+            assert alpha_run.status_code == 200
+
+            app.dependency_overrides[get_current_user] = lambda: beta_user
+            beta_run = client.get(f"/api/v1/runs/{run_id}")
+            beta_runs = client.get("/api/v1/runs")
+            beta_approval = client.post(f"/api/v1/runs/{run_id}/approve", json={"notes": "wrong org"})
+
+        assert beta_run.status_code == 404
+        assert beta_approval.status_code == 404
+        assert run_id not in {item["id"] for item in beta_runs.json()}
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_pr_context_preview_returns_clear_dev_placeholder_without_token() -> None:

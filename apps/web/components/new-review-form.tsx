@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ExternalLink, FileJson, GitPullRequest, Play, UploadCloud } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, FileJson, GitPullRequest, LockKeyhole, Play, ShieldCheck, UploadCloud } from "lucide-react";
 import { createDemoTerraformReview, createTerraformReview, getGitHubPrContext, listPolicyPacks } from "@/lib/api";
 import type { GitHubPRContext, PolicyPack } from "@/types/api";
 import { Button, Card, FieldLabel } from "@/components/ui";
@@ -30,6 +30,21 @@ const sampleReviews = [
     cta: "Launch cost review",
     badge: "Cost control"
   }
+];
+
+const reviewFlowSteps = [
+  "Validate Terraform plan JSON and summarize changed resources.",
+  "Redact secret-like values before reviewer nodes use the artifact.",
+  "Run deterministic security, cost, reliability, governance, and compliance checks.",
+  "Generate evidence-backed findings, remediations, runbook steps, and a PR comment draft.",
+  "Require approval before posting a GitHub comment or committing a suggested patch."
+];
+
+const privateDeploymentChecks = [
+  "Cognito or another real identity provider is required for private team use.",
+  "GitHub writes stay mocked in the hosted demo and become live only when credentials are configured.",
+  "Terraform sandbox execution is disabled here; use a private deployment for repo plan generation.",
+  "Infracost is optional, with heuristic estimates clearly labeled when it is not configured."
 ];
 
 const showSandboxControls = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").includes("localhost");
@@ -153,10 +168,10 @@ export function NewReviewForm() {
   return (
     <div className="space-y-6">
       <div className="border-b border-[#24324a] pb-6">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">New review</p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">Review Terraform risk</h1>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">Terraform PR review</p>
+        <h1 className="mt-3 text-3xl font-semibold text-white">Start a risk review</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-          The production path is PR-native: connect GitHub, let webhooks start reviews, and require approval before comments or patch commits. Uploads and samples stay available for demos.
+          Use a hosted sample for the fastest walkthrough, attach GitHub PR context when available, or upload a Terraform plan JSON file for a real review.
         </p>
       </div>
 
@@ -174,11 +189,11 @@ export function NewReviewForm() {
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-[#6ea8fe]/40 bg-[#6ea8fe]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#bdd6ff]">
                   <GitPullRequest className="h-3.5 w-3.5" />
-                  Primary workflow
+                  Production workflow
                 </div>
                 <h2 className="mt-4 text-xl font-semibold text-white">Start from a GitHub PR</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                  Paste a PR URL to fetch changed Terraform files and attach file/patch context to findings. In production, configure the webhook below so PR opens and updates run automatically.
+                  Paste a PR URL to fetch changed Terraform files and attach file/patch context to findings. In a private deployment, the webhook can start reviews automatically on PR open and synchronize events.
                 </p>
               </div>
             </div>
@@ -294,7 +309,7 @@ export function NewReviewForm() {
                       className={`rounded-md border px-4 py-3 text-left text-sm ${executionMode === "sandbox_plan" ? "border-[#43c6ac] bg-[#102033] text-white" : "border-[#26364d] bg-[#091424] text-slate-300"}`}
                     >
                       {executionMode === "sandbox_plan" ? "Sandbox plan selected" : "Use sandbox plan source"}
-                      <span className="mt-1 block text-xs text-slate-500">Local/dev-only path under TERRAFORM_SANDBOX_ROOT.</span>
+                      <span className="mt-1 block text-xs text-slate-500">Private deployment path under TERRAFORM_SANDBOX_ROOT.</span>
                     </button>
                     {executionMode === "sandbox_plan" ? (
                       <>
@@ -384,7 +399,7 @@ export function NewReviewForm() {
                   <Button type="button" variant="secondary" onClick={() => void fetchPrContext()} disabled={fetchingPr}>
                     <GitPullRequest className="h-4 w-4" /> {fetchingPr ? "Fetching PR..." : "Fetch PR context"}
                   </Button>
-                  <span className="text-xs text-slate-500">Uses the backend `GITHUB_TOKEN`; falls back to a clear dev placeholder when unset.</span>
+                  <span className="text-xs text-slate-500">Uses configured GitHub credentials; otherwise returns a safe placeholder so the demo flow stays usable.</span>
                 </div>
                 {prContext ? <p className="mt-4 text-xs text-[#9aeadc]">PR context fetched above and will be saved with this review.</p> : null}
               </div>
@@ -406,8 +421,40 @@ export function NewReviewForm() {
               <div>
                 <h2 className="text-base font-semibold text-white">Plan privacy</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Terraform plans can expose secrets and provider-generated values. Public demo samples are safest for a quick trial; uploaded plans are redacted before AI review.
+                  Terraform plans can expose secrets, resource names, provider values, and topology. Hosted samples are safest for a quick trial; uploaded plans are redacted before AI review.
                 </p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-5">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-1 h-5 w-5 text-[#43c6ac]" />
+              <div>
+                <h2 className="text-base font-semibold text-white">What happens after submit</h2>
+                <div className="mt-4 space-y-3">
+                  {reviewFlowSteps.map((step) => (
+                    <div key={step} className="flex gap-2 text-sm leading-5 text-slate-400">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#43c6ac]" />
+                      <span>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-5">
+            <div className="flex items-start gap-3">
+              <LockKeyhole className="mt-1 h-5 w-5 text-[#6ea8fe]" />
+              <div>
+                <h2 className="text-base font-semibold text-white">Private deployment checklist</h2>
+                <div className="mt-4 space-y-3">
+                  {privateDeploymentChecks.map((item) => (
+                    <div key={item} className="flex gap-2 text-sm leading-5 text-slate-400">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#6ea8fe]" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </Card>
@@ -462,7 +509,7 @@ function GitHubContextPreview({ context }: { context: GitHubPRContext }) {
         ) : null}
       </div>
       <div className="mt-4 grid gap-3 text-sm sm:grid-cols-4">
-        <Metric label="Source" value={context.mock ? "dev placeholder" : "live GitHub"} />
+        <Metric label="Source" value={context.mock ? "safe placeholder" : "live GitHub"} />
         <Metric label="Files" value={String(context.changed_files_count)} />
         <Metric label="Terraform files" value={String(terraformFiles)} />
         <Metric label="Diff" value={`+${context.additions} / -${context.deletions}`} />

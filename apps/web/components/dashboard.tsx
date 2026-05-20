@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, ClipboardCheck, CloudCog, DollarSign, FileText, Play, ShieldAlert, Siren } from "lucide-react";
+import { ArrowRight, CheckCircle2, ClipboardCheck, CloudCog, DollarSign, FileText, GitPullRequest, History, LockKeyhole, Play, ShieldAlert, Siren } from "lucide-react";
 import { createDemoTerraformReview, listRuns } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { RunListItem } from "@/types/api";
@@ -42,6 +42,48 @@ const modes = [
     status: "Coming soon",
     description: "Waste detection, rightsizing candidates, and accountability workflows.",
     icon: DollarSign
+  }
+];
+
+const activationSteps = [
+  {
+    title: "Launch a sample review",
+    description: "See the full risk workflow without uploading private Terraform data."
+  },
+  {
+    title: "Attach GitHub context",
+    description: "Map findings back to changed Terraform files and PR metadata."
+  },
+  {
+    title: "Approve the draft",
+    description: "Review the generated PR comment before any external write."
+  },
+  {
+    title: "Use private deployment settings",
+    description: "Enable Cognito, GitHub writes, Infracost, and policy packs for a real team."
+  }
+];
+
+const trustControls = [
+  {
+    title: "Deterministic evidence first",
+    description: "Rules parse the Terraform plan and produce JSON-path evidence before AI explains anything.",
+    icon: CheckCircle2
+  },
+  {
+    title: "Approval-gated GitHub writes",
+    description: "Comments and fix commits are drafted first and blocked until a reviewer approves.",
+    icon: GitPullRequest
+  },
+  {
+    title: "Sensitive data guardrails",
+    description: "Plan values and PR patch context are redacted before reviewer nodes use them.",
+    icon: LockKeyhole
+  },
+  {
+    title: "Auditable review history",
+    description: "Runs preserve findings, approvals, check state, policy context, and action history.",
+    icon: History
   }
 ];
 
@@ -87,11 +129,16 @@ export function Dashboard() {
     <div className="space-y-8">
       <div className="flex flex-col justify-between gap-4 border-b border-[#24324a] pb-6 md:flex-row md:items-end">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">Portfolio platform v1</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-normal text-white md:text-4xl">Terraform PR risk gate</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">Terraform PR risk gate</p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-normal text-white md:text-4xl">Catch risky Terraform changes before merge</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-            A production-style workflow for reviewing infrastructure changes with deterministic evidence, AI-assisted remediation, and human approval before external actions.
+            TerraGate reviews Terraform plans and GitHub PR context with deterministic evidence, AI-assisted remediation, runbook-grade checklists, and human approval before external actions.
           </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Badge tone="success">Deterministic checks first</Badge>
+            <Badge tone="info">Approval-gated GitHub actions</Badge>
+            <Badge tone="neutral">AWS + Terraform focused</Badge>
+          </div>
         </div>
         <Link href="/reviews/new">
           <Button>
@@ -99,6 +146,33 @@ export function Dashboard() {
           </Button>
         </Link>
       </div>
+
+      <Card className="p-5">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+          <div>
+            <h2 className="text-base font-semibold text-white">Fastest path to value</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+              A reviewer should be able to understand the product in one run: launch a sample, inspect evidence, approve the draft, and see what would be posted to GitHub.
+            </p>
+          </div>
+          <Link href="/reviews/new">
+            <Button type="button" variant="secondary">
+              Start walkthrough <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {activationSteps.map((step, index) => (
+            <div key={step.title} className="rounded-md border border-[#26364d] bg-[#07101d] p-4">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-[#43c6ac]/40 bg-[#43c6ac]/10 text-xs font-semibold text-[#9aeadc]">
+                {index + 1}
+              </div>
+              <p className="mt-3 text-sm font-semibold text-white">{step.title}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-400">{step.description}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-5">
@@ -120,10 +194,10 @@ export function Dashboard() {
           <div>
             <div className="flex items-center gap-2">
               <Play className="h-4 w-4 text-[#43c6ac]" />
-              <h2 className="text-base font-semibold text-white">Public demo path</h2>
+              <h2 className="text-base font-semibold text-white">Hosted sample reviews</h2>
             </div>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-              Launch a preloaded review without uploading sensitive Terraform data, then open the generated runbook or compliance checklist from the same run.
+              Launch a preloaded review without uploading sensitive Terraform data. Each sample runs the same graph, findings, remediation, approval, and audit workflow used by uploaded plans.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -150,6 +224,27 @@ export function Dashboard() {
         </div>
         {demoError ? <p className="mt-3 text-sm text-red-200">{demoError}</p> : null}
       </Card>
+
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-white">Trust controls</h2>
+          <Badge tone="success">Built into the review flow</Badge>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {trustControls.map((control) => {
+            const Icon = control.icon;
+            return (
+              <div key={control.title} className="rounded-lg border border-[#24324a] bg-[#0d1728]/88 p-5">
+                <span className="flex h-10 w-10 items-center justify-center rounded-md border border-[#31445f] bg-[#111d31]">
+                  <Icon className="h-4 w-4 text-[#43c6ac]" />
+                </span>
+                <h3 className="mt-4 text-sm font-semibold text-white">{control.title}</h3>
+                <p className="mt-2 text-xs leading-5 text-slate-400">{control.description}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <section>
         <div className="mb-4 flex items-center justify-between">
@@ -187,7 +282,7 @@ export function Dashboard() {
             <div className="p-6 text-sm text-red-200">{error}</div>
           ) : runs.length === 0 ? (
             <div className="p-5">
-              <EmptyState title="No runs yet" body="Launch a public demo sample or upload one of the Terraform plan fixtures to populate the command center." />
+              <EmptyState title="No reviews yet" body="Launch a hosted sample or upload a Terraform plan to create the first review history entry." />
             </div>
           ) : (
             <div className="overflow-x-auto">

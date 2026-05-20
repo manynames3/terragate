@@ -21,15 +21,15 @@ const statusItems = [
   },
   {
     label: "Auth",
-    value: authProvider === "cognito" ? "Cognito" : "Public demo mode",
-    detail: authProvider === "cognito" ? "JWT validation enabled" : "Demo platform-admin fallback",
+    value: authProvider === "cognito" ? "Cognito" : "Demo access",
+    detail: authProvider === "cognito" ? "JWT validation enabled" : "No customer login required for samples",
     tone: authProvider === "cognito" ? "success" as const : "info" as const,
     icon: KeyRound
   },
   {
     label: "GitHub writes",
     value: "Approval gated",
-    detail: "Mocked in public demo",
+    detail: "Mocked for anonymous visitors",
     tone: "info" as const,
     icon: GitPullRequest
   },
@@ -54,10 +54,10 @@ export function DeploymentStatusPanel() {
     <Card className="p-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
-          <p className="text-sm font-semibold text-white">Deployment status</p>
-          <p className="mt-1 text-sm leading-6 text-slate-400">This hosted demo is wired to the live Cloudflare and AWS public-demo stack.</p>
+          <p className="text-sm font-semibold text-white">Runtime safeguards</p>
+          <p className="mt-1 text-sm leading-6 text-slate-400">This hosted environment runs the live review workflow while blocking anonymous users from expensive or external-write actions.</p>
         </div>
-        <Badge tone="info">Public demo</Badge>
+        <Badge tone="info">Hosted demo</Badge>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {statusItems.map((item) => {

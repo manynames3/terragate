@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.dev import DevUser, get_current_user, require_role
@@ -457,10 +457,10 @@ def update_policy_pack(
 @router.get("/runs", response_model=list[RunListItem])
 def list_runs(
     db: Session = Depends(get_db),
-    _user: DevUser = Depends(get_current_user),
+    user: DevUser = Depends(get_current_user),
 ) -> list[RunListItem]:
     runs = db.scalars(
-        select(RunModel)
+        _scope_run_query(select(RunModel), user)
         .options(selectinload(RunModel.findings))
         .order_by(RunModel.created_at.desc())
         .limit(25)
@@ -488,9 +488,9 @@ def list_runs(
 def get_run(
     run_id: str,
     db: Session = Depends(get_db),
-    _user: DevUser = Depends(get_current_user),
+    user: DevUser = Depends(get_current_user),
 ) -> RunDetail:
-    run = _get_run_or_404(db, run_id, with_findings=True)
+    run = _get_run_or_404(db, run_id, with_findings=True, user=user)
     return _run_detail(run)
 
 
@@ -498,9 +498,9 @@ def get_run(
 def get_findings(
     run_id: str,
     db: Session = Depends(get_db),
-    _user: DevUser = Depends(get_current_user),
+    user: DevUser = Depends(get_current_user),
 ) -> list[Finding]:
-    run = _get_run_or_404(db, run_id, with_findings=True)
+    run = _get_run_or_404(db, run_id, with_findings=True, user=user)
     return [_finding_schema(finding) for finding in run.findings]
 
 
@@ -508,9 +508,9 @@ def get_findings(
 def get_report(
     run_id: str,
     db: Session = Depends(get_db),
-    _user: DevUser = Depends(get_current_user),
+    user: DevUser = Depends(get_current_user),
 ) -> ReportResponse:
-    run = _get_run_or_404(db, run_id)
+    run = _get_run_or_404(db, run_id, user=user)
     risk = run.risk_score_detail or {
         "overall_score": run.risk_score,
         "risk_level": run.risk_level,
@@ -534,7 +534,7 @@ def approve_run(
     user: DevUser = Depends(get_current_user),
 ) -> DecisionResponse:
     require_role(user, {"reviewer", "platform-admin"})
-    run = _get_run_or_404(db, run_id)
+    run = _get_run_or_404(db, run_id, user=user)
     run.status = "approved"
     run.approval_status = "approved"
     db.add(ApprovalModel(run_id=run.id, decision="approved", notes=request.notes))
@@ -559,7 +559,7 @@ def reject_run(
     user: DevUser = Depends(get_current_user),
 ) -> DecisionResponse:
     require_role(user, {"reviewer", "platform-admin"})
-    run = _get_run_or_404(db, run_id)
+    run = _get_run_or_404(db, run_id, user=user)
     run.status = "rejected"
     run.approval_status = "rejected"
     db.add(ApprovalModel(run_id=run.id, decision="rejected", notes=request.notes))
@@ -583,7 +583,7 @@ async def post_github_comment(
     user: DevUser = Depends(get_current_user),
 ) -> GitHubCommentResponse:
     require_role(user, {"reviewer", "platform-admin"})
-    run = _get_run_or_404(db, run_id)
+    run = _get_run_or_404(db, run_id, user=user)
     if run.approval_status != "approved":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -639,9 +639,9 @@ async def post_github_comment(
 def get_audit_log(
     run_id: str,
     db: Session = Depends(get_db),
-    _user: DevUser = Depends(get_current_user),
+    user: DevUser = Depends(get_current_user),
 ) -> list[AuditLogEntry]:
-    _get_run_or_404(db, run_id)
+    _get_run_or_404(db, run_id, user=user)
     entries = db.scalars(
         select(AuditLogModel)
         .where(AuditLogModel.run_id == run_id)
@@ -666,9 +666,9 @@ def get_audit_log(
 def get_runbook_progress(
     run_id: str,
     db: Session = Depends(get_db),
-    _user: DevUser = Depends(get_current_user),
+    user: DevUser = Depends(get_current_user),
 ) -> list[RunbookProgressEntry]:
-    _get_run_or_404(db, run_id)
+    _get_run_or_404(db, run_id, user=user)
     entries = db.scalars(
         select(RunbookProgressModel)
         .where(RunbookProgressModel.run_id == run_id)
@@ -695,7 +695,7 @@ def update_runbook_progress(
     user: DevUser = Depends(get_current_user),
 ) -> RunbookProgressEntry:
     require_role(user, {"reviewer", "platform-admin"})
-    _get_run_or_404(db, run_id)
+    _get_run_or_404(db, run_id, user=user)
     entry = db.scalar(
         select(RunbookProgressModel)
         .where(RunbookProgressModel.run_id == run_id)
@@ -732,9 +732,9 @@ def update_runbook_progress(
 def get_fix_patches(
     run_id: str,
     db: Session = Depends(get_db),
-    _user: DevUser = Depends(get_current_user),
+    user: DevUser = Depends(get_current_user),
 ) -> list[FixPatch]:
-    _get_run_or_404(db, run_id)
+    _get_run_or_404(db, run_id, user=user)
     patches = db.scalars(
         select(FixPatchModel)
         .where(FixPatchModel.run_id == run_id)
@@ -751,7 +751,7 @@ def approve_fix_patch(
     user: DevUser = Depends(get_current_user),
 ) -> FixPatch:
     require_role(user, {"reviewer", "platform-admin"})
-    _get_run_or_404(db, run_id)
+    _get_run_or_404(db, run_id, user=user)
     patch = db.scalar(
         select(FixPatchModel)
         .where(FixPatchModel.run_id == run_id)
@@ -783,7 +783,7 @@ def commit_fix_patch_to_github(
     user: DevUser = Depends(get_current_user),
 ) -> PatchCommitResponse:
     require_role(user, {"platform-admin"})
-    run = _get_run_or_404(db, run_id)
+    run = _get_run_or_404(db, run_id, user=user)
     patch = db.scalar(
         select(FixPatchModel)
         .where(FixPatchModel.run_id == run_id)
@@ -862,6 +862,7 @@ async def _create_and_queue_review(
     _ensure_user_record(db, user)
     run = RunModel(
         user_id=user.id if user else None,
+        org_id=user.org_id if user else ("public-demo" if settings.public_demo_mode else None),
         mode="terraform_pr_review",
         status="queued",
         environment=environment,
@@ -1258,8 +1259,33 @@ def _record_github_check(
     )
 
 
-def _get_run_or_404(db: Session, run_id: str, with_findings: bool = False) -> RunModel:
+def _scope_run_query(query: Any, user: DevUser | None) -> Any:
+    if not user:
+        return query
+    settings = get_settings()
+    if settings.public_demo_mode and user.org_id == "dev":
+        return query.where(
+            or_(
+                RunModel.org_id == "dev",
+                RunModel.org_id == "public-demo",
+                RunModel.org_id.is_(None),
+            )
+        )
+    if user.org_id:
+        return query.where(RunModel.org_id == user.org_id)
+    if user.id:
+        return query.where(RunModel.user_id == user.id)
+    return query.where(RunModel.user_id.is_(None))
+
+
+def _get_run_or_404(
+    db: Session,
+    run_id: str,
+    with_findings: bool = False,
+    user: DevUser | None = None,
+) -> RunModel:
     query = select(RunModel).where(RunModel.id == run_id)
+    query = _scope_run_query(query, user)
     if with_findings:
         query = query.options(
             selectinload(RunModel.artifacts),

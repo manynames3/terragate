@@ -33,6 +33,7 @@ class RunModel(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("run"))
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    org_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
     mode: Mapped[str] = mapped_column(String(80), default="terraform_pr_review", index=True)
     status: Mapped[str] = mapped_column(String(40), default="queued", index=True)
     environment: Mapped[str] = mapped_column(String(40), default="dev")

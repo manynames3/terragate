@@ -61,6 +61,7 @@ Architecture docs:
 
 - [Architecture overview and C4-style diagram](docs/architecture.md)
 - [Architecture Decision Records](docs/adrs/README.md)
+- [Product readiness plan](docs/product-readiness.md)
 - [Low-cost public demo deployment](docs/public-demo.md)
 - [API contract](docs/api-contract.md)
 - [Threat model](docs/threat-model.md)
@@ -81,6 +82,7 @@ Architecture docs:
 - Generate a markdown GitHub PR comment draft.
 - Require approval before posting comments or committing suggested fixes.
 - Persist review history, audit log events, and graph progress.
+- Scope run history and run actions to the authenticated user's organization.
 - Run locally without OpenAI or GitHub credentials using deterministic and mock fallbacks.
 - Launch bundled public-demo sample reviews without requiring visitors to upload Terraform plans.
 
