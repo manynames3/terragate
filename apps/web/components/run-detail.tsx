@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, CheckCircle2, DollarSign, ExternalLink, FileDiff, GitPullRequest, History, LockKeyhole, RefreshCcw, ShieldAlert, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, ClipboardCheck, DollarSign, ExternalLink, FileDiff, FileSearch, GitPullRequest, History, LockKeyhole, RefreshCcw, ShieldAlert, XCircle } from "lucide-react";
 import { approveFixPatch, approveRun, commitFixPatch, getAuditLog, getFindings, getFixPatches, getReport, getRun, postGitHubComment, rejectRun } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { AuditLogEntry, Finding, FixPatch, GitHubCommentResponse, Report, RunDetail } from "@/types/api";
@@ -121,8 +121,11 @@ export function RunDetailClient({ runId }: { runId: string }) {
     return <div className="rounded-lg border border-red-400/40 bg-red-500/12 p-6 text-sm text-red-100">{error ?? "Run not found."}</div>;
   }
 
+  const decisionBrief = buildDecisionBrief(run, findings);
+  const topFindings = findings.slice().sort(compareFindingsBySeverity).slice(0, 3);
+
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div className="flex flex-col justify-between gap-4 border-b border-[#24324a] pb-6 xl:flex-row xl:items-end">
         <div>
           <div className="flex flex-wrap items-center gap-3">
@@ -130,13 +133,16 @@ export function RunDetailClient({ runId }: { runId: string }) {
             <Badge tone={run.approval_status === "approved" ? "success" : run.approval_status === "rejected" ? "danger" : "warn"}>{run.approval_status}</Badge>
             <Badge tone="neutral">{run.status.replaceAll("_", " ")}</Badge>
           </div>
-          <h1 className="mt-4 text-3xl font-semibold text-white">{run.id}</h1>
+          <h1 className="mt-4 text-3xl font-semibold text-white">Review decision: {decisionBrief.title}</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{run.summary}</p>
+          <p className="mt-2 font-mono text-xs text-slate-500">{run.id}</p>
         </div>
         <Button variant="secondary" onClick={() => void load()}>
           <RefreshCcw className="h-4 w-4" /> Refresh
         </Button>
       </div>
+
+      <DecisionBrief run={run} report={report} decision={decisionBrief} topFindings={topFindings} />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card className="p-5">
@@ -161,8 +167,8 @@ export function RunDetailClient({ runId }: { runId: string }) {
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="space-y-6">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="min-w-0 space-y-6">
           <Card className="p-5">
             <div className="mb-4 flex items-center gap-2">
               <ShieldAlert className="h-5 w-5 text-[#43c6ac]" />
@@ -251,12 +257,17 @@ export function RunDetailClient({ runId }: { runId: string }) {
           </div>
 
           <section>
-            <h2 className="mb-4 text-lg font-semibold text-white">Findings</h2>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-white">Evidence-backed findings</h2>
+              <p className="mt-1 text-sm text-slate-400">Each row links the reviewer claim to Terraform evidence, changed files, impact, and a concrete fix path.</p>
+            </div>
             <FindingsTable findings={findings} />
           </section>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
+          <GitHubPreviewCard run={run} report={report} actionLoading={actionLoading} onApprove={() => void runAction("approve")} onPost={() => void runAction("post")} />
+
           {run.github_pr_context || run.repo_owner ? (
             <Card className="p-5">
               <div className="flex items-center gap-2">
@@ -334,17 +345,17 @@ export function RunDetailClient({ runId }: { runId: string }) {
         </div>
       </div>
 
-      <Card className="p-5">
+      <Card className="min-w-0 p-5">
         <h2 className="text-lg font-semibold text-white">PR comment draft</h2>
         {report.pr_comment_draft ? (
-          <pre className="mt-4 max-h-[560px] overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-4 text-xs leading-6 text-slate-100">{report.pr_comment_draft}</pre>
+          <pre className="mt-4 max-h-[560px] min-w-0 overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-4 text-xs leading-6 text-slate-100">{report.pr_comment_draft}</pre>
         ) : (
           <EmptyState title="No draft generated" body="The report builder has not produced a PR comment for this run." />
         )}
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="p-5">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+        <Card className="min-w-0 p-5">
           <div className="mb-4 flex items-center gap-2">
             <FileDiff className="h-5 w-5 text-[#43c6ac]" />
             <h2 className="text-lg font-semibold text-white">Suggested fix workflow</h2>
@@ -352,19 +363,19 @@ export function RunDetailClient({ runId }: { runId: string }) {
           {fixPatches.length ? (
             <div className="space-y-4">
               {fixPatches.slice(0, 4).map((patch) => (
-                <div key={patch.id} className="rounded-md border border-[#26364d] bg-[#091424] p-4">
-                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
-                    <div>
+                <div key={patch.id} className="min-w-0 rounded-md border border-[#26364d] bg-[#091424] p-4">
+                  <div className="flex min-w-0 flex-col justify-between gap-3 md:flex-row md:items-start">
+                    <div className="min-w-0">
                       <Badge tone={patch.status === "approved" || patch.status === "committed" ? "success" : "neutral"}>{patch.status}</Badge>
-                      <p className="mt-2 text-sm font-semibold text-white">{patch.summary}</p>
-                      <p className="mt-1 font-mono text-xs text-slate-500">{patch.pr_file_path}</p>
+                      <p className="mt-2 break-words text-sm font-semibold text-white">{patch.summary}</p>
+                      <p className="mt-1 truncate font-mono text-xs text-slate-500">{patch.pr_file_path}</p>
                       {patch.commit_url ? (
                         <a href={patch.commit_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#43c6ac]">
                           Open commit <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       ) : null}
                     </div>
-                    <div className="flex flex-col gap-2 sm:flex-row">
+                    <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
                       <Button variant="secondary" disabled={actionLoading || patch.status === "approved" || patch.status === "committed"} onClick={() => void approvePatch(patch.id)}>
                         <CheckCircle2 className="h-4 w-4" /> Approve patch
                       </Button>
@@ -373,7 +384,7 @@ export function RunDetailClient({ runId }: { runId: string }) {
                       </Button>
                     </div>
                   </div>
-                  <pre className="mt-3 max-h-52 overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-3 text-xs leading-5 text-slate-200">{patch.diff}</pre>
+                  <pre className="mt-3 max-h-52 min-w-0 overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-3 text-xs leading-5 text-slate-200">{patch.diff}</pre>
                 </div>
               ))}
             </div>
@@ -382,7 +393,7 @@ export function RunDetailClient({ runId }: { runId: string }) {
           )}
         </Card>
 
-        <Card className="p-5">
+        <Card className="min-w-0 p-5">
           <div className="mb-4 flex items-center gap-2">
             <History className="h-5 w-5 text-[#6ea8fe]" />
             <h2 className="text-lg font-semibold text-white">Audit log</h2>
@@ -402,6 +413,166 @@ export function RunDetailClient({ runId }: { runId: string }) {
         </Card>
       </div>
     </div>
+  );
+}
+
+type DecisionBriefData = {
+  title: string;
+  summary: string;
+  nextAction: string;
+  tone: "success" | "warn" | "danger";
+};
+
+const severityRank: Record<string, number> = {
+  critical: 5,
+  high: 4,
+  medium: 3,
+  low: 2,
+  info: 1
+};
+
+function buildDecisionBrief(run: RunDetail, findings: Finding[]): DecisionBriefData {
+  const critical = run.severity_counts.critical ?? 0;
+  const high = run.severity_counts.high ?? 0;
+  const criticalRisk = run.risk_level === "critical";
+  const replacements = run.plan_summary.replacements ?? 0;
+  const costOverThreshold = Boolean(run.cost_estimate.over_threshold);
+  const productionStatefulChange = run.environment === "prod" && replacements > 0 && (run.blast_radius.level === "high" || run.blast_radius.level === "critical");
+  const topFinding = findings.slice().sort(compareFindingsBySeverity)[0];
+
+  if (critical > 0 || criticalRisk) {
+    return {
+      title: "Block merge",
+      summary: `Critical infrastructure risk is present${topFinding ? `: ${topFinding.title}` : "."}`,
+      nextAction: "Fix critical findings, rerun the review, then approve the GitHub draft.",
+      tone: "danger"
+    };
+  }
+
+  if (productionStatefulChange) {
+    return {
+      title: "Require production approval",
+      summary: "The plan touches stateful production resources and needs rollback and backup validation before merge.",
+      nextAction: "Confirm the runbook, maintenance window, and rollback plan before approving.",
+      tone: "warn"
+    };
+  }
+
+  if (high > 0 || costOverThreshold) {
+    return {
+      title: "Review before merge",
+      summary: high > 0 ? "High-severity findings need owner review before this PR is safe to merge." : "The estimated monthly cost exceeds the active policy threshold.",
+      nextAction: "Assign the finding owner, resolve or accept the risk, then approve the draft.",
+      tone: "warn"
+    };
+  }
+
+  return {
+    title: "Ready with notes",
+    summary: "No blocking risk was detected by the configured policy profile.",
+    nextAction: "Review the generated note and post it to GitHub when ready.",
+    tone: "success"
+  };
+}
+
+function compareFindingsBySeverity(a: Finding, b: Finding) {
+  return (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0);
+}
+
+function DecisionBrief({ run, report, decision, topFindings }: { run: RunDetail; report: Report; decision: DecisionBriefData; topFindings: Finding[] }) {
+  const changes = run.plan_summary;
+  const monthlyDelta = Number(run.cost_estimate.monthly_delta ?? 0);
+  return (
+    <Card className="p-5">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={decision.tone}>{decision.title}</Badge>
+            <Badge tone={run.github_check?.state === "fail" ? "danger" : run.github_check?.state === "warn" ? "warn" : "neutral"}>
+              GitHub check: {run.github_check?.state ?? "not created"}
+            </Badge>
+          </div>
+          <h2 className="mt-4 text-xl font-semibold text-white">What this means for the reviewer</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-300">{decision.summary}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-400">{report.risk_score.summary}</p>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <DecisionMetric icon={FileSearch} label="Changed resources" value={String(changes.total_resource_changes ?? 0)} detail={`${changes.creates ?? 0} create / ${changes.updates ?? 0} update / ${changes.deletes ?? 0} delete`} />
+            <DecisionMetric icon={AlertTriangle} label="Blast radius" value={`${run.blast_radius.score ?? 0}`} detail={run.blast_radius.summary ?? "No destructive stateful changes detected."} />
+            <DecisionMetric icon={DollarSign} label="Cost delta" value={`$${monthlyDelta.toFixed(2)}/mo`} detail={run.cost_estimate.message ?? "Heuristic estimate"} />
+          </div>
+        </div>
+        <div className="rounded-md border border-[#26364d] bg-[#091424] p-4">
+          <div className="flex items-center gap-2">
+            <ClipboardCheck className="h-4 w-4 text-[#43c6ac]" />
+            <h3 className="text-sm font-semibold text-white">Next action</h3>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{decision.nextAction}</p>
+          <div className="mt-4 space-y-2">
+            {topFindings.length ? (
+              topFindings.map((finding) => (
+                <div key={finding.id} className="rounded-md border border-[#26364d] bg-[#07101d] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-medium text-slate-100">{finding.title}</p>
+                    <SeverityBadge severity={finding.severity} />
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-400">{finding.impact || finding.description}</p>
+                </div>
+              ))
+            ) : (
+              <p className="rounded-md border border-[#26364d] bg-[#07101d] p-3 text-sm text-slate-400">No findings were produced for this run.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function DecisionMetric({ icon: Icon, label, value, detail }: { icon: typeof Activity; label: string; value: string; detail: string }) {
+  return (
+    <div className="rounded-md border border-[#26364d] bg-[#091424] p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+        <Icon className="h-3.5 w-3.5 text-[#6ea8fe]" />
+        {label}
+      </div>
+      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+      <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{detail}</p>
+    </div>
+  );
+}
+
+function GitHubPreviewCard({ run, report, actionLoading, onApprove, onPost }: { run: RunDetail; report: Report; actionLoading: boolean; onApprove: () => void; onPost: () => void }) {
+  const draft = report.pr_comment_draft?.trim();
+  const preview = draft ? draft.split("\n").filter(Boolean).slice(0, 8).join("\n") : "";
+  const approved = run.approval_status === "approved";
+  return (
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <GitPullRequest className="h-5 w-5 text-[#6ea8fe]" />
+          <h2 className="text-lg font-semibold text-white">GitHub preview</h2>
+        </div>
+        <Badge tone={approved ? "success" : "warn"}>{approved ? "Approved" : "Needs approval"}</Badge>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-slate-400">
+        This is the exact reviewer-facing moment: inspect the draft, approve it, then post to GitHub. Anonymous hosted-demo writes stay mocked.
+      </p>
+      {preview ? (
+        <pre className="mt-4 max-h-72 overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-3 text-xs leading-5 text-slate-100">{preview}</pre>
+      ) : (
+        <div className="mt-4">
+          <EmptyState title="No draft generated" body="The report builder has not produced a GitHub comment for this run." />
+        </div>
+      )}
+      <div className="mt-4 grid gap-2">
+        <Button onClick={onApprove} disabled={actionLoading || approved || !draft} className="w-full">
+          <CheckCircle2 className="h-4 w-4" /> Approve draft
+        </Button>
+        <Button variant="secondary" onClick={onPost} disabled={actionLoading || !approved || !draft} className="w-full">
+          <GitPullRequest className="h-4 w-4" /> Post to GitHub
+        </Button>
+      </div>
+    </Card>
   );
 }
 

@@ -39,57 +39,93 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
             <EmptyState title="No findings in this view" body="The selected category has no findings for this run." />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] text-left text-sm">
+          <>
+          <div className="grid gap-3 p-4 md:hidden">
+            {filtered.map((finding) => {
+              const evidence = finding.evidence[0];
+              return (
+                <div key={finding.id} className="min-w-0 rounded-md border border-[#26364d] bg-[#091424] p-4">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <SeverityBadge severity={finding.severity} />
+                    <span className="text-xs capitalize text-slate-400">{finding.category}</span>
+                  </div>
+                  <h3 className="mt-3 min-w-0 text-sm font-semibold text-white">{finding.title}</h3>
+                  <p className="mt-2 min-w-0 text-xs leading-5 text-slate-400">{finding.impact || finding.description}</p>
+                  <div className="mt-3 min-w-0 space-y-2 text-xs">
+                    <p className="min-w-0 truncate font-mono text-slate-200">{finding.resource_address ?? "resource not mapped"}</p>
+                    <p className="min-w-0 truncate font-mono text-slate-500">{evidence?.json_path ?? "no JSON path"}</p>
+                  </div>
+                  <Button variant="secondary" onClick={() => setSelected(finding)} className="mt-4 min-h-9 w-full min-w-0 px-3">
+                    <Eye className="h-4 w-4" /> Review evidence
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[920px] text-left text-sm">
               <thead className="border-b border-[#24324a] bg-[#101b2d] text-xs uppercase tracking-[0.12em] text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Severity</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Resource</th>
-                  <th className="px-4 py-3">PR file</th>
-                  <th className="px-4 py-3">Action</th>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Confidence</th>
-                  <th className="px-4 py-3">Source</th>
+                  <th className="px-4 py-3">Finding</th>
+                  <th className="px-4 py-3">Evidence</th>
+                  <th className="px-4 py-3">Terraform target</th>
                   <th className="px-4 py-3">Reviewer</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((finding) => (
-                  <tr key={finding.id} className="border-b border-[#1d2a3f] last:border-0">
-                    <td className="px-4 py-4"><SeverityBadge severity={finding.severity} /></td>
-                    <td className="px-4 py-4 capitalize text-slate-300">{finding.category}</td>
-                    <td className="max-w-56 truncate px-4 py-4 font-mono text-xs text-slate-300">{finding.resource_address ?? "n/a"}</td>
-                    <td className="max-w-56 truncate px-4 py-4 font-mono text-xs text-slate-400">
-                      {finding.pr_file_path ? (
-                        finding.pr_file_url ? (
-                          <a href={finding.pr_file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#9eeadf] hover:text-white">
-                            {finding.pr_file_path}
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        ) : (
-                          finding.pr_file_path
-                        )
-                      ) : (
-                        "n/a"
-                      )}
-                    </td>
-                    <td className="px-4 py-4 font-mono text-xs text-slate-400">{finding.change_actions.join(", ") || "n/a"}</td>
-                    <td className="px-4 py-4 text-white">{finding.title}</td>
-                    <td className="px-4 py-4 text-slate-300">{Math.round(finding.confidence * 100)}%</td>
-                    <td className="px-4 py-4 text-slate-400">{finding.source.replaceAll("_", " ")}</td>
-                    <td className="px-4 py-4 text-slate-400">{finding.reviewer_node}</td>
-                    <td className="px-4 py-4">
-                      <Button variant="secondary" onClick={() => setSelected(finding)} className="min-h-9 px-3">
-                        <Eye className="h-4 w-4" /> View
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((finding) => {
+                  const evidence = finding.evidence[0];
+                  return (
+                    <tr key={finding.id} className="border-b border-[#1d2a3f] last:border-0">
+                      <td className="px-4 py-4 align-top"><SeverityBadge severity={finding.severity} /></td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="font-medium text-white">{finding.title}</p>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{finding.impact || finding.description}</p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                          <span className="rounded-full border border-[#31445f] px-2 py-1 capitalize text-slate-300">{finding.category}</span>
+                          <span className="rounded-full border border-[#31445f] px-2 py-1 text-slate-300">{Math.round(finding.confidence * 100)}% confidence</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="max-w-72 truncate font-mono text-xs text-slate-200">{evidence?.json_path ?? "no JSON path"}</p>
+                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{evidence?.explanation ?? "Evidence was not attached to this finding."}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="max-w-64 truncate font-mono text-xs text-slate-200">{finding.resource_address ?? "resource not mapped"}</p>
+                        <p className="mt-2 text-xs text-slate-500">{finding.change_actions.join(", ") || "action not reported"}</p>
+                        <div className="mt-2 max-w-64 truncate font-mono text-xs text-slate-400">
+                          {finding.pr_file_path ? (
+                            finding.pr_file_url ? (
+                              <a href={finding.pr_file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#9eeadf] hover:text-white">
+                                {finding.pr_file_path}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              finding.pr_file_path
+                            )
+                          ) : (
+                            "PR file not mapped"
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <p className="text-xs capitalize text-slate-300">{finding.source.replaceAll("_", " ")}</p>
+                        <p className="mt-1 text-xs text-slate-500">{finding.reviewer_node}</p>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <Button variant="secondary" onClick={() => setSelected(finding)} className="min-h-9 px-3">
+                          <Eye className="h-4 w-4" /> Review
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+          </>
         )}
       </Card>
       {selected ? <FindingDrawer finding={selected} onClose={() => setSelected(null)} /> : null}

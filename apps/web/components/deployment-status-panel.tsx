@@ -1,4 +1,4 @@
-import { Cloud, GitPullRequest, KeyRound, Server, ShieldCheck, WalletCards } from "lucide-react";
+import { Cloud, Database, FileSearch, GitPullRequest, KeyRound, Server, ShieldCheck, WalletCards } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -20,6 +20,13 @@ const statusItems = [
     icon: Server
   },
   {
+    label: "Database",
+    value: "Neon / External Postgres",
+    detail: "Terraform no longer recreates RDS",
+    tone: "success" as const,
+    icon: Database
+  },
+  {
     label: "Auth",
     value: authProvider === "cognito" ? "Cognito" : "Demo access",
     detail: authProvider === "cognito" ? "JWT validation enabled" : "No customer login required for samples",
@@ -32,6 +39,13 @@ const statusItems = [
     detail: "Mocked for anonymous visitors",
     tone: "info" as const,
     icon: GitPullRequest
+  },
+  {
+    label: "AI reviewer input",
+    value: "Redacted evidence",
+    detail: "Plan values reduced before summaries",
+    tone: "info" as const,
+    icon: FileSearch
   },
   {
     label: "Terraform sandbox",

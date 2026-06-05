@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, ClipboardCheck, CloudCog, DollarSign, FileText, GitPullRequest, History, LockKeyhole, Play, ShieldAlert, Siren } from "lucide-react";
+import { ArrowRight, CheckCircle2, ClipboardCheck, CloudCog, DollarSign, FileSearch, FileText, GitPullRequest, History, LockKeyhole, Play, ShieldAlert, Siren } from "lucide-react";
 import { createDemoTerraformReview, listRuns } from "@/lib/api";
+import { demoScenarios, primaryDemoScenario, trustSignals } from "@/lib/demo-scenarios";
 import { formatDate } from "@/lib/format";
 import type { RunListItem } from "@/types/api";
 import { Badge, Button, Card, EmptyState, SeverityBadge } from "@/components/ui";
@@ -47,45 +48,24 @@ const modes = [
 
 const activationSteps = [
   {
-    title: "Launch a sample review",
-    description: "See the full risk workflow without uploading private Terraform data."
+    title: "Run the hosted review",
+    description: "Start with a safe Terraform sample that finishes in seconds."
   },
   {
-    title: "Attach GitHub context",
-    description: "Map findings back to changed Terraform files and PR metadata."
+    title: "Read the decision brief",
+    description: "See the recommended merge decision, top findings, and evidence."
   },
   {
-    title: "Approve the draft",
-    description: "Review the generated PR comment before any external write."
+    title: "Preview GitHub output",
+    description: "Inspect the PR comment and approval state before posting."
   },
   {
-    title: "Use private deployment settings",
-    description: "Enable Cognito, GitHub writes, Infracost, and policy packs for a real team."
+    title: "Adopt private safeguards",
+    description: "Turn on real auth, live GitHub writes, Infracost, and policy packs."
   }
 ];
 
-const trustControls = [
-  {
-    title: "Deterministic evidence first",
-    description: "Rules parse the Terraform plan and produce JSON-path evidence before AI explains anything.",
-    icon: CheckCircle2
-  },
-  {
-    title: "Approval-gated GitHub writes",
-    description: "Comments and fix commits are drafted first and blocked until a reviewer approves.",
-    icon: GitPullRequest
-  },
-  {
-    title: "Sensitive data guardrails",
-    description: "Plan values and PR patch context are redacted before reviewer nodes use them.",
-    icon: LockKeyhole
-  },
-  {
-    title: "Auditable review history",
-    description: "Runs preserve findings, approvals, check state, policy context, and action history.",
-    icon: History
-  }
-];
+const trustControlIcons = [FileSearch, GitPullRequest, LockKeyhole, History] as const;
 
 export function Dashboard() {
   const router = useRouter();
@@ -127,24 +107,31 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col justify-between gap-4 border-b border-[#24324a] pb-6 md:flex-row md:items-end">
+      <div className="grid gap-5 border-b border-[#24324a] pb-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">Terraform PR risk gate</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-normal text-white md:text-4xl">Catch risky Terraform changes before merge</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-            TerraGate reviews Terraform plans and GitHub PR context with deterministic evidence, AI-assisted remediation, runbook-grade checklists, and human approval before external actions.
+            TerraGate turns a Terraform plan into a reviewer-ready merge decision: what changed, what can break, why it matters, and what would be posted back to GitHub after approval.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Badge tone="success">Deterministic checks first</Badge>
-            <Badge tone="info">Approval-gated GitHub actions</Badge>
-            <Badge tone="neutral">AWS + Terraform focused</Badge>
+            <Badge tone="success">Evidence-backed findings</Badge>
+            <Badge tone="info">GitHub draft preview</Badge>
+            <Badge tone="neutral">Hosted safe samples</Badge>
+          </div>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button type="button" onClick={() => void launchDemo(primaryDemoScenario.sample)} disabled={launchingSample !== null}>
+              <Play className="h-4 w-4" />
+              {launchingSample === primaryDemoScenario.sample ? "Running demo..." : "Run demo review"}
+            </Button>
+            <Link href="/reviews/new">
+              <Button type="button" variant="secondary">
+                Upload plan <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
-        <Link href="/reviews/new">
-          <Button>
-            New Terraform review <ArrowRight className="h-4 w-4" />
-          </Button>
-        </Link>
+        <LatestDecisionCard run={lastTerraformRun} />
       </div>
 
       <Card className="p-5">
@@ -201,15 +188,6 @@ export function Dashboard() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => void launchDemo("risky-security")} disabled={launchingSample !== null}>
-              {launchingSample === "risky-security" ? "Launching..." : "Try security risk"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => void launchDemo("destructive-prod")} disabled={launchingSample !== null}>
-              {launchingSample === "destructive-prod" ? "Launching..." : "Try prod blast radius"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => void launchDemo("risky-cost")} disabled={launchingSample !== null}>
-              {launchingSample === "risky-cost" ? "Launching..." : "Try cost spike"}
-            </Button>
             {lastTerraformRun ? (
               <>
                 <Link href={`/runbooks?run=${lastTerraformRun.id}`}>
@@ -223,6 +201,32 @@ export function Dashboard() {
           </div>
         </div>
         {demoError ? <p className="mt-3 text-sm text-red-200">{demoError}</p> : null}
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          {demoScenarios.map((scenario) => (
+            <div key={scenario.sample} className="flex flex-col rounded-md border border-[#26364d] bg-[#091424] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <Badge tone={scenario.tone}>{scenario.decision}</Badge>
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{scenario.badge}</span>
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-white">{scenario.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-400">{scenario.description}</p>
+              <div className="mt-4 grid gap-2 text-xs leading-5 text-slate-300">
+                <p><span className="text-slate-500">Expected:</span> {scenario.expected}</p>
+                <p><span className="text-slate-500">Focus:</span> {scenario.focus}</p>
+              </div>
+              <Button
+                type="button"
+                className="mt-5 w-full"
+                variant={scenario.sample === primaryDemoScenario.sample ? "primary" : "secondary"}
+                onClick={() => void launchDemo(scenario.sample)}
+                disabled={launchingSample !== null}
+              >
+                <Play className="h-4 w-4" />
+                {launchingSample === scenario.sample ? "Launching..." : scenario.cta}
+              </Button>
+            </div>
+          ))}
+        </div>
       </Card>
 
       <section>
@@ -231,8 +235,8 @@ export function Dashboard() {
           <Badge tone="success">Built into the review flow</Badge>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {trustControls.map((control) => {
-            const Icon = control.icon;
+          {trustSignals.map((control, index) => {
+            const Icon = trustControlIcons[index];
             return (
               <div key={control.title} className="rounded-lg border border-[#24324a] bg-[#0d1728]/88 p-5">
                 <span className="flex h-10 w-10 items-center justify-center rounded-md border border-[#31445f] bg-[#111d31]">
@@ -320,6 +324,63 @@ export function Dashboard() {
 }
 
 type CommandMode = (typeof modes)[number];
+
+function LatestDecisionCard({ run }: { run: RunListItem | undefined }) {
+  if (!run) {
+    return (
+      <Card className="p-5">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-[#43c6ac]" />
+          <p className="text-sm font-semibold text-white">Demo ready</p>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-slate-400">
+          Run the security sample to see a complete review: merge decision, evidence-backed findings, GitHub comment draft, approval gate, and audit history.
+        </p>
+        <div className="mt-4 rounded-md border border-[#26364d] bg-[#091424] p-3">
+          <p className="text-xs uppercase tracking-[0.12em] text-slate-500">First scenario</p>
+          <p className="mt-1 text-sm font-semibold text-slate-100">{primaryDemoScenario.title}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-400">{primaryDemoScenario.outcome}</p>
+        </div>
+      </Card>
+    );
+  }
+
+  const critical = run.severity_counts.critical ?? 0;
+  const high = run.severity_counts.high ?? 0;
+  const criticalRisk = run.risk_level === "critical";
+  const decision = critical > 0 || criticalRisk ? "Block merge" : high > 0 ? "Review before merge" : "Ready with notes";
+  const tone = critical > 0 || criticalRisk ? "danger" : high > 0 ? "warn" : "success";
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-white">Latest review decision</p>
+          <p className="mt-1 text-xs text-slate-500">{formatDate(run.completed_at)}</p>
+        </div>
+        <Badge tone={tone}>{decision}</Badge>
+      </div>
+      <p className="mt-4 text-sm leading-6 text-slate-300">{run.summary}</p>
+      <div className="mt-4 grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
+        <SmallStat label="Risk" value={`${run.risk_score}`} />
+        <SmallStat label="Critical" value={`${critical}`} />
+        <SmallStat label="High" value={`${high}`} />
+      </div>
+      <Link href={`/runs/${run.id}`} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#43c6ac] hover:text-white">
+        Open latest run <ArrowRight className="h-4 w-4" />
+      </Link>
+    </Card>
+  );
+}
+
+function SmallStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-[#26364d] bg-[#091424] px-3 py-2">
+      <p className="text-[11px] uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-100">{value}</p>
+    </div>
+  );
+}
 
 function CommandModeCard({ mode, lastTerraformRun }: { mode: CommandMode; lastTerraformRun: RunListItem | undefined }) {
   const Icon = mode.icon;

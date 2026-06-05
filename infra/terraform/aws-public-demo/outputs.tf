@@ -12,19 +12,3 @@ output "ecr_repository_url" {
   description = "ECR repository used for the Lambda image."
   value       = aws_ecr_repository.api.repository_url
 }
-
-output "rds_instance_id" {
-  description = "RDS PostgreSQL instance identifier."
-  value       = aws_db_instance.postgres.identifier
-}
-
-output "rds_endpoint" {
-  description = "RDS PostgreSQL endpoint."
-  value       = aws_db_instance.postgres.endpoint
-}
-
-output "database_url" {
-  description = "Database URL stored on the Lambda function."
-  value       = "postgresql+psycopg://${var.db_username}:${urlencode(random_password.database.result)}@${aws_db_instance.postgres.address}:5432/${var.db_name}"
-  sensitive   = true
-}

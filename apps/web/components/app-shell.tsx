@@ -52,9 +52,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="rounded-lg border border-[#26364d] bg-[#0d1728] p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
               <Activity className="h-4 w-4 text-[#6ea8fe]" />
-              Deterministic first
+              Start here
             </div>
-            <p className="mt-2 text-xs leading-5 text-slate-400">Policy checks produce evidence before AI explains, ranks, or drafts a comment.</p>
+            <p className="mt-2 text-xs leading-5 text-slate-400">Run a hosted demo review, read the merge decision, then approve the GitHub draft before any external write.</p>
+            <Link href="/reviews/new" className="mt-3 inline-flex text-xs font-semibold text-[#43c6ac] hover:text-white">Samples and upload</Link>
           </div>
         </div>
       </aside>

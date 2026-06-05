@@ -3,6 +3,7 @@ project_name    = "terragate"
 environment     = "demo"
 git_ref         = "main"
 source_revision = "REPLACE_WITH_GIT_SHA"
+database_url    = "postgresql+psycopg://REPLACE_WITH_USER:REPLACE_WITH_PASSWORD@REPLACE_WITH_HOST/neondb?sslmode=require"
 
 cors_origins = [
   "http://localhost:3000",

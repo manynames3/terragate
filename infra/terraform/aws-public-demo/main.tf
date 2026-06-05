@@ -1,9 +1,3 @@
-data "aws_caller_identity" "current" {}
-
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
   tags = merge(
@@ -15,100 +9,6 @@ locals {
     },
     var.tags
   )
-}
-
-resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  tags = {
-    Name = "${local.name_prefix}-vpc"
-  }
-}
-
-resource "aws_subnet" "private" {
-  count = 2
-
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index + 10)
-  availability_zone = data.aws_availability_zones.available.names[count.index]
-
-  tags = {
-    Name = "${local.name_prefix}-private-${count.index + 1}"
-  }
-}
-
-resource "aws_security_group" "lambda" {
-  name        = "${local.name_prefix}-lambda"
-  description = "TerraGate Lambda egress"
-  vpc_id      = aws_vpc.main.id
-
-  egress {
-    description = "Allow Lambda to reach RDS and AWS service endpoints"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${local.name_prefix}-lambda"
-  }
-}
-
-resource "aws_security_group" "database" {
-  name        = "${local.name_prefix}-postgres"
-  description = "PostgreSQL access from TerraGate Lambda only"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description     = "PostgreSQL from Lambda"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.lambda.id]
-  }
-
-  tags = {
-    Name = "${local.name_prefix}-postgres"
-  }
-}
-
-resource "aws_db_subnet_group" "main" {
-  name       = "${local.name_prefix}-postgres"
-  subnet_ids = aws_subnet.private[*].id
-
-  tags = {
-    Name = "${local.name_prefix}-postgres"
-  }
-}
-
-resource "random_password" "database" {
-  length           = 24
-  special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
-}
-
-resource "aws_db_instance" "postgres" {
-  identifier = "${local.name_prefix}-postgres"
-
-  allocated_storage       = var.db_allocated_storage
-  backup_retention_period = var.db_backup_retention_period
-  db_name                 = var.db_name
-  db_subnet_group_name    = aws_db_subnet_group.main.name
-  deletion_protection     = var.db_deletion_protection
-  engine                  = "postgres"
-  instance_class          = var.db_instance_class
-  password                = random_password.database.result
-  publicly_accessible     = false
-  skip_final_snapshot     = true
-  storage_encrypted       = true
-  storage_type            = "gp3"
-  username                = var.db_username
-  vpc_security_group_ids  = [aws_security_group.database.id]
-
-  apply_immediately = true
 }
 
 resource "aws_ecr_repository" "api" {
@@ -328,11 +228,6 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_vpc" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
-
 resource "aws_lambda_function" "api" {
   function_name = "${local.name_prefix}-api"
   role          = aws_iam_role.lambda.arn
@@ -343,11 +238,6 @@ resource "aws_lambda_function" "api" {
   memory_size   = var.lambda_memory_size
   timeout       = var.lambda_timeout_seconds
 
-  vpc_config {
-    security_group_ids = [aws_security_group.lambda.id]
-    subnet_ids         = aws_subnet.private[*].id
-  }
-
   environment {
     variables = merge(
       {
@@ -355,7 +245,7 @@ resource "aws_lambda_function" "api" {
         ARTIFACT_STORAGE_DIR                = "/tmp/artifacts"
         AUTH_MODE                           = "dev"
         CORS_ORIGINS                        = join(",", var.cors_origins)
-        DATABASE_URL                        = "postgresql+psycopg://${var.db_username}:${urlencode(random_password.database.result)}@${aws_db_instance.postgres.address}:5432/${var.db_name}"
+        DATABASE_URL                        = var.database_url
         LANGSMITH_PROJECT                   = "terragate"
         LANGSMITH_TRACING                   = "false"
         OPENAI_MODEL                        = "gpt-5.4-mini"
@@ -374,8 +264,7 @@ resource "aws_lambda_function" "api" {
 
   depends_on = [
     aws_cloudwatch_log_group.lambda,
-    aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy_attachment.lambda_vpc
+    aws_iam_role_policy_attachment.lambda_basic
   ]
 }
 

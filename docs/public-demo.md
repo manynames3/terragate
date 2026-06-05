@@ -14,7 +14,7 @@ flowchart LR
   pages --> gateway["AWS API Gateway\nHTTP API"]
   github["GitHub Webhooks\noptional"] --> gateway
   gateway --> lambda["AWS Lambda\nFastAPI + Mangum"]
-  lambda --> rds["RDS PostgreSQL t3.micro\nstopped when idle"]
+  lambda --> neon["External PostgreSQL\nNeon Free"]
   lambda --> artifacts["Ephemeral/local artifacts\nor S3 adapter later"]
   lambda --> ssm["SSM Parameter Store"]
   lambda --> cloudwatch["CloudWatch Logs"]
@@ -26,7 +26,7 @@ This deployment maximizes end-user appeal per dollar:
 
 - Cloudflare Workers with OpenNext keeps the dashboard fast and nearly free at idle while supporting the dynamic Next.js run-detail route.
 - API Gateway and Lambda cost approximately nothing when nobody is using the demo.
-- RDS can be stopped outside demos to keep idle cost very low.
+- Neon Free keeps the small demo database cheap at idle without recreating RDS in Terraform.
 - SSM Parameter Store is enough for non-rotating demo configuration and avoids Secrets Manager per-secret charges.
 - The public demo does not need a worker process if reviews run inline against sample plans.
 
@@ -71,12 +71,14 @@ CORS_ORIGINS=https://your-cloudflare-workers-subdomain.workers.dev
 
 ## Cloudflare Workers UI
 
-The frontend is a client-fetching Next.js app and can point at the Lambda API with:
+The frontend is a client-fetching Next.js app and must receive the public API/auth values at build time:
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=https://your-api-id.execute-api.us-east-1.amazonaws.com
 NEXT_PUBLIC_AUTH_PROVIDER=dev
 ```
+
+`apps/web/.env.production` pins the current public demo values so Cloudflare deploys do not accidentally build a browser bundle that falls back to `http://localhost:8000`.
 
 Use Cloudflare's current Next.js SSR path with `@opennextjs/cloudflare` and Wrangler:
 
@@ -91,9 +93,9 @@ The repo keeps the local/Docker build as standard Next.js `standalone` output so
 
 For a public portfolio demo, keep Cognito off unless login is part of the demo. Cognito is still the right next step for private org/user permissions.
 
-## RDS Cost Control
+## Database Cost Control
 
-For demos, RDS PostgreSQL can be stopped when not in use. AWS may auto-start a stopped RDS instance after the allowed stop window, so use an EventBridge schedule or manual stop/start around demos. Avoid RDS Proxy for this low-cost path because its idle cost is higher than the rest of the stack.
+For demos, use a small external PostgreSQL database such as Neon Free and pass its direct connection string as `DATABASE_URL` / Terraform `database_url`. The AWS Terraform stack intentionally does not create RDS, a VPC, or RDS Proxy.
 
 ## What This Does Not Claim
 

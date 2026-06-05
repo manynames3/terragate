@@ -40,46 +40,15 @@ variable "image_tag" {
   default     = "public-demo"
 }
 
-variable "vpc_cidr" {
-  description = "CIDR block for the isolated demo VPC."
+variable "database_url" {
+  description = "External PostgreSQL connection string used by the Lambda API, for example a Neon direct connection string."
   type        = string
-  default     = "10.42.0.0/16"
-}
+  sensitive   = true
 
-variable "db_name" {
-  description = "PostgreSQL database name."
-  type        = string
-  default     = "terragate"
-}
-
-variable "db_username" {
-  description = "PostgreSQL admin username."
-  type        = string
-  default     = "terragate_admin"
-}
-
-variable "db_instance_class" {
-  description = "Small RDS instance class for the demo."
-  type        = string
-  default     = "db.t4g.micro"
-}
-
-variable "db_allocated_storage" {
-  description = "Allocated RDS storage in GiB."
-  type        = number
-  default     = 20
-}
-
-variable "db_backup_retention_period" {
-  description = "RDS backup retention period in days. Keep 0 for the cheapest demo path."
-  type        = number
-  default     = 0
-}
-
-variable "db_deletion_protection" {
-  description = "Enable RDS deletion protection. Disabled by default for disposable demo infra."
-  type        = bool
-  default     = false
+  validation {
+    condition     = startswith(var.database_url, "postgresql://") || startswith(var.database_url, "postgresql+psycopg://")
+    error_message = "database_url must be a PostgreSQL connection string."
+  }
 }
 
 variable "lambda_memory_size" {

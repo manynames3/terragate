@@ -92,7 +92,7 @@ Low-cost public demo mode:
 - AWS API Gateway invokes the FastAPI app through Mangum on Lambda.
 - `REVIEW_EXECUTION_MODE=inline` is used for bundled sample reviews to avoid running an idle worker.
 - `PUBLIC_DEMO_MODE=true` enables upload limits, read-only policy packs, mock GitHub writes, and sandbox disablement.
-- RDS PostgreSQL can be stopped outside demos to keep idle cost low.
+- External PostgreSQL, currently Neon Free, stores demo runs without Terraform recreating RDS.
 - See [public demo deployment](public-demo.md).
 
 Intended production direction:

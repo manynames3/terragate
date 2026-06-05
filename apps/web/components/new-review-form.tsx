@@ -4,33 +4,10 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, ExternalLink, FileJson, GitPullRequest, LockKeyhole, Play, ShieldCheck, UploadCloud } from "lucide-react";
 import { createDemoTerraformReview, createTerraformReview, getGitHubPrContext, listPolicyPacks } from "@/lib/api";
+import { demoScenarios, primaryDemoScenario, trustSignals } from "@/lib/demo-scenarios";
 import type { GitHubPRContext, PolicyPack } from "@/types/api";
-import { Button, Card, FieldLabel } from "@/components/ui";
+import { Badge, Button, Card, FieldLabel } from "@/components/ui";
 import { DeploymentStatusPanel } from "@/components/deployment-status-panel";
-
-const sampleReviews = [
-  {
-    sample: "risky-security",
-    title: "Security risk review",
-    description: "Public SSH, public RDS, and wildcard IAM policy findings.",
-    cta: "Launch security review",
-    badge: "Best first demo"
-  },
-  {
-    sample: "destructive-prod",
-    title: "Production blast radius",
-    description: "Stateful replacement risk with rollback and approval checklist.",
-    cta: "Launch prod review",
-    badge: "Operational risk"
-  },
-  {
-    sample: "risky-cost",
-    title: "Cost spike review",
-    description: "Large compute, NAT gateway, cost-center, and policy threshold checks.",
-    cta: "Launch cost review",
-    badge: "Cost control"
-  }
-];
 
 const reviewFlowSteps = [
   "Validate Terraform plan JSON and summarize changed resources.",
@@ -236,15 +213,22 @@ export function NewReviewForm() {
               </div>
             </div>
             <div className="mt-5 grid gap-3 lg:grid-cols-3">
-              {sampleReviews.map((sample) => (
+              {demoScenarios.map((sample) => (
                 <div key={sample.sample} className="rounded-lg border border-[#26364d] bg-[#091424] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6ea8fe]">{sample.badge}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6ea8fe]">{sample.badge}</p>
+                    <Badge tone={sample.tone}>{sample.decision}</Badge>
+                  </div>
                   <h3 className="mt-3 text-base font-semibold text-white">{sample.title}</h3>
                   <p className="mt-2 min-h-16 text-sm leading-6 text-slate-400">{sample.description}</p>
+                  <div className="mt-3 min-h-20 rounded-md border border-[#26364d] bg-[#07101d] p-3 text-xs leading-5 text-slate-300">
+                    <p><span className="text-slate-500">Expected:</span> {sample.expected}</p>
+                    <p className="mt-1"><span className="text-slate-500">Outcome:</span> {sample.outcome}</p>
+                  </div>
                   <Button
                     type="button"
                     className="mt-4 w-full"
-                    variant={sample.sample === "risky-security" ? "primary" : "secondary"}
+                    variant={sample.sample === primaryDemoScenario.sample ? "primary" : "secondary"}
                     onClick={() => void launchDemoSample(sample.sample)}
                     disabled={launchingSample !== null || submitting}
                   >
@@ -436,6 +420,22 @@ export function NewReviewForm() {
                     <div key={step} className="flex gap-2 text-sm leading-5 text-slate-400">
                       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#43c6ac]" />
                       <span>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-5">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-1 h-5 w-5 text-[#43c6ac]" />
+              <div>
+                <h2 className="text-base font-semibold text-white">Reviewer trust signals</h2>
+                <div className="mt-4 space-y-3">
+                  {trustSignals.map((signal) => (
+                    <div key={signal.title} className="rounded-md border border-[#26364d] bg-[#07101d] p-3">
+                      <p className="text-sm font-semibold text-slate-100">{signal.title}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-400">{signal.description}</p>
                     </div>
                   ))}
                 </div>
