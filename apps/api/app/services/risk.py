@@ -66,7 +66,13 @@ def score_risk(
 
     monthly_delta = _float((cost_estimate or {}).get("monthly_delta"))
     threshold = _float((cost_estimate or {}).get("threshold"), default=500.0)
-    cost_bonus = 24 if monthly_delta > threshold else 8 if monthly_delta > 0 else 0
+    cost_bonus = (
+        24
+        if monthly_delta > threshold and _has_cost_threshold_finding(findings)
+        else 8
+        if monthly_delta > 0
+        else 0
+    )
     if cost_bonus:
         drivers.append(f"Monthly cost delta: ${monthly_delta:,.0f}")
 
@@ -130,6 +136,14 @@ def _is_public_exposure(finding: dict[str, Any]) -> bool:
         ]
     ).lower()
     return "public" in text or "0.0.0.0/0" in text or "::/0" in text
+
+
+def _has_cost_threshold_finding(findings: list[dict[str, Any]]) -> bool:
+    return any(
+        finding.get("category") == "cost"
+        and "cost delta" in str(finding.get("title", "")).lower()
+        for finding in findings
+    )
 
 
 def _float(value: Any, default: float = 0.0) -> float:

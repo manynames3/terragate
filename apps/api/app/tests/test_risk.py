@@ -40,9 +40,15 @@ def test_risk_scoring_separates_security_cost_and_stateful_scenarios() -> None:
         for index in range(5)
     ]
     cost_findings = (
-        [{"severity": "high", "title": "Estimated monthly cost delta exceeds policy threshold"}]
-        + [{"severity": "medium", "title": f"Medium cost signal {index}"} for index in range(8)]
-        + [{"severity": "low", "title": f"Low governance signal {index}"} for index in range(9)]
+        [
+            {
+                "severity": "high",
+                "category": "cost",
+                "title": "Estimated monthly cost delta exceeds policy threshold",
+            }
+        ]
+        + [{"severity": "medium", "category": "cost", "title": f"Medium cost signal {index}"} for index in range(8)]
+        + [{"severity": "low", "category": "governance", "title": f"Low governance signal {index}"} for index in range(9)]
     )
     destructive_findings = (
         [
@@ -69,7 +75,7 @@ def test_risk_scoring_separates_security_cost_and_stateful_scenarios() -> None:
     destructive = score_risk(
         destructive_findings,
         "prod",
-        cost_estimate={"monthly_delta": 240, "threshold": 500},
+        cost_estimate={"monthly_delta": 240, "threshold": 0},
         blast_radius={
             "stateful_changes": [
                 {"resource_address": "aws_db_instance.primary", "severity": "critical"},
