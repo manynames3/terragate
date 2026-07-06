@@ -56,7 +56,20 @@ def test_risk_scoring_separates_security_cost_and_stateful_scenarios() -> None:
             {"severity": "critical", "title": "Production stateful deletion blocked by policy"},
         ]
         + [{"severity": "high", "title": f"High reliability signal {index}"} for index in range(6)]
-        + [{"severity": "medium", "title": f"Medium reliability signal {index}"} for index in range(2)]
+        + [
+            {
+                "severity": "medium",
+                "title": "Resource type outside restricted policy profile",
+                "evidence": [
+                    {
+                        "json_path": "$.resource_changes[1].type",
+                        "observed_value": "aws_efs_file_system",
+                        "expected_value": '["aws_s3_bucket_public_access_block"]',
+                    }
+                ],
+            },
+            {"severity": "medium", "title": "Production RDS appears single-AZ"},
+        ]
         + [{"severity": "low", "title": f"Low governance signal {index}"} for index in range(2)]
     )
 

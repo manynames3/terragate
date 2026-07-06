@@ -128,14 +128,31 @@ def _stateful_changes(
 
 
 def _is_public_exposure(finding: dict[str, Any]) -> bool:
-    text = " ".join(
+    title_and_description = " ".join(
         [
             str(finding.get("title", "")),
             str(finding.get("description", "")),
-            str(finding.get("evidence", "")),
         ]
     ).lower()
-    return "public" in text or "0.0.0.0/0" in text or "::/0" in text
+    explicit_public_signals = (
+        "public ingress",
+        "publicly accessible",
+        "public network access",
+        "public internet",
+        "public access block disabled",
+        "public access block not visible",
+    )
+    if any(signal in title_and_description for signal in explicit_public_signals):
+        return True
+
+    for evidence in finding.get("evidence") or []:
+        observed = str(evidence.get("observed_value", "")).lower()
+        json_path = str(evidence.get("json_path", "")).lower()
+        if "0.0.0.0/0" in observed or "::/0" in observed:
+            return True
+        if "publicly_accessible" in json_path and observed == "true":
+            return True
+    return False
 
 
 def _has_cost_threshold_finding(findings: list[dict[str, Any]]) -> bool:
