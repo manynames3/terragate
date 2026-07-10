@@ -37,6 +37,12 @@ Returns the current authenticated actor:
 }
 ```
 
+## GET /api/v1/runtime-capabilities
+
+Returns non-secret capability state for the active deployment. The UI uses this response instead of hard-coded integration status. It reports whether GitHub writes are live, mocked, or unavailable; whether sandbox execution and Infracost are active; the auth and execution modes; optional AI/tracing state; and any public-demo upload limit. The endpoint never returns tokens, connection strings, private keys, or credential values.
+
+This endpoint follows the same authentication boundary as the rest of `/api/v1`.
+
 ## POST /api/v1/terraform-reviews
 
 Multipart form upload. Requires `reviewer` or `platform-admin`.
