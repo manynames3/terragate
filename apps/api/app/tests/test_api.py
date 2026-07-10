@@ -49,6 +49,21 @@ def test_auth_me_uses_dev_header_identity() -> None:
     }
 
 
+def test_runtime_capabilities_do_not_expose_configuration_values() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/v1/runtime-capabilities")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["auth_provider"] == "dev"
+    assert payload["github_reads"] == "disabled"
+    assert payload["github_writes"] == "disabled"
+    assert payload["cost_estimation"] == "heuristic"
+    assert payload["max_upload_bytes"] is None
+    assert "github_token" not in payload
+    assert "database_url" not in payload
+
+
 def test_review_creation_is_role_gated() -> None:
     with TestClient(app) as client:
         response = client.post(

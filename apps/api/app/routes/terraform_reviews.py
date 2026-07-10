@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth.dev import DevUser, get_current_user, require_role
 from app.config import get_settings
 from app.db.session import SessionLocal, get_db
-from app.graph.terraform_review.graph import stream_terraform_review
 from app.integrations.github import (
     GitHubCheckResult,
     GitHubClient,
@@ -54,6 +53,7 @@ from app.schemas.review import (
     PatchCommitResponse,
     ReportResponse,
     RiskScore,
+    RuntimeCapabilities,
     RunDetail,
     RunListItem,
     RunbookProgressEntry,
@@ -118,6 +118,52 @@ def get_auth_user(user: DevUser = Depends(get_current_user)) -> AuthUser:
         org_id=user.org_id,
         groups=user.groups,
         auth_provider=user.auth_provider,
+    )
+
+
+@router.get("/runtime-capabilities", response_model=RuntimeCapabilities)
+def get_runtime_capabilities(_: DevUser = Depends(get_current_user)) -> RuntimeCapabilities:
+    settings = get_settings()
+    github_configured = bool(
+        settings.github_token
+        or (
+            settings.github_app_id
+            and settings.github_app_installation_id
+            and (settings.github_app_private_key or settings.github_app_private_key_path)
+        )
+    )
+    live_github_reads = github_configured and (
+        not settings.public_demo_mode or settings.public_demo_allow_live_github_reads
+    )
+    if settings.public_demo_mode and settings.public_demo_mock_github_writes:
+        github_writes = "mocked"
+    elif github_configured:
+        github_writes = "live"
+    else:
+        github_writes = "disabled"
+
+    sandbox_enabled = settings.terraform_sandbox_enabled and not (
+        settings.public_demo_mode and settings.public_demo_disable_sandbox
+    )
+    tracing_enabled = bool(settings.langsmith_api_key) and settings.langsmith_tracing.lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    return RuntimeCapabilities(
+        environment=settings.app_env,
+        public_demo=settings.public_demo_mode,
+        auth_provider="cognito" if settings.auth_mode.lower() == "cognito" else "dev",
+        review_execution_mode=settings.review_execution_mode,
+        max_upload_bytes=settings.public_demo_max_upload_bytes if settings.public_demo_mode else None,
+        github_reads="live" if live_github_reads else "disabled",
+        github_writes=github_writes,
+        terraform_sandbox="enabled" if sandbox_enabled else "disabled",
+        terraform_sandbox_driver=settings.terraform_sandbox_driver if sandbox_enabled else None,
+        cost_estimation="infracost" if settings.infracost_api_key else "heuristic",
+        llm_enrichment="enabled" if settings.openai_api_key else "disabled",
+        tracing="enabled" if tracing_enabled else "disabled",
     )
 
 
@@ -1114,6 +1160,8 @@ async def _fetch_and_store_github_context(
 
 def _execute_review_job(run_id: str, initial_state: dict[str, Any]) -> None:
     settings = get_settings()
+    from app.graph.terraform_review.graph import stream_terraform_review
+
     with SessionLocal() as db:
         run = db.scalar(select(RunModel).where(RunModel.id == run_id))
         if not run:

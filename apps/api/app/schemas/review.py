@@ -115,6 +115,21 @@ class AuthUser(BaseModel):
     auth_provider: Literal["dev", "cognito"]
 
 
+class RuntimeCapabilities(BaseModel):
+    environment: str
+    public_demo: bool
+    auth_provider: Literal["dev", "cognito"]
+    review_execution_mode: str
+    max_upload_bytes: int | None = None
+    github_reads: Literal["live", "disabled"]
+    github_writes: Literal["live", "mocked", "disabled"]
+    terraform_sandbox: Literal["enabled", "disabled"]
+    terraform_sandbox_driver: str | None = None
+    cost_estimation: Literal["infracost", "heuristic"]
+    llm_enrichment: Literal["enabled", "disabled"]
+    tracing: Literal["enabled", "disabled"]
+
+
 class TerraformReviewCreateResponse(BaseModel):
     run_id: str
     status: str

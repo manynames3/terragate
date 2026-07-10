@@ -9,6 +9,7 @@ import type {
   PatchCommitResponse,
   PolicyPack,
   Report,
+  RuntimeCapabilities,
   RunDetail,
   RunbookProgressEntry,
   RunListItem
@@ -18,25 +19,60 @@ import { getAuthHeaders } from "@/lib/auth";
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-      ...getAuthHeaders(),
-      ...(init?.headers ?? {})
-    },
-    cache: "no-store"
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+        ...getAuthHeaders(),
+        ...(init?.headers ?? {})
+      },
+      cache: "no-store"
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The request was cancelled before TerraGate received a response.");
+    }
+    throw new Error("TerraGate could not reach the API. Check your connection and try again.");
+  }
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(payload.detail ?? response.statusText);
+    const payload = await response.json().catch(() => null) as { detail?: unknown; message?: unknown } | null;
+    const detail = formatApiError(payload?.detail ?? payload?.message);
+    if (response.status === 401) {
+      throw new Error(detail || "Your session is missing or expired. Sign in again and retry.");
+    }
+    if (response.status === 403) {
+      throw new Error(detail || "Your account does not have permission to perform this action.");
+    }
+    throw new Error(detail || response.statusText || `Request failed with status ${response.status}.`);
   }
   return response.json() as Promise<T>;
 }
 
+function formatApiError(detail: unknown): string | null {
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const message = "msg" in item && typeof item.msg === "string" ? item.msg : null;
+        const location = "loc" in item && Array.isArray(item.loc) ? item.loc.join(".") : null;
+        return message ? `${location ? `${location}: ` : ""}${message}` : null;
+      })
+      .filter(Boolean);
+    return messages.length ? messages.join(" ") : null;
+  }
+  return null;
+}
+
 export function getCurrentUser(): Promise<AuthUser> {
   return request<AuthUser>("/api/v1/auth/me");
+}
+
+export function getRuntimeCapabilities(): Promise<RuntimeCapabilities> {
+  return request<RuntimeCapabilities>("/api/v1/runtime-capabilities");
 }
 
 export function listRuns(): Promise<RunListItem[]> {
@@ -100,10 +136,20 @@ export function listDemoSamplePlans(): Promise<DemoSamplePlan[]> {
   return request<DemoSamplePlan[]>("/api/v1/demo/sample-plans");
 }
 
-export function createDemoTerraformReview(sample: string): Promise<{ run_id: string; status: string }> {
+export function createDemoTerraformReview(
+  sample: string,
+  options?: {
+    environment?: string;
+    cloud_provider?: string;
+    policy_profile?: string;
+    repo_owner?: string;
+    repo_name?: string;
+    pull_number?: number;
+  }
+): Promise<{ run_id: string; status: string }> {
   return request<{ run_id: string; status: string }>("/api/v1/demo/terraform-reviews", {
     method: "POST",
-    body: JSON.stringify({ sample })
+    body: JSON.stringify({ sample, ...(options ?? {}) })
   });
 }
 

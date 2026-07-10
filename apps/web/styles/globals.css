@@ -15,14 +15,22 @@
   --text: #e5edf6;
   --accent: #43c6ac;
   --accent-2: #6ea8fe;
+  --focus: #7de8d2;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  min-width: 320px;
+  background: var(--background);
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
+  min-height: 100vh;
   background:
     linear-gradient(180deg, rgba(14, 28, 48, 0.96), rgba(7, 13, 24, 1) 44%),
     #09111f;
@@ -37,6 +45,30 @@ textarea {
   font: inherit;
 }
 
+button,
+select,
+input[type="checkbox"] {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  color-scheme: dark;
+}
+
 code,
 pre {
   font-family: var(--font-mono);
@@ -44,4 +76,19 @@ pre {
 
 ::selection {
   background: rgba(67, 198, 172, 0.32);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -64,6 +64,21 @@ export type AuthUser = {
   auth_provider: "dev" | "cognito";
 };
 
+export type RuntimeCapabilities = {
+  environment: string;
+  public_demo: boolean;
+  auth_provider: "dev" | "cognito";
+  review_execution_mode: string;
+  max_upload_bytes: number | null;
+  github_reads: "live" | "disabled";
+  github_writes: "live" | "mocked" | "disabled";
+  terraform_sandbox: "enabled" | "disabled";
+  terraform_sandbox_driver: string | null;
+  cost_estimation: "infracost" | "heuristic";
+  llm_enrichment: "enabled" | "disabled";
+  tracing: "enabled" | "disabled";
+};
+
 export type DemoSamplePlan = {
   sample: string;
   filename: string;
@@ -167,6 +182,8 @@ export type RunDetail = RunListItem & {
   terraform_execution: {
     mode?: string;
     enabled?: boolean;
+    sample?: string;
+    source?: string;
     source_working_dir?: string;
     plan_json_path?: string;
     refresh?: boolean;
