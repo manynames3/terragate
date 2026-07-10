@@ -442,14 +442,11 @@ export function presentShowcaseRun(run: RunDetail): RunDetail {
   if (!scenario) return run;
   const cost = scenarioCost(run, scenario);
   const blastRadius = scenarioBlastRadius(run, scenario);
-  const risk = calibratedScenarioRisk(run, scenario, cost, blastRadius);
   return {
     ...run,
     environment: run.environment || scenario.environment,
     cloud_provider: run.cloud_provider || scenario.cloudProvider,
     policy_profile: run.policy_profile || scenario.policyProfile,
-    risk_score: risk.score,
-    risk_level: risk.level,
     summary: run.summary || fallbackSummary(run, scenario),
     github_pr_context: scenarioContext(run, scenario),
     github_check: run.github_check ?? scenarioCheck(run, scenario),
@@ -636,35 +633,6 @@ function scenarioBlastRadius(run: RunDetail, scenario: DemoScenario): RunDetail[
     return run.blast_radius;
   }
   return scenario.fallbackBlast;
-}
-
-function calibratedScenarioRisk(
-  run: RunDetail,
-  scenario: DemoScenario,
-  cost: RunDetail["cost_estimate"],
-  blastRadius: RunDetail["blast_radius"]
-): { score: number; level: string } {
-  if (scenario.sample === "safe" && Object.values(run.severity_counts).every((count) => (count ?? 0) === 0)) {
-    return { score: 4, level: "low" };
-  }
-
-  const counts = run.severity_counts;
-  const severityComponent = Math.min(
-    55,
-    (counts.critical ?? 0) * 18 + (counts.high ?? 0) * 8 + (counts.medium ?? 0) * 3 + (counts.low ?? 0)
-  );
-  const statefulChanges = blastRadius.stateful_changes ?? [];
-  const statefulBonus = Math.min(25, statefulChanges.length * 12 + statefulChanges.filter((item) => item.severity === "critical").length * 5);
-  const monthlyDelta = Number(cost.monthly_delta ?? 0);
-  const threshold = Number(cost.threshold ?? 500);
-  const costBonus = monthlyDelta > threshold && scenario.sample === "risky-cost" ? 24 : monthlyDelta > 0 ? 8 : 0;
-  const exposureBonus = scenario.sample === "risky-security" ? 26 : 0;
-  const prodBonus = run.environment === "prod" ? 8 : 0;
-  const score = Math.min(100, Math.round(severityComponent + statefulBonus + costBonus + exposureBonus + prodBonus));
-  return {
-    score,
-    level: score >= 80 ? "critical" : score >= 50 ? "high" : score >= 20 ? "medium" : "low"
-  };
 }
 
 function calibratedListRiskScore(run: Pick<RunListItem, "severity_counts" | "environment">): number {
