@@ -29,7 +29,7 @@ TerraGate turns a Terraform plan into a review workflow: parse and redact the pl
 
 ## About
 
-This project is built for platform engineers, SREs, DevOps teams, and security reviewers who need faster infrastructure change review without trusting an LLM to guess from raw files. The working v1 focuses on the **Review Terraform PR** mode. Other command-center modes are represented in the UI as planned expansion areas.
+This project is built for platform engineers, SREs, DevOps teams, and security reviewers who need faster infrastructure change review without trusting an LLM to guess from raw files. **Review Terraform PR** is the primary workflow. Runbook and compliance views reuse the same persisted findings and evidence; broader incident and cost-optimization workflows remain out of scope.
 
 The core product philosophy is deterministic first, AI second:
 
@@ -76,7 +76,7 @@ UI screenshots are intentionally not checked in unless generated from the runnin
 - **Async-capable execution:** Supports inline execution, FastAPI background tasks, and a worker process that claims queued review jobs from the database.
 - **Operational risk analysis:** Detects destructive stateful changes and generates runbook-grade checklists for backup, maintenance window, rollback, owner signoff, and post-apply validation.
 - **Hosted-demo guardrails:** Includes preloaded sample-review endpoints, upload size limits, sandbox disablement, read-only policy packs, and mock GitHub writes for public demos.
-- **Recruiter-visible engineering hygiene:** TypeScript checks, ESLint, pytest suite, Docker Compose, Alembic migrations, sample data, API contract docs, threat model, and ADRs.
+- **Engineering hygiene:** TypeScript checks, ESLint, pytest, a focused frontend regression test, Docker Compose, Alembic migrations, sample data, API contract docs, threat model, and ADRs.
 
 ## Evidence Matrix
 
@@ -89,7 +89,7 @@ UI screenshots are intentionally not checked in unless generated from the runnin
 | Observability | CloudWatch log groups, Cloudflare Workers observability, persisted audit events, optional LangSmith tracing, graph progress visible in the UI. |
 | Cost | Lambda/API Gateway request-driven backend, no NAT gateway in demo stack, stoppable small RDS, 14-day log retention, optional Infracost, documented low-idle public-demo path. |
 | Operations | Runbook-grade remediation output, deployment docs, teardown docs, threat model, public demo guide, API contract, reviewer guide. |
-| Testing | Pytest coverage for parser/redaction/policy/risk/API/auth/GitHub behavior, frontend TypeScript/lint/build checks, CI Terraform validation. |
+| Testing | Pytest coverage for parser/redaction/policy/risk/API/auth/GitHub behavior, a frontend regression test, TypeScript/lint/build checks, and CI Terraform validation. |
 | Documentation | Architecture docs, ADRs, tradeoffs, security, observability, cost model, testing, deployment, teardown, and reviewer guide. |
 
 ## Architecture
@@ -294,12 +294,13 @@ Frontend:
 
 ```bash
 cd apps/web
+npm test
 npm run typecheck
 npm run lint
 npm run build
 ```
 
-GitHub Actions runs backend pytest plus frontend typecheck, lint, and build.
+GitHub Actions runs backend pytest plus the frontend regression test, typecheck, lint, and build.
 
 CI also validates Alembic migrations and Terraform formatting/validation for the AWS public-demo stack.
 
@@ -350,7 +351,7 @@ The UI is designed to hide that cost from the first impression:
 
 - The Cloudflare-hosted app shell, navigation, controls, and static trust signals render immediately.
 - Dashboard metrics and run history load progressively with skeleton states instead of showing temporary zero values.
-- The homepage hydrates the seeded showcase review after the cockpit is visible.
+- The dashboard fetches persisted review history after the application shell is visible.
 - The API imports the LangGraph/LangChain review workflow only when a review job executes, so simple health and dashboard endpoints avoid unnecessary heavy startup work.
 
 This is a deliberate portfolio-demo tradeoff: keep idle spend low while preserving a credible user experience. A paid production deployment would add a durable queue, stronger caching, and optionally Lambda provisioned concurrency or an always-on service for stricter latency targets.

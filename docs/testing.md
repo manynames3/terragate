@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-The repo has meaningful backend tests and frontend static checks. CI now validates backend migrations, backend tests, frontend type/lint/build, and Terraform fmt/validate. Browser e2e tests remain the biggest testing gap.
+The repo has meaningful backend tests, a focused frontend regression test, and frontend static checks. CI validates backend migrations, backend tests, frontend test/type/lint/build, and Terraform fmt/validate. Browser e2e tests remain the biggest testing gap.
 
 ## Backend Tests
 
@@ -28,12 +28,13 @@ Current test areas include:
 Run from `apps/web`:
 
 ```bash
+npm test
 npm run typecheck
 npm run lint
 npm run build
 ```
 
-These checks catch TypeScript, lint, and Next.js build failures. They do not replace browser e2e coverage.
+These checks cover the showcase risk-score regression plus TypeScript, lint, and Next.js build failures. They do not replace browser e2e coverage.
 
 ## Migration Validation
 

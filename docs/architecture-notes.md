@@ -20,7 +20,7 @@ The repository proves configuration and implementation, not the current state of
 | Database | Encrypted, private RDS PostgreSQL (gp3) | Terraform places RDS in two private subnets and allows port 5432 only from the Lambda security group. Docker Compose uses PostgreSQL; manual local mode can fall back to SQLite. |
 | Artifact storage | Lambda `/tmp/artifacts` in the public demo; local filesystem adapter elsewhere | `ARTIFACT_STORAGE_DIR` and `app/integrations/storage.py`. This storage is ephemeral in Lambda. S3 is planned, not implemented. |
 | Build registry | CodeBuild and ECR | Terraform starts CodeBuild during apply; CodeBuild clones a selected Git ref, builds `Dockerfile.lambda`, and pushes to scan-on-push ECR. |
-| CI | GitHub Actions | `.github/workflows/ci.yml` runs backend pytest and frontend typecheck, lint, and build. It performs no deployment. |
+| CI | GitHub Actions | `.github/workflows/ci.yml` runs backend pytest and frontend test, typecheck, lint, and build. It performs no deployment. |
 | Observability | CloudWatch Logs, Cloudflare Workers observability, database audit events | Terraform creates 14-day Lambda and CodeBuild log groups. `wrangler.jsonc` enables Workers observability. Audit events are persisted by `app/services/audit.py`. LangSmith is optional and disabled in the public-demo Terraform. |
 
 ## Request and review flow

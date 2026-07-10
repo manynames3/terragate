@@ -48,6 +48,7 @@ Frontend checks:
 
 ```bash
 cd apps/web
+npm test
 npm run typecheck
 npm run lint
 npm run build
@@ -78,4 +79,4 @@ terraform validate
 - Lambda artifact storage is ephemeral; S3/KMS is the production direction.
 - Terraform sandboxing is not a hardened multi-tenant execution boundary.
 - Policy packs are editable files, not a full approval/versioning workflow.
-- Frontend checks cover type/lint/build; browser e2e tests are still a gap.
+- Frontend checks cover a focused regression test plus type/lint/build; browser e2e tests are still a gap.
