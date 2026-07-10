@@ -16,6 +16,10 @@ Key responsibilities:
 - **LangGraph workflow:** Redaction, normalization, deterministic checks, optional AI explanation, remediation, compliance mapping, report generation, and approval gate.
 - **Database:** Run history, review jobs, findings, evidence, remediations, approvals, suggested patches, GitHub check/comment records, and audit log events.
 
+The AWS public-demo diagram below is generated from `docs/architecture_aws.py` and reflects the Terraform-defined deployment path under `infra/terraform/aws-public-demo`.
+
+![AWS public-demo architecture](architecture_aws.png)
+
 ## C4-Style Container Diagram
 
 ```mermaid
@@ -125,3 +129,11 @@ Intended production direction:
 - [API contract](api-contract.md)
 - [Threat model](threat-model.md)
 - [Demo script](demo-script.md)
+- [Reviewer guide](reviewer-guide.md)
+- [Deployment guide](deployment.md)
+- [Security model](security.md)
+- [Observability model](observability.md)
+- [Cost model](cost-model.md)
+- [Teardown guide](teardown.md)
+- [Tradeoffs](tradeoffs.md)
+- [Testing guide](testing.md)

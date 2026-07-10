@@ -1,7 +1,10 @@
 .env
+.env.*
+!.env.example
 .DS_Store
 artifacts/
 test_artifacts/
+ci_artifacts/
 *.db
 *.sqlite
 *.sqlite3
@@ -20,6 +23,8 @@ coverage/
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tfvars
+!*.tfvars.example
 *.tfplan
 
 tfplan

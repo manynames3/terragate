@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, ClipboardCheck, Download, ExternalLink, FileSearch, Play, RefreshCcw, ShieldAlert, TriangleAlert } from "lucide-react";
-import { createDemoTerraformReview, getFindings, getRun, listRuns } from "@/lib/api";
+import { createDemoTerraformReview, getFindings, getRun, getRuntimeCapabilities, listRuns } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { demoScenarioReviewOptions, presentRunListItem } from "@/lib/showcase";
 import type { Finding, RunDetail, RunListItem, Severity } from "@/types/api";
-import { Badge, Button, Card, EmptyState, SeverityBadge } from "@/components/ui";
+import { AlertBanner, Badge, Button, Card, EmptyState, LoadingPanel, SeverityBadge } from "@/components/ui";
 
 type ControlStatus = "pass" | "fail" | "needs_review";
 
@@ -97,13 +98,21 @@ export function ComplianceCenter() {
   const [loadingRun, setLoadingRun] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [examplesAvailable, setExamplesAvailable] = useState(false);
+
+  useEffect(() => {
+    getRuntimeCapabilities()
+      .then((runtime) => setExamplesAvailable(runtime.public_demo || runtime.auth_provider === "dev"))
+      .catch(() => setExamplesAvailable(false));
+  }, []);
 
   useEffect(() => {
     listRuns()
       .then((items) => {
-        setRuns(items);
+        const presented = items.map(presentRunListItem);
+        setRuns(presented);
         const requestedRun = searchParams.get("run");
-        const firstRun = items.find((item) => item.id === requestedRun) ?? items.find((item) => item.mode === "terraform_pr_review");
+        const firstRun = presented.find((item) => item.id === requestedRun) ?? presented.find((item) => item.mode === "terraform_pr_review");
         if (firstRun) setSelectedRunId(firstRun.id);
       })
       .catch((err: Error) => setError(err.message))
@@ -136,8 +145,9 @@ export function ComplianceCenter() {
     setError(null);
     try {
       const items = await listRuns();
-      setRuns(items);
-      if (!selectedRunId && items[0]) setSelectedRunId(items[0].id);
+      const presented = items.map(presentRunListItem);
+      setRuns(presented);
+      if (!selectedRunId && presented[0]) setSelectedRunId(presented[0].id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to refresh runs.");
     } finally {
@@ -149,7 +159,7 @@ export function ComplianceCenter() {
     setLaunching(true);
     setError(null);
     try {
-      const result = await createDemoTerraformReview("risky-security");
+      const result = await createDemoTerraformReview("risky-security", demoScenarioReviewOptions("risky-security"));
       router.push(`/compliance?run=${result.run_id}`);
       setSelectedRunId(result.run_id);
     } catch (err) {
@@ -183,13 +193,13 @@ export function ComplianceCenter() {
           <Button variant="secondary" onClick={() => void refreshRuns()} disabled={loadingRuns}>
             <RefreshCcw className="h-4 w-4" /> Refresh
           </Button>
-          <Button onClick={() => void launchComplianceSample()} disabled={launching}>
+          {examplesAvailable ? <Button onClick={() => void launchComplianceSample()} disabled={launching}>
             <Play className="h-4 w-4" /> {launching ? "Launching..." : "Run sample check"}
-          </Button>
+          </Button> : null}
         </div>
       </div>
 
-      {error ? <div className="rounded-lg border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">{error}</div> : null}
+      {error ? <AlertBanner tone="danger" title="Compliance data unavailable" onDismiss={() => setError(null)}>{error}</AlertBanner> : null}
 
       <Card className="p-5">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -227,8 +237,10 @@ export function ComplianceCenter() {
         </div>
       </Card>
 
-      {!run && !loadingRun ? (
-        <EmptyState title="No review runs yet" body="Launch a sample compliance check or create a Terraform review first." />
+      {!run && (loadingRuns || loadingRun) ? <LoadingPanel label="Loading compliance evidence" /> : null}
+
+      {!run && !loadingRuns && !loadingRun ? (
+        <EmptyState title="No review runs yet" body={examplesAvailable ? "Launch an example check or create a Terraform review first." : "Create a Terraform review to map its findings to compliance controls."} />
       ) : null}
 
       {run ? (
@@ -241,12 +253,12 @@ export function ComplianceCenter() {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               {controlResults.map((control) => (
                 <ControlCard key={control.id} control={control} />
               ))}
             </div>
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <Card className="p-5">
                 <div className="flex items-center gap-2">
                   <ClipboardCheck className="h-5 w-5 text-[#43c6ac]" />
@@ -396,21 +408,21 @@ function ControlCard({ control }: { control: ControlResult }) {
       {control.findings.length ? (
         <div className="mt-5 space-y-3">
           {control.findings.map((finding) => (
-            <div key={finding.id} className="rounded-md border border-[#26364d] bg-[#091424] p-4">
+            <div key={finding.id} className="min-w-0 overflow-hidden rounded-md border border-[#26364d] bg-[#091424] p-4">
               <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
-                <div>
+                <div className="min-w-0">
                   <SeverityBadge severity={finding.severity} />
                   <p className="mt-2 text-sm font-semibold text-white">{finding.title}</p>
-                  <p className="mt-1 font-mono text-xs text-slate-500">{finding.resource_address ?? "resource not mapped"}</p>
+                  <p className="mt-1 break-all font-mono text-xs text-slate-500">{finding.resource_address ?? "resource not mapped"}</p>
                 </div>
                 <Badge tone={finding.requires_human_review ? "warn" : "info"}>{finding.requires_human_review ? "Human review" : finding.source}</Badge>
               </div>
               <p className="mt-3 text-sm leading-6 text-slate-400">{finding.recommendation}</p>
               {finding.evidence[0] ? (
-                <div className="mt-3 rounded-md border border-[#20314a] bg-[#07101d] p-3 text-xs">
-                  <p className="font-mono text-slate-300">{finding.evidence[0].json_path}</p>
-                  <p className="mt-1 text-slate-500">Observed: {stringValue(finding.evidence[0].observed_value)}</p>
-                  {finding.evidence[0].expected_value !== null ? <p className="mt-1 text-slate-500">Expected: {stringValue(finding.evidence[0].expected_value)}</p> : null}
+                <div className="mt-3 min-w-0 rounded-md border border-[#20314a] bg-[#07101d] p-3 text-xs">
+                  <p className="break-all font-mono text-slate-300">{finding.evidence[0].json_path}</p>
+                  <p className="mt-1 break-words text-slate-500">Observed: {stringValue(finding.evidence[0].observed_value)}</p>
+                  {finding.evidence[0].expected_value !== null ? <p className="mt-1 break-words text-slate-500">Expected: {stringValue(finding.evidence[0].expected_value)}</p> : null}
                 </div>
               ) : null}
             </div>

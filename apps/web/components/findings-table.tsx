@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ExternalLink, Eye, X } from "lucide-react";
 import type { Category, Finding } from "@/types/api";
@@ -22,7 +22,9 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
         {categories.map((item) => (
           <button
             key={item}
+            type="button"
             onClick={() => setCategory(item)}
+            aria-pressed={category === item}
             className={`rounded-md border px-3 py-2 text-sm capitalize transition ${
               category === item
                 ? "border-[#43c6ac] bg-[#43c6ac]/14 text-[#bdf4e9]"
@@ -99,16 +101,38 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
 
 function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => void }) {
   const evidence = finding.evidence[0];
+  const titleId = useId();
+  const descriptionId = useId();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "Tab") trapDrawerFocus(event, drawerRef.current);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKeyDown);
+      previous?.focus();
+    };
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/55">
-      <aside className="h-full w-full max-w-2xl overflow-y-auto border-l border-[#31445f] bg-[#081120] p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <button type="button" className="absolute inset-0 bg-black/65" onClick={onClose} aria-label="Close finding detail" />
+      <aside ref={drawerRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} className="relative h-full w-full max-w-2xl overflow-y-auto border-l border-[#31445f] bg-[#081120] p-5 shadow-2xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <SeverityBadge severity={finding.severity} />
-            <h2 className="mt-4 text-2xl font-semibold text-white">{finding.title}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">{finding.description}</p>
+            <h2 id={titleId} className="mt-4 text-2xl font-semibold text-white">{finding.title}</h2>
+            <p id={descriptionId} className="mt-2 text-sm leading-6 text-slate-400">{finding.description}</p>
           </div>
-          <button onClick={onClose} className="rounded-md p-2 text-slate-400 hover:bg-white/8 hover:text-white" aria-label="Close finding detail">
+          <button ref={closeRef} type="button" onClick={onClose} className="rounded-md p-2 text-slate-400 hover:bg-white/8 hover:text-white" aria-label="Close finding detail">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -218,4 +242,19 @@ function DetailBlock({ title, body, children }: { title: string; body?: string; 
       {children ? <div className="mt-3">{children}</div> : null}
     </section>
   );
+}
+
+function trapDrawerFocus(event: KeyboardEvent, container: HTMLElement | null) {
+  if (!container) return;
+  const focusable = Array.from(container.querySelectorAll<HTMLElement>("button:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])"));
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }

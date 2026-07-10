@@ -7,7 +7,12 @@ from app.services.risk import score_risk
 
 def report_builder(state: dict[str, Any]) -> dict[str, Any]:
     findings = state.get("merged_findings", [])
-    risk_score = score_risk(findings, state.get("environment", "dev"))
+    risk_score = score_risk(
+        findings,
+        state.get("environment", "dev"),
+        cost_estimate=state.get("cost_estimate", {}),
+        blast_radius=state.get("blast_radius", {}),
+    )
     comment = _build_pr_comment(state, findings, risk_score)
     report = _build_report(state, findings, risk_score, comment)
     return {

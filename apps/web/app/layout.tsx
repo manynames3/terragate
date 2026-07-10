@@ -15,13 +15,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TerraGate",
-  description: "Deterministic-first Terraform risk review platform"
+  title: {
+    default: "TerraGate",
+    template: "%s | TerraGate"
+  },
+  description: "Evidence-backed Terraform risk reviews with approval-gated GitHub actions",
+  applicationName: "TerraGate"
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
         <AppShell>{children}</AppShell>
       </body>

@@ -1,0 +1,101 @@
+flowchart LR
+    classDef implemented fill:#e8f5e9,stroke:#2e7d32,color:#102a12,stroke-width:1.5px
+    classDef aws fill:#fff3e0,stroke:#ef6c00,color:#3e2200,stroke-width:1.5px
+    classDef external fill:#e3f2fd,stroke:#1565c0,color:#0d2a42,stroke-width:1.5px
+    classDef optional fill:#fffde7,stroke:#9e7d00,color:#332a00,stroke-width:1.5px,stroke-dasharray:5 5
+    classDef planned fill:#f5f5f5,stroke:#757575,color:#333,stroke-width:1.5px,stroke-dasharray:3 3
+
+    subgraph Runtime["Runtime request and data flow"]
+        direction TB
+
+        subgraph Internet["Public internet / edge boundary"]
+            direction LR
+            Reviewer["Platform engineer / reviewer"]:::external
+            Browser["Browser"]:::external
+            Frontend["Frontend<br/>Next.js 16 + OpenNext<br/>Cloudflare Worker"]:::implemented
+            CFObs["Workers observability<br/>enabled"]:::implemented
+            Cognito["Amazon Cognito Hosted UI + JWKS<br/>optional; not provisioned by demo Terraform"]:::optional
+            GitHubPR["GitHub pull request<br/>optional webhook source"]:::optional
+
+            Reviewer --> Browser
+            Browser -->|"HTTPS: load UI"| Frontend
+            Frontend --> CFObs
+            Browser -.->|"optional PKCE login"| Cognito
+            Cognito -.->|"JWT"| Browser
+        end
+
+        subgraph AWS["AWS account: Terraform-defined public-demo backend"]
+            direction TB
+            APIGW["API Gateway v2<br/>public HTTP API + CORS"]:::aws
+            CloudWatch["CloudWatch Logs<br/>Lambda + CodeBuild<br/>14-day retention"]:::aws
+
+            subgraph VPC["VPC security boundary: 2 private subnets, no NAT gateway"]
+                direction LR
+                Lambda["API / backend<br/>Lambda container: FastAPI + Mangum<br/>inline review execution"]:::aws
+                Engine["LangGraph review engine<br/>redaction -> deterministic checks -><br/>optional enrichment -> approval gate"]:::implemented
+                Artifacts["Artifact storage<br/>Lambda /tmp/artifacts (ephemeral)<br/>no S3 in current stack"]:::aws
+                RDS["RDS PostgreSQL<br/>encrypted gp3, private, not public<br/>review state + audit events"]:::aws
+                DBSG["DB security group<br/>TCP 5432 from Lambda SG only"]:::implemented
+
+                Lambda --> Engine
+                Lambda --> Artifacts
+                Engine --> Artifacts
+                Engine --> RDS
+                DBSG --- RDS
+            end
+
+            APIGW -->|"AWS_PROXY"| Lambda
+            Lambda -->|"application logs"| CloudWatch
+        end
+
+        Browser -->|"HTTPS JSON + optional bearer token"| APIGW
+        GitHubPR -.->|"optional signed webhook"| APIGW
+
+        subgraph Extensions["Optional and planned extensions"]
+            direction LR
+            OptionalAdapters["Optional adapters<br/>GitHub API: approved writes<br/>OpenAI: reviewer enrichment<br/>Infracost: cost estimate<br/>LangSmith: tracing"]:::optional
+            Planned["Planned<br/>S3 artifact adapter<br/>durable queue + isolated worker"]:::planned
+        end
+
+        Engine -.->|"credential-dependent;<br/>disabled or mocked in public demo"| OptionalAdapters
+        Engine -.-> Planned
+    end
+
+    subgraph Delivery["Source, CI, and deployment flows"]
+        direction TB
+        Repo["GitHub repository"]:::external
+        Actions["GitHub Actions CI<br/>backend pytest<br/>frontend typecheck + lint + build<br/>no deployment"]:::implemented
+
+        subgraph BackendDeploy["AWS backend deployment"]
+            direction LR
+            Operator["Operator / Terraform CLI"]:::external
+            Terraform["Terraform apply<br/>provision stack + start build"]:::implemented
+            CodeBuild["AWS CodeBuild<br/>clone ref + build Dockerfile.lambda<br/>CloudWatch logs: 14 days"]:::aws
+            ECR["Amazon ECR<br/>scan on push"]:::aws
+
+            Operator --> Terraform --> CodeBuild --> ECR
+            Repo -->|"selected Git ref"| CodeBuild
+        end
+
+        subgraph FrontendDeploy["Cloudflare frontend deployment"]
+            direction LR
+            CFOperator["Operator"]:::external
+            CFDeploy["npm run deploy:cloudflare<br/>OpenNext build + Wrangler deploy"]:::implemented
+
+            CFOperator --> CFDeploy
+        end
+
+        Repo -->|"push to main / pull request"| Actions
+    end
+
+    ECR -->|"deploy image digest"| Lambda
+    CFDeploy -->|"deploy Worker"| Frontend
+
+    style Runtime fill:#ffffff,stroke:#546e7a,stroke-width:2px
+    style Internet fill:#f8fbff,stroke:#1565c0,stroke-width:1.5px
+    style AWS fill:#fffaf2,stroke:#ef6c00,stroke-width:2px
+    style VPC fill:#fffdf8,stroke:#8d6e63,stroke-width:2px
+    style Extensions fill:#fffef5,stroke:#9e7d00,stroke-width:1.5px
+    style Delivery fill:#ffffff,stroke:#546e7a,stroke-width:2px
+    style BackendDeploy fill:#fffaf2,stroke:#ef6c00,stroke-width:1.5px
+    style FrontendDeploy fill:#f4fbf5,stroke:#2e7d32,stroke-width:1.5px

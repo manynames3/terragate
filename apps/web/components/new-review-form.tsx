@@ -2,10 +2,11 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, ExternalLink, FileJson, GitPullRequest, LockKeyhole, Play, ShieldCheck, UploadCloud } from "lucide-react";
-import { createDemoTerraformReview, createTerraformReview, getGitHubPrContext, listPolicyPacks } from "@/lib/api";
+import { AlertTriangle, CheckCircle2, ExternalLink, FileJson, GitPullRequest, Play, ShieldCheck, UploadCloud } from "lucide-react";
+import { createDemoTerraformReview, createTerraformReview, getCurrentUser, getGitHubPrContext, getRuntimeCapabilities, listPolicyPacks } from "@/lib/api";
+import { demoScenarioReviewOptions } from "@/lib/showcase";
 import type { GitHubPRContext, PolicyPack } from "@/types/api";
-import { Button, Card, FieldLabel } from "@/components/ui";
+import { AlertBanner, Button, Card, FieldLabel } from "@/components/ui";
 import { DeploymentStatusPanel } from "@/components/deployment-status-panel";
 
 const sampleReviews = [
@@ -14,7 +15,7 @@ const sampleReviews = [
     title: "Security risk review",
     description: "Public SSH, public RDS, and wildcard IAM policy findings.",
     cta: "Launch security review",
-    badge: "Best first demo"
+    badge: "Security controls"
   },
   {
     sample: "destructive-prod",
@@ -40,18 +41,10 @@ const reviewFlowSteps = [
   "Require approval before posting a GitHub comment or committing a suggested patch."
 ];
 
-const privateDeploymentChecks = [
-  "Cognito or another real identity provider is required for private team use.",
-  "GitHub writes stay mocked in the hosted demo and become live only when credentials are configured.",
-  "Terraform sandbox execution is disabled here; use a private deployment for repo plan generation.",
-  "Infracost is optional, with heuristic estimates clearly labeled when it is not configured."
-];
-
-const showSandboxControls = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").includes("localhost");
-
 export function NewReviewForm() {
   const router = useRouter();
   const uploadSectionRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [environment, setEnvironment] = useState("dev");
   const [cloudProvider, setCloudProvider] = useState("aws");
@@ -75,20 +68,75 @@ export function NewReviewForm() {
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [sandboxAvailable, setSandboxAvailable] = useState(false);
+  const [samplesAvailable, setSamplesAvailable] = useState(false);
+  const [maxPlanBytes, setMaxPlanBytes] = useState<number | null>(null);
+  const [canCreateReview, setCanCreateReview] = useState(false);
+  const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
-    listPolicyPacks()
-      .then(setPolicyPacks)
-      .catch(() => setPolicyPacks([]));
+    Promise.allSettled([listPolicyPacks(), getRuntimeCapabilities(), getCurrentUser()]).then(([packResult, capabilityResult, userResult]) => {
+      if (packResult.status === "fulfilled") setPolicyPacks(packResult.value);
+      if (capabilityResult.status === "fulfilled") {
+        setSandboxAvailable(capabilityResult.value.terraform_sandbox === "enabled");
+        setSamplesAvailable(capabilityResult.value.public_demo || capabilityResult.value.auth_provider === "dev");
+        setMaxPlanBytes(capabilityResult.value.max_upload_bytes);
+      }
+      if (userResult.status === "fulfilled") setCanCreateReview(userResult.value.role === "reviewer" || userResult.value.role === "platform-admin");
+      setAccessChecked(true);
+    });
   }, []);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canCreateReview) {
+      setError("Reviewer or platform administrator access is required to create Terraform reviews.");
+      return;
+    }
     if (executionMode === "uploaded_plan" && !file) {
-      setUploadError("Choose a Terraform plan JSON file first, or launch a hosted-safe sample from the sample plans panel.");
+      setUploadError("Choose a Terraform plan JSON file before starting the review.");
       setError(null);
       window.requestAnimationFrame(() => uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
       return;
+    }
+    if (executionMode === "uploaded_plan" && file) {
+      const fileError = await validatePlanFile(file, maxPlanBytes);
+      if (fileError) {
+        setUploadError(fileError);
+        window.requestAnimationFrame(() => uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+        return;
+      }
+    }
+    if (prUrl.trim() && !repoOwner && !repoName && !pullNumber) {
+      setError("Parse the GitHub pull request URL before starting the review, or clear the URL field.");
+      return;
+    }
+    const githubError = validateGitHubContext(repoOwner, repoName, pullNumber);
+    if (githubError) {
+      setError(githubError);
+      return;
+    }
+    if (executionMode === "sandbox_plan") {
+      if (!terraformWorkingDir.trim()) {
+        setError("Enter a working directory under the configured Terraform sandbox root.");
+        return;
+      }
+      const envError = validateJsonObject(terraformEnvVarsJson, "Terraform environment variables");
+      if (envError) {
+        setError(envError);
+        return;
+      }
+      if (terraformBackendEnabled) {
+        const backendError = validateJsonObject(terraformBackendConfigJson, "Terraform backend configuration");
+        if (backendError) {
+          setError(backendError);
+          return;
+        }
+      }
     }
     setSubmitting(true);
     setError(null);
@@ -122,15 +170,21 @@ export function NewReviewForm() {
   }
 
   async function fetchPrContext() {
-    if (!repoOwner || !repoName || !pullNumber) {
-      setError("Enter repo owner, repo name, and pull number before fetching PR context.");
+    const githubError = validateGitHubContext(repoOwner, repoName, pullNumber, true);
+    if (githubError) {
+      setError(githubError);
       return;
     }
     setFetchingPr(true);
     setError(null);
     setPrContext(null);
     try {
-      setPrContext(await getGitHubPrContext(repoOwner, repoName, pullNumber));
+      const context = await getGitHubPrContext(repoOwner, repoName, pullNumber);
+      if (!context.available || context.mock) {
+        setError(context.message || "Live GitHub PR context is not available in this environment.");
+        return;
+      }
+      setPrContext(context);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch GitHub PR context.");
     } finally {
@@ -155,10 +209,10 @@ export function NewReviewForm() {
     setError(null);
     setStatusMessage("Creating hosted sample review...");
     try {
-      const result = await createDemoTerraformReview(sample);
+      const result = await createDemoTerraformReview(sample, demoScenarioReviewOptions(sample));
       router.push(`/runs/${result.run_id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to launch demo sample.");
+      setError(err instanceof Error ? err.message : "Failed to launch example review.");
     } finally {
       setLaunchingSample(null);
       setStatusMessage(null);
@@ -171,67 +225,26 @@ export function NewReviewForm() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">Terraform PR review</p>
         <h1 className="mt-3 text-3xl font-semibold text-white">Start a risk review</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-          Use a hosted sample for the fastest walkthrough, attach GitHub PR context when available, or upload a Terraform plan JSON file for a real review.
+          Upload Terraform plan JSON, choose the policy context, and optionally attach the GitHub pull request that produced the change.
         </p>
       </div>
 
-      {statusMessage ? (
-        <div className="rounded-lg border border-[#43c6ac]/40 bg-[#43c6ac]/10 px-4 py-3 text-sm text-[#baf4e9]" role="status">
-          {statusMessage}
-        </div>
-      ) : null}
-      {error ? <div className="rounded-lg border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">{error}</div> : null}
+      {statusMessage ? <AlertBanner tone="info" title="Review in progress">{statusMessage}</AlertBanner> : null}
+      {error ? <div ref={errorRef} tabIndex={-1}><AlertBanner tone="danger" title="Review could not start" onDismiss={() => setError(null)}>{error}</AlertBanner></div> : null}
+      {accessChecked && !canCreateReview ? <AlertBanner tone="warning" title="Read-only access">Reviewer or platform administrator access is required to create a review.</AlertBanner> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <div className="space-y-6">
-          <Card className="p-6">
-            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#6ea8fe]/40 bg-[#6ea8fe]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#bdd6ff]">
-                  <GitPullRequest className="h-3.5 w-3.5" />
-                  Production workflow
-                </div>
-                <h2 className="mt-4 text-xl font-semibold text-white">Start from a GitHub PR</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                  Paste a PR URL to fetch changed Terraform files and attach file/patch context to findings. In a private deployment, the webhook can start reviews automatically on PR open and synchronize events.
-                </p>
-              </div>
-            </div>
-            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-              <input
-                value={prUrl}
-                onChange={(event) => setPrUrl(event.target.value)}
-                placeholder="https://github.com/org/repo/pull/123"
-                className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
-              />
-              <Button type="button" variant="secondary" onClick={parsePrUrl}>
-                Parse PR URL
-              </Button>
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <input value={repoOwner} onChange={(event) => setRepoOwner(event.target.value)} placeholder="repo owner" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
-              <input value={repoName} onChange={(event) => setRepoName(event.target.value)} placeholder="repo name" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
-              <input value={pullNumber} onChange={(event) => setPullNumber(event.target.value)} placeholder="pull number" inputMode="numeric" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Button type="button" onClick={() => void fetchPrContext()} disabled={fetchingPr}>
-                <GitPullRequest className="h-4 w-4" /> {fetchingPr ? "Fetching PR..." : "Fetch PR context"}
-              </Button>
-              <span className="text-xs text-slate-500">Webhook endpoint: {webhookUrl()}</span>
-            </div>
-            {prContext ? <GitHubContextPreview context={prContext} /> : null}
-          </Card>
-
-          <Card className="p-6">
+        <div className="flex min-w-0 flex-col gap-6">
+          {samplesAvailable ? <Card className="order-2 p-6">
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-[#43c6ac]/40 bg-[#43c6ac]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#9aeadc]">
                   <Play className="h-3.5 w-3.5" />
-                  Fastest path
+                  Example data
                 </div>
-                <h2 className="mt-4 text-xl font-semibold text-white">Try a hosted sample review</h2>
+                <h2 className="mt-4 text-xl font-semibold text-white">Explore with a sample plan</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                  See risk score, graph progress, evidence, remediation, approval gates, and mock GitHub actions without uploading anything sensitive.
+                  Creates a clearly labeled sample run using bundled Terraform data. It never reads a real repository or performs a GitHub write.
                 </p>
               </div>
             </div>
@@ -246,7 +259,7 @@ export function NewReviewForm() {
                     className="mt-4 w-full"
                     variant={sample.sample === "risky-security" ? "primary" : "secondary"}
                     onClick={() => void launchDemoSample(sample.sample)}
-                    disabled={launchingSample !== null || submitting}
+                    disabled={launchingSample !== null || submitting || !canCreateReview}
                   >
                     <Play className="h-4 w-4" />
                     {launchingSample === sample.sample ? "Creating review..." : sample.cta}
@@ -254,49 +267,59 @@ export function NewReviewForm() {
                 </div>
               ))}
             </div>
-          </Card>
+          </Card> : null}
 
-          <Card className="p-6">
+          <Card className="order-1 p-6">
             <div className="mb-6 flex items-center gap-3">
               <span className="flex h-11 w-11 items-center justify-center rounded-md border border-[#31445f] bg-[#111d31]">
                 <FileJson className="h-5 w-5 text-[#43c6ac]" />
               </span>
               <div>
-                <h2 className="text-xl font-semibold text-white">Upload your own plan</h2>
-                <p className="mt-1 text-sm text-slate-400">Use this path when you already have a Terraform plan JSON file.</p>
+                <h2 className="text-xl font-semibold text-white">Review a Terraform plan</h2>
+                <p className="mt-1 text-sm text-slate-400">Use JSON produced by <code className="text-slate-300">terraform show -json</code>.</p>
               </div>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-6">
               <div ref={uploadSectionRef}>
-                <FieldLabel>Terraform plan JSON</FieldLabel>
-                <label className={`mt-2 flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-[#091424] px-6 py-8 text-center transition hover:border-[#43c6ac] ${uploadError ? "border-red-300/70 ring-2 ring-red-400/20" : "border-[#3a506d]"}`}>
+                <label htmlFor="terraform-plan-file"><FieldLabel>Terraform plan JSON</FieldLabel></label>
+                <label htmlFor="terraform-plan-file" className={`mt-2 flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-[#091424] px-6 py-8 text-center transition hover:border-[#43c6ac] ${uploadError ? "border-red-300/70 ring-2 ring-red-400/20" : "border-[#3a506d]"}`}>
                   <UploadCloud className="h-8 w-8 text-[#6ea8fe]" />
                   <span className="mt-3 text-sm font-medium text-white">{file ? file.name : "Choose tfplan.json"}</span>
-                  <span className="mt-2 max-w-xl text-xs leading-5 text-slate-400">
-                    The app parses the plan, redacts sensitive values, and sends only reduced evidence to AI-assisted review nodes.
+                  <span id="terraform-plan-help" className="mt-2 max-w-xl text-xs leading-5 text-slate-400">
+                    JSON only{maxPlanBytes ? `, up to ${formatFileSize(maxPlanBytes)}` : ""}. TerraGate validates the shape and redacts sensitive values before reviewer enrichment.
                   </span>
+                  {file ? <span className="mt-2 text-xs font-medium text-[#9aeadc]">{formatFileSize(file.size)} selected</span> : null}
                   <input
+                    id="terraform-plan-file"
+                    name="terraform-plan-file"
                     type="file"
                     accept="application/json,.json"
                     className="sr-only"
                     aria-invalid={Boolean(uploadError)}
+                    aria-describedby={`terraform-plan-help${uploadError ? " terraform-plan-error" : ""}`}
                     onChange={(event) => {
-                      setFile(event.target.files?.[0] ?? null);
+                      const selectedFile = event.target.files?.[0] ?? null;
+                      setFile(selectedFile);
                       setExecutionMode("uploaded_plan");
                       setUploadError(null);
                       setError(null);
+                      if (selectedFile) {
+                        void validatePlanFile(selectedFile, maxPlanBytes).then((validationError) => {
+                          if (validationError) setUploadError(validationError);
+                        });
+                      }
                     }}
                   />
                 </label>
                 {uploadError ? (
-                  <div className="mt-3 rounded-md border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100" role="alert">
+                  <div id="terraform-plan-error" className="mt-3 rounded-md border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100" role="alert">
                     {uploadError}
                   </div>
                 ) : null}
               </div>
 
-              {showSandboxControls ? (
+              {sandboxAvailable ? (
                 <details className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
                   <summary className="cursor-pointer text-sm font-semibold text-slate-100">Advanced: sandbox Terraform plan</summary>
                   <div className="mt-4 grid gap-3">
@@ -313,43 +336,38 @@ export function NewReviewForm() {
                     </button>
                     {executionMode === "sandbox_plan" ? (
                       <>
-                        <input
-                          value={terraformWorkingDir}
-                          onChange={(event) => setTerraformWorkingDir(event.target.value)}
-                          placeholder="relative path under sandbox root, e.g. demo-infra"
-                          className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
-                        />
+                        <label className="space-y-2">
+                          <span className="text-xs font-medium text-slate-300">Working directory</span>
+                          <input
+                            value={terraformWorkingDir}
+                            onChange={(event) => setTerraformWorkingDir(event.target.value)}
+                            placeholder="relative path under sandbox root"
+                            className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                          />
+                        </label>
                         <div className="grid gap-3 md:grid-cols-2">
-                          <input
-                            value={terraformWorkspace}
-                            onChange={(event) => setTerraformWorkspace(event.target.value)}
-                            placeholder="workspace, optional"
-                            className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
-                          />
-                          <input
-                            value={terraformVarFile}
-                            onChange={(event) => setTerraformVarFile(event.target.value)}
-                            placeholder="var file, optional"
-                            className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
-                          />
+                          <label className="space-y-2">
+                            <span className="text-xs font-medium text-slate-300">Workspace (optional)</span>
+                            <input value={terraformWorkspace} onChange={(event) => setTerraformWorkspace(event.target.value)} placeholder="default" className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                          </label>
+                          <label className="space-y-2">
+                            <span className="text-xs font-medium text-slate-300">Variable file (optional)</span>
+                            <input value={terraformVarFile} onChange={(event) => setTerraformVarFile(event.target.value)} placeholder="prod.tfvars" className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                          </label>
                         </div>
-                        <textarea
-                          value={terraformEnvVarsJson}
-                          onChange={(event) => setTerraformEnvVarsJson(event.target.value)}
-                          placeholder='env vars JSON, e.g. {"TF_VAR_region":"us-east-1"}'
-                          className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500"
-                        />
+                        <label className="space-y-2">
+                          <span className="text-xs font-medium text-slate-300">Environment variables JSON (optional)</span>
+                          <textarea value={terraformEnvVarsJson} onChange={(event) => setTerraformEnvVarsJson(event.target.value)} placeholder='{"TF_VAR_region":"us-east-1"}' className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500" />
+                        </label>
                         <label className="flex items-center gap-2 text-sm text-slate-300">
                           <input type="checkbox" checked={terraformBackendEnabled} onChange={(event) => setTerraformBackendEnabled(event.target.checked)} />
                           Enable backend config for sandbox init
                         </label>
                         {terraformBackendEnabled ? (
-                          <textarea
-                            value={terraformBackendConfigJson}
-                            onChange={(event) => setTerraformBackendConfigJson(event.target.value)}
-                            placeholder='backend config JSON, e.g. {"bucket":"tf-state-demo"}'
-                            className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500"
-                          />
+                          <label className="space-y-2">
+                            <span className="text-xs font-medium text-slate-300">Backend configuration JSON</span>
+                            <textarea value={terraformBackendConfigJson} onChange={(event) => setTerraformBackendConfigJson(event.target.value)} placeholder='{"bucket":"tf-state"}' className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500" />
+                          </label>
                         ) : null}
                       </>
                     ) : null}
@@ -378,7 +396,7 @@ export function NewReviewForm() {
                 <label className="space-y-2">
                   <FieldLabel>Policy profile</FieldLabel>
                   <select value={policyProfile} onChange={(event) => setPolicyProfile(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
-                    {(policyPacks.length ? policyPacks : [{ name: "default" }, { name: "restricted" }, { name: "startup_cost_control" }] as PolicyPack[]).map((pack) => (
+                    {(policyPacks.length ? policyPacks : [{ name: "default" }] as PolicyPack[]).map((pack) => (
                       <option key={pack.name} value={pack.name}>{pack.name}</option>
                     ))}
                   </select>
@@ -386,42 +404,73 @@ export function NewReviewForm() {
               </div>
 
               <div className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
-                <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-100">
-                  <GitPullRequest className="h-4 w-4 text-[#6ea8fe]" />
-                  GitHub PR context attached to this review
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+                    <GitPullRequest className="h-4 w-4 text-[#6ea8fe]" />
+                    Optional GitHub PR context
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">Attach changed-file and redacted patch evidence to this plan review. A PR URL does not replace the Terraform plan.</p>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                  <label className="space-y-2">
+                    <span className="text-xs font-medium text-slate-300">Pull request URL</span>
+                    <input
+                      id="github-pr-url"
+                      type="url"
+                      value={prUrl}
+                      onChange={(event) => setPrUrl(event.target.value)}
+                      placeholder="https://github.com/org/repo/pull/123"
+                      autoComplete="url"
+                      className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                    />
+                  </label>
+                  <div className="flex items-end">
+                    <Button type="button" variant="secondary" onClick={parsePrUrl} disabled={!prUrl.trim()}>
+                      Parse URL
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
-                  <input value={repoOwner} onChange={(event) => setRepoOwner(event.target.value)} placeholder="repo owner" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
-                  <input value={repoName} onChange={(event) => setRepoName(event.target.value)} placeholder="repo name" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
-                  <input value={pullNumber} onChange={(event) => setPullNumber(event.target.value)} placeholder="pull number" inputMode="numeric" className="rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                  <label className="mt-4 space-y-2">
+                    <span className="text-xs font-medium text-slate-300">Repository owner</span>
+                    <input value={repoOwner} onChange={(event) => setRepoOwner(event.target.value)} placeholder="acme" autoComplete="off" className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                  </label>
+                  <label className="mt-4 space-y-2">
+                    <span className="text-xs font-medium text-slate-300">Repository name</span>
+                    <input value={repoName} onChange={(event) => setRepoName(event.target.value)} placeholder="infrastructure" autoComplete="off" className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                  </label>
+                  <label className="mt-4 space-y-2">
+                    <span className="text-xs font-medium text-slate-300">Pull request number</span>
+                    <input value={pullNumber} onChange={(event) => setPullNumber(event.target.value.replace(/[^0-9]/g, ""))} placeholder="42" inputMode="numeric" pattern="[0-9]*" className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                  </label>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <Button type="button" variant="secondary" onClick={() => void fetchPrContext()} disabled={fetchingPr}>
                     <GitPullRequest className="h-4 w-4" /> {fetchingPr ? "Fetching PR..." : "Fetch PR context"}
                   </Button>
-                  <span className="text-xs text-slate-500">Uses configured GitHub credentials; otherwise returns a safe placeholder so the demo flow stays usable.</span>
+                  <span className="text-xs text-slate-500">Live context requires a configured server-side GitHub credential.</span>
                 </div>
-                {prContext ? <p className="mt-4 text-xs text-[#9aeadc]">PR context fetched above and will be saved with this review.</p> : null}
+                {prContext ? <GitHubContextPreview context={prContext} /> : null}
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <Button type="submit" disabled={submitting || launchingSample !== null}>
+                <Button type="submit" disabled={submitting || launchingSample !== null || Boolean(uploadError) || !canCreateReview} aria-busy={submitting}>
                   {submitting ? "Creating review..." : "Run uploaded plan review"}
                 </Button>
-                <span className="text-xs text-slate-500">{file || executionMode === "sandbox_plan" ? "Runs usually complete in a few seconds." : "Choose a plan JSON first."}</span>
+                <span className="text-xs text-slate-500">{file || executionMode === "sandbox_plan" ? "You will be taken to live graph progress after creation." : "Choose a plan JSON first."}</span>
               </div>
             </form>
           </Card>
         </div>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Card className="p-5">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-1 h-5 w-5 text-amber-300" />
               <div>
                 <h2 className="text-base font-semibold text-white">Plan privacy</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Terraform plans can expose secrets, resource names, provider values, and topology. Hosted samples are safest for a quick trial; uploaded plans are redacted before AI review.
+                  Terraform plans can expose secrets, resource names, provider values, and topology. Uploaded plans are stored as review artifacts and redacted before any optional AI enrichment.
                 </p>
               </div>
             </div>
@@ -436,22 +485,6 @@ export function NewReviewForm() {
                     <div key={step} className="flex gap-2 text-sm leading-5 text-slate-400">
                       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#43c6ac]" />
                       <span>{step}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <LockKeyhole className="mt-1 h-5 w-5 text-[#6ea8fe]" />
-              <div>
-                <h2 className="text-base font-semibold text-white">Private deployment checklist</h2>
-                <div className="mt-4 space-y-3">
-                  {privateDeploymentChecks.map((item) => (
-                    <div key={item} className="flex gap-2 text-sm leading-5 text-slate-400">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#6ea8fe]" />
-                      <span>{item}</span>
                     </div>
                   ))}
                 </div>
@@ -479,16 +512,59 @@ function parseGitHubPrUrl(value: string): { owner: string; repo: string; pullNum
     const [owner, repo, pullLiteral, pullNumber] = url.pathname.split("/").filter(Boolean);
     if (!owner || !repo || pullLiteral !== "pull" || !pullNumber) return null;
     const parsedPull = Number(pullNumber);
-    if (!Number.isFinite(parsedPull)) return null;
+    if (!Number.isInteger(parsedPull) || parsedPull < 1) return null;
     return { owner, repo, pullNumber: parsedPull };
   } catch {
     return null;
   }
 }
 
-function webhookUrl(): string {
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-  return `${apiBase.replace(/\/$/, "")}/api/v1/github/webhook`;
+async function validatePlanFile(file: File, maxBytes: number | null): Promise<string | null> {
+  if (!file.name.toLowerCase().endsWith(".json")) {
+    return "Terraform plans must be uploaded as a .json file generated by terraform show -json.";
+  }
+  if (file.size === 0) return "The selected Terraform plan is empty.";
+  if (maxBytes && file.size > maxBytes) {
+    return `The selected plan is ${formatFileSize(file.size)}. This environment accepts files up to ${formatFileSize(maxBytes)}.`;
+  }
+  try {
+    const parsed = JSON.parse(await file.text()) as unknown;
+    if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as { resource_changes?: unknown }).resource_changes)) {
+      return "This JSON does not contain a Terraform resource_changes array. Generate it with terraform show -json.";
+    }
+  } catch {
+    return "The selected file is not valid JSON. Regenerate it with terraform show -json and try again.";
+  }
+  return null;
+}
+
+function validateGitHubContext(owner: string, repo: string, pullNumber: string, required = false): string | null {
+  const values = [owner.trim(), repo.trim(), pullNumber.trim()];
+  if (!required && values.every((value) => !value)) return null;
+  if (values.some((value) => !value)) return "Enter the repository owner, repository name, and pull request number together.";
+  if (!/^[A-Za-z0-9_.-]+$/.test(owner) || !/^[A-Za-z0-9_.-]+$/.test(repo)) {
+    return "Repository owner and name may contain letters, numbers, periods, underscores, and hyphens.";
+  }
+  const parsedPull = Number(pullNumber);
+  if (!Number.isInteger(parsedPull) || parsedPull < 1) return "Pull request number must be a positive whole number.";
+  return null;
+}
+
+function validateJsonObject(value: string, label: string): string | null {
+  if (!value.trim()) return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return `${label} must be a JSON object.`;
+    return null;
+  } catch {
+    return `${label} contains invalid JSON.`;
+  }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function GitHubContextPreview({ context }: { context: GitHubPRContext }) {
@@ -509,7 +585,7 @@ function GitHubContextPreview({ context }: { context: GitHubPRContext }) {
         ) : null}
       </div>
       <div className="mt-4 grid gap-3 text-sm sm:grid-cols-4">
-        <Metric label="Source" value={context.mock ? "safe placeholder" : "live GitHub"} />
+        <Metric label="Source" value={context.mock ? "unavailable" : "live GitHub"} />
         <Metric label="Files" value={String(context.changed_files_count)} />
         <Metric label="Terraform files" value={String(terraformFiles)} />
         <Metric label="Diff" value={`+${context.additions} / -${context.deletions}`} />

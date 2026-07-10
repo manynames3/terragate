@@ -16,10 +16,11 @@ import {
   ShieldCheck,
   UserCheck
 } from "lucide-react";
-import { createDemoTerraformReview, getFindings, getRun, getRunbookProgress, listRuns, updateRunbookProgress } from "@/lib/api";
+import { createDemoTerraformReview, getCurrentUser, getFindings, getRun, getRunbookProgress, getRuntimeCapabilities, listRuns, updateRunbookProgress } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { demoScenarioReviewOptions, presentRunListItem } from "@/lib/showcase";
 import type { Finding, RunDetail, RunListItem, Severity } from "@/types/api";
-import { Badge, Button, Card, EmptyState, SeverityBadge } from "@/components/ui";
+import { AlertBanner, Badge, Button, Card, EmptyState, LoadingPanel, SeverityBadge } from "@/components/ui";
 
 type RunbookStep = {
   id: string;
@@ -71,13 +72,28 @@ export function RunbookCenter() {
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
+  const [examplesAvailable, setExamplesAvailable] = useState(false);
+  const [canEditProgress, setCanEditProgress] = useState(false);
+
+  useEffect(() => {
+    Promise.all([getRuntimeCapabilities(), getCurrentUser()])
+      .then(([runtime, user]) => {
+        setExamplesAvailable(runtime.public_demo || runtime.auth_provider === "dev");
+        setCanEditProgress(user.role === "reviewer" || user.role === "platform-admin");
+      })
+      .catch(() => {
+        setExamplesAvailable(false);
+        setCanEditProgress(false);
+      });
+  }, []);
 
   useEffect(() => {
     listRuns()
       .then((items) => {
-        setRuns(items);
+        const presented = items.map(presentRunListItem);
+        setRuns(presented);
         const requestedRun = searchParams.get("run");
-        const firstRun = items.find((item) => item.id === requestedRun) ?? items.find((item) => item.mode === "terraform_pr_review");
+        const firstRun = presented.find((item) => item.id === requestedRun) ?? presented.find((item) => item.mode === "terraform_pr_review");
         if (firstRun) setSelectedRunId(firstRun.id);
       })
       .catch((err: Error) => setError(err.message))
@@ -113,8 +129,9 @@ export function RunbookCenter() {
     setError(null);
     try {
       const items = await listRuns();
-      setRuns(items);
-      if (!selectedRunId && items[0]) setSelectedRunId(items[0].id);
+      const presented = items.map(presentRunListItem);
+      setRuns(presented);
+      if (!selectedRunId && presented[0]) setSelectedRunId(presented[0].id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to refresh runs.");
     } finally {
@@ -126,7 +143,7 @@ export function RunbookCenter() {
     setLaunching(true);
     setError(null);
     try {
-      const result = await createDemoTerraformReview("destructive-prod");
+      const result = await createDemoTerraformReview("destructive-prod", demoScenarioReviewOptions("destructive-prod"));
       router.push(`/runbooks?run=${result.run_id}`);
       setSelectedRunId(result.run_id);
     } catch (err) {
@@ -148,6 +165,10 @@ export function RunbookCenter() {
 
   async function toggleStep(sectionId: string, stepId: string) {
     if (!run) return;
+    if (!canEditProgress) {
+      setError("Reviewer or platform administrator access is required to update runbook progress.");
+      return;
+    }
     const nextChecked = !checkedSteps[stepId];
     setCheckedSteps((current) => ({ ...current, [stepId]: nextChecked }));
     setProgressMessage(null);
@@ -174,14 +195,14 @@ export function RunbookCenter() {
           <Button variant="secondary" onClick={() => void refreshRuns()} disabled={loadingRuns}>
             <RefreshCcw className="h-4 w-4" /> Refresh
           </Button>
-          <Button onClick={() => void launchRunbookSample()} disabled={launching}>
+          {examplesAvailable ? <Button onClick={() => void launchRunbookSample()} disabled={launching}>
             <Play className="h-4 w-4" /> {launching ? "Launching..." : "Run blast-radius sample"}
-          </Button>
+          </Button> : null}
         </div>
       </div>
 
-      {error ? <div className="rounded-lg border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">{error}</div> : null}
-      {progressMessage ? <div className="rounded-lg border border-[#43c6ac]/35 bg-[#43c6ac]/10 px-4 py-3 text-sm text-[#baf4e9]">{progressMessage}</div> : null}
+      {error ? <AlertBanner tone="danger" title="Runbook unavailable" onDismiss={() => setError(null)}>{error}</AlertBanner> : null}
+      {progressMessage ? <AlertBanner tone="success" onDismiss={() => setProgressMessage(null)}>{progressMessage}</AlertBanner> : null}
 
       <Card className="p-5">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
@@ -219,8 +240,10 @@ export function RunbookCenter() {
         </div>
       </Card>
 
-      {!run && !loadingRun ? (
-        <EmptyState title="No review runs yet" body="Launch a blast-radius sample or create a Terraform review first." />
+      {!run && (loadingRuns || loadingRun) ? <LoadingPanel label="Loading runbook evidence" /> : null}
+
+      {!run && !loadingRuns && !loadingRun ? (
+        <EmptyState title="No review runs yet" body={examplesAvailable ? "Launch a blast-radius example or create a Terraform review first." : "Create a Terraform review to generate an operational runbook."} />
       ) : null}
 
       {run ? (
@@ -233,18 +256,19 @@ export function RunbookCenter() {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_410px]">
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               {runbook.sections.map((section) => (
                 <RunbookSectionCard
                   key={section.id}
                   section={section}
                   checkedSteps={checkedSteps}
+                  disabled={!canEditProgress}
                   onToggle={(stepId) => void toggleStep(section.id, stepId)}
                 />
               ))}
             </div>
 
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <Card className="p-5">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-[#43c6ac]" />
@@ -255,7 +279,7 @@ export function RunbookCenter() {
                   <SmallRow label="Environment" value={run.environment} />
                   <SmallRow label="Risk" value={`${run.risk_level} (${run.risk_score})`} />
                   <SmallRow label="Policy" value={run.policy_profile} />
-                  <SmallRow label="Generated" value={formatDate(new Date().toISOString())} />
+                  <SmallRow label="Generated" value={formatDate(run.completed_at ?? run.created_at)} />
                 </div>
               </Card>
 
@@ -416,7 +440,7 @@ function buildRunbookMarkdown(run: RunDetail, sections: RunbookSection[], source
     `Risk: ${run.risk_level} (${run.risk_score})`,
     `Policy profile: ${run.policy_profile}`,
     `Approval status: ${run.approval_status}`,
-    `Generated: ${formatDate(new Date().toISOString())}`,
+    `Generated: ${formatDate(run.completed_at ?? run.created_at)}`,
     "",
     "## Source findings",
     sourceFindings.length ? "" : "No high-risk or manual-review findings were available for this run."
@@ -442,10 +466,12 @@ function buildRunbookMarkdown(run: RunDetail, sections: RunbookSection[], source
 function RunbookSectionCard({
   section,
   checkedSteps,
+  disabled,
   onToggle
 }: {
   section: RunbookSection;
   checkedSteps: Record<string, boolean>;
+  disabled: boolean;
   onToggle: (stepId: string) => void;
 }) {
   const Icon = sectionIcons[section.id as keyof typeof sectionIcons] ?? FileText;
@@ -470,6 +496,7 @@ function RunbookSectionCard({
               type="checkbox"
               checked={Boolean(checkedSteps[step.id])}
               onChange={() => onToggle(step.id)}
+              disabled={disabled}
               className="mt-1 h-4 w-4 shrink-0 rounded border-[#31445f] bg-[#07101d] accent-[#43c6ac]"
             />
             <span className="min-w-0">

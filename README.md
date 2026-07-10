@@ -2,6 +2,8 @@
 
 TerraGate is a production-style Terraform PR risk gate for reviewing infrastructure changes before they merge. It parses Terraform plan JSON, redacts sensitive values, runs deterministic security/cost/reliability/governance checks, uses a LangGraph workflow to enrich and rank findings, persists review history, drafts a GitHub PR comment, and requires human approval before posting or committing suggested fixes.
 
+**Positioning:** AI-assisted Terraform review that treats policy evidence as the source of truth and LLM output as explanation, remediation, and workflow acceleration.
+
 ## TL;DR
 
 - **What it is:** An AI-assisted Terraform PR reviewer for cloud/platform teams.
@@ -9,6 +11,21 @@ TerraGate is a production-style Terraform PR risk gate for reviewing infrastruct
 - **Why it is credible:** It uses deterministic policy checks first, redacts artifacts before AI review, persists runs/findings/evidence, has Alembic migrations, tests, CI, Docker Compose, GitHub integration, and Cognito-ready auth.
 - **Live demo:** [https://terragate.hangi87.workers.dev](https://terragate.hangi87.workers.dev)
 - **Example run:** [Critical risky-security review](https://terragate.hangi87.workers.dev/runs/run_8182267f6ba84b629a)
+
+## Problem
+
+Terraform PR review is slow because reviewers have to reconstruct blast radius, security exposure, cost impact, and operational risk from scattered plan output, code diffs, tags, and tribal knowledge. Generic AI review is not trustworthy enough on its own because Terraform plan JSON can contain sensitive values and because hallucinated infrastructure findings create review noise.
+
+## Solution
+
+TerraGate turns a Terraform plan into a review workflow: parse and redact the plan, run deterministic checks, map findings to evidence and PR context, rank risk, generate remediation/runbook guidance, draft one clean PR comment, and block all external writes until a human approves them.
+
+## Operational Value
+
+- Reduces manual review time by turning plan JSON into prioritized findings with evidence.
+- Reduces cloud risk by catching public ingress, destructive stateful changes, missing backups, weak tags, and cost surprises before merge.
+- Preserves reviewer control by requiring explicit approval before comments or patch commits.
+- Keeps sensitive data out of optional LLM calls by redacting raw artifacts and sending reduced evidence summaries.
 
 ## About
 
@@ -22,6 +39,14 @@ The core product philosophy is deterministic first, AI second:
 4. Run deterministic policy checks.
 5. Use reviewer nodes to explain, prioritize, and generate remediation from structured evidence.
 6. Require human approval before GitHub writes.
+
+## Screenshots And Diagrams
+
+The public-demo architecture diagram is generated from repository-owned source and reflects the AWS/Cloudflare deployment shape defined in this repo.
+
+![AWS Architecture](docs/architecture_aws.png)
+
+UI screenshots are intentionally not checked in unless generated from the running app. Use the live demo link above or the local quickstart below to inspect the current dashboard.
 
 ## Tech Stack
 
@@ -53,13 +78,48 @@ The core product philosophy is deterministic first, AI second:
 - **Hosted-demo guardrails:** Includes preloaded sample-review endpoints, upload size limits, sandbox disablement, read-only policy packs, and mock GitHub writes for public demos.
 - **Recruiter-visible engineering hygiene:** TypeScript checks, ESLint, pytest suite, Docker Compose, Alembic migrations, sample data, API contract docs, threat model, and ADRs.
 
+## Evidence Matrix
+
+| Area | Evidence |
+| --- | --- |
+| IaC | `infra/terraform/aws-public-demo` provisions API Gateway, Lambda container, ECR, CodeBuild, private RDS, VPC/subnets/security groups, log groups, and outputs. |
+| CI/CD | `.github/workflows/ci.yml` runs backend tests, Alembic migration validation, frontend typecheck/lint/build, and Terraform fmt/validate. AWS backend deploy uses Terraform + CodeBuild; Cloudflare deploy uses OpenNext/Wrangler. |
+| Security | Terraform plan and PR patch redaction, Cognito JWT support, dev-auth isolation for demos, private RDS, security-group scoped DB access, approval-gated GitHub writes, public-demo guardrails. |
+| Reliability | Persisted run/job state, node-level graph progress, retry metadata, worker claim flow, explicit public-demo fallback behavior, documented failure modes and recovery. |
+| Observability | CloudWatch log groups, Cloudflare Workers observability, persisted audit events, optional LangSmith tracing, graph progress visible in the UI. |
+| Cost | Lambda/API Gateway request-driven backend, no NAT gateway in demo stack, stoppable small RDS, 14-day log retention, optional Infracost, documented low-idle public-demo path. |
+| Operations | Runbook-grade remediation output, deployment docs, teardown docs, threat model, public demo guide, API contract, reviewer guide. |
+| Testing | Pytest coverage for parser/redaction/policy/risk/API/auth/GitHub behavior, frontend TypeScript/lint/build checks, CI Terraform validation. |
+| Documentation | Architecture docs, ADRs, tradeoffs, security, observability, cost model, testing, deployment, teardown, and reviewer guide. |
+
 ## Architecture
 
-The system is a monorepo with a Next.js dashboard and a FastAPI backend. The backend owns Terraform parsing, redaction, policy checks, LangGraph orchestration, persistence, and integrations. The frontend focuses on review intake, run detail, findings, approvals, policy-pack editing, and GitHub action controls.
+The implemented public-demo path serves the Next.js/OpenNext frontend from Cloudflare Workers. Browser requests call an AWS API Gateway HTTP API, which invokes a Mangum-wrapped FastAPI Lambda in private subnets. The backend runs the deterministic-first LangGraph review inline, stores ephemeral artifacts in Lambda `/tmp`, and persists review state and audit events in private, encrypted RDS PostgreSQL.
+
+- **Request flow:** The reviewer loads the UI from Cloudflare Workers; the browser sends API calls directly to API Gateway -> FastAPI/Lambda -> review engine -> RDS. Optional GitHub, OpenAI, LangSmith, and Infracost adapters are disabled, mocked, or credential-dependent in the public-demo path.
+- **Deployment flow:** Terraform provisions the AWS backend and starts CodeBuild, which clones the selected Git ref, builds `Dockerfile.lambda`, pushes to ECR, and supplies Lambda by image digest. The Cloudflare frontend deploy is a separate manual npm script. GitHub Actions runs tests and builds only; it does not deploy.
+- **Security:** Lambda and RDS run in private subnets, RDS accepts port 5432 only from the Lambda security group, raw plans are redacted before optional AI review, and GitHub writes require human approval. Cognito support is optional and is not provisioned by the demo Terraform; the public demo uses dev auth.
+- **Cost controls:** The stack uses request-driven Lambda/API Gateway, inline execution with no idle worker, no NAT gateway, a small RDS default, and 14-day log retention. Stopping RDS outside demos is a documented manual control, not an automated schedule.
 
 Architecture docs:
 
+- [AWS diagram source](docs/architecture_aws.py)
+- [AWS diagram SVG](docs/architecture_aws.svg)
+- [Mermaid diagram source](docs/architecture.mmd)
+- [Architecture diagram notes and evidence](docs/architecture-notes.md)
 - [Architecture overview and C4-style diagram](docs/architecture.md)
+- [Hiring manager reviewer guide](docs/reviewer-guide.md)
+- [Deployment guide](docs/deployment.md)
+- [Operations runbook](docs/runbook.md)
+- [Security model](docs/security.md)
+- [Observability model](docs/observability.md)
+- [Cost model](docs/cost-model.md)
+- [Teardown guide](docs/teardown.md)
+- [Testing guide](docs/testing.md)
+- [Tradeoffs](docs/tradeoffs.md)
+- [GitHub App onboarding plan](docs/github-app-onboarding.md)
+- [S3/KMS artifact storage plan](docs/s3-artifact-storage.md)
+- [Durable worker queue plan](docs/worker-queue.md)
 - [Architecture Decision Records](docs/adrs/README.md)
 - [Product readiness plan](docs/product-readiness.md)
 - [Low-cost public demo deployment](docs/public-demo.md)
@@ -117,7 +177,7 @@ Docker Compose runs PostgreSQL, the API, the worker, and the web app. Optional R
 
 ### Public Demo Mode
 
-For a hosted portfolio demo, enable the safe public path:
+For a hosted public work-sample demo, enable the safe public path:
 
 ```bash
 PUBLIC_DEMO_MODE=true
@@ -241,6 +301,69 @@ npm run build
 
 GitHub Actions runs backend pytest plus frontend typecheck, lint, and build.
 
+CI also validates Alembic migrations and Terraform formatting/validation for the AWS public-demo stack.
+
+## Deployment Overview
+
+- **Local:** Docker Compose runs API, web, worker, and PostgreSQL. Manual mode can use SQLite for quick API runs.
+- **Public demo frontend:** Cloudflare Workers through OpenNext and Wrangler. The current repository includes `apps/web/wrangler.jsonc` and npm scripts for preview/deploy.
+- **Public demo backend:** AWS API Gateway invokes a Mangum-wrapped FastAPI Lambda container. Terraform provisions private RDS PostgreSQL, ECR, CodeBuild, VPC networking, and log groups.
+- **CI:** GitHub Actions validates code and Terraform but intentionally does not auto-deploy.
+
+See [docs/deployment.md](docs/deployment.md) and [docs/public-demo.md](docs/public-demo.md).
+
+## Security Model Summary
+
+- Deterministic checks are authoritative; optional LLM calls receive redacted evidence summaries only.
+- Terraform plan values and GitHub patch snippets are redacted before AI review or display in sensitive contexts.
+- Public demo mode blocks live GitHub writes, Terraform sandbox execution, and policy-pack edits by default.
+- Cognito JWT validation exists for private deployments, while the public demo uses dev auth and clearly labels it.
+- GitHub comments/checks/patch commits are approval-gated and audited.
+- Private RDS only accepts PostgreSQL traffic from the Lambda security group in the AWS demo stack.
+
+See [docs/security.md](docs/security.md) and [docs/threat-model.md](docs/threat-model.md).
+
+## Observability Model Summary
+
+- Runs persist graph progress, node status, findings, approvals, GitHub action attempts, and audit events.
+- Public-demo infrastructure writes Lambda and CodeBuild logs to CloudWatch with 14-day retention.
+- Cloudflare Workers observability is enabled in `apps/web/wrangler.jsonc`.
+- LangSmith tracing is optional through environment variables and disabled in the low-cost public-demo Terraform by default.
+
+See [docs/observability.md](docs/observability.md).
+
+## Cost Controls Summary
+
+- Lambda/API Gateway are request-driven.
+- The public-demo stack avoids a NAT gateway and separate always-on worker.
+- RDS uses a small instance class and is documented as stoppable outside demos.
+- Log retention is limited to 14 days.
+- Infracost can provide stronger estimates; heuristic estimates are labeled when Infracost is unavailable.
+
+See [docs/cost-model.md](docs/cost-model.md).
+
+## Public Demo Performance
+
+The public demo is optimized for very low idle cost, so the first API request after inactivity can be slower than a paid always-warm service. The likely causes are Lambda container cold start, FastAPI/database connection startup, and RDS connection warm-up.
+
+The UI is designed to hide that cost from the first impression:
+
+- The Cloudflare-hosted app shell, navigation, controls, and static trust signals render immediately.
+- Dashboard metrics and run history load progressively with skeleton states instead of showing temporary zero values.
+- The homepage hydrates the seeded showcase review after the cockpit is visible.
+- The API imports the LangGraph/LangChain review workflow only when a review job executes, so simple health and dashboard endpoints avoid unnecessary heavy startup work.
+
+This is a deliberate portfolio-demo tradeoff: keep idle spend low while preserving a credible user experience. A paid production deployment would add a durable queue, stronger caching, and optionally Lambda provisioned concurrency or an always-on service for stricter latency targets.
+
+## Teardown And Cleanup
+
+- Local containers can be stopped with Docker Compose.
+- AWS public-demo resources are removed with `terraform destroy`.
+- Cloudflare frontend resources are managed through Wrangler/Cloudflare.
+- The demo stack is disposable by design: RDS deletion protection and final snapshot are disabled by default.
+
+See [docs/teardown.md](docs/teardown.md).
+
 ## Known Limits
 
 - The worker is database-polling, not a durable queue system such as SQS, Celery, or Temporal.
@@ -253,11 +376,11 @@ GitHub Actions runs backend pytest plus frontend typecheck, lint, and build.
 
 ## Roadmap
 
-- Durable queue backend with leases, heartbeats, and node-level retry recovery.
-- Tenant-isolated Terraform execution with short-lived cloud credentials.
-- Policy-pack approval/versioning workflow.
-- S3 artifact storage adapter.
+- Durable queue backend such as SQS or Temporal for customer-scale review execution.
+- Tenant-isolated Terraform execution with short-lived cloud credentials and stronger sandbox boundaries.
+- Policy-pack approval/versioning workflow with policy snapshots per run.
+- S3/KMS artifact storage adapter with retention and deletion controls.
 - OPA/Rego policy execution alongside Python checks.
 - Chroma/Qdrant runbook retrieval for incident investigation and remediation context.
 - LangSmith trace links in the UI.
-- AWS ECS/Lambda or Azure Container Apps deployment templates.
+- First-class GitHub App installation onboarding and repository registration.
