@@ -1,7 +1,5 @@
 import type { AuditLogEntry, Category, Finding, FixPatch, GitHubPRContext, Report, RunDetail, RunListItem, Severity } from "@/types/api";
 
-export const SHOWCASE_STORAGE_KEY = "terragate.showcase_run_id";
-
 type DemoSample = "safe" | "risky-security" | "risky-cost" | "destructive-prod";
 
 type ScenarioFile = {
@@ -405,16 +403,6 @@ const DEMO_SCENARIOS: Record<DemoSample, DemoScenario> = {
   }
 };
 
-export const SHOWCASE_REPO = {
-  owner: DEMO_SCENARIOS["destructive-prod"].repoOwner,
-  name: DEMO_SCENARIOS["destructive-prod"].repoName,
-  pullNumber: DEMO_SCENARIOS["destructive-prod"].pullNumber,
-  sample: DEMO_SCENARIOS["destructive-prod"].sample,
-  environment: DEMO_SCENARIOS["destructive-prod"].environment,
-  cloudProvider: DEMO_SCENARIOS["destructive-prod"].cloudProvider,
-  policyProfile: DEMO_SCENARIOS["destructive-prod"].policyProfile
-};
-
 export function demoScenarioReviewOptions(sample: string) {
   const scenario = getDemoScenario(sample);
   if (!scenario) return undefined;
@@ -426,15 +414,6 @@ export function demoScenarioReviewOptions(sample: string) {
     repo_name: scenario.repoName,
     pull_number: scenario.pullNumber
   };
-}
-
-export function isShowcaseRun(run: Pick<RunDetail, "repo_owner" | "repo_name" | "pull_number" | "terraform_execution">): boolean {
-  return Boolean(resolveScenario(run));
-}
-
-export function isHomeShowcaseRun(run: Pick<RunDetail, "repo_owner" | "repo_name" | "pull_number" | "terraform_execution">): boolean {
-  const scenario = resolveScenario(run);
-  return scenario?.sample === SHOWCASE_REPO.sample && run.repo_owner === SHOWCASE_REPO.owner && run.repo_name === SHOWCASE_REPO.name && run.pull_number === SHOWCASE_REPO.pullNumber;
 }
 
 export function presentShowcaseRun(run: RunDetail): RunDetail {
