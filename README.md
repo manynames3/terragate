@@ -333,7 +333,7 @@ Results for the review-integrity changes, not evidence of a new cloud deployment
 | Local Playwright smoke | Desktop/mobile review, API-matching draft and snippet download, approval, mock post, repeat-post disabled; no page errors or mobile page overflow |
 | Whitespace and changed-document local links | Passed |
 
-The browser smoke used a local preview and mock GitHub writes; it is not a checked-in CI e2e suite. No live GitHub write or hosted AWS/Cloudflare rollout was tested for this change. See [testing details and remaining gaps](docs/testing.md).
+The local browser smoke is not a checked-in CI e2e suite. The same approval/export/mock-post journey was subsequently verified on the AWS/Cloudflare deployment, on desktop and mobile. Live GitHub writes were not tested. See the [deployment record](docs/deployment.md#verified-public-demo-release) and [testing details and remaining gaps](docs/testing.md).
 
 ## Deployment Overview
 
