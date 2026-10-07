@@ -21,7 +21,8 @@ TerraGate treats Terraform plans and PR patches as sensitive artifacts, uses det
 - GitHub patch context is redacted before it is stored or shown.
 - LLM reviewer nodes operate on reduced evidence summaries.
 - Policy findings include evidence paths, rule IDs, confidence, and reviewer source.
-- GitHub comments, check updates, and patch commits require approval.
+- GitHub comments require approval of an exact review snapshot, including draft, findings, artifact hashes, policy inputs, and reviewed PR head. Live PR heads are checked again before posting. Check updates run automatically during review.
+- Generated remediation snippets cannot be approved or committed; their export controls provide guidance for local adaptation. Complete source-verified diffs use context checks, Terraform syntax/format checks, and non-force branch updates in the adapter; automatic generation and full module validation are not implemented.
 - Public demo mode mocks GitHub writes by default.
 - Public demo mode disables sandbox Terraform execution by default.
 - Cognito JWT validation and group-to-role mapping are available for private deployments.

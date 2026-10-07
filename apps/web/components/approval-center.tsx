@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ExternalLink, GitPullRequest, XCircle } from "lucide-react";
 import { approveRun, getCurrentUser, getReport, listRuns, postGitHubComment, rejectRun } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import { presentRunListItem } from "@/lib/showcase";
+import { canDecideReview, canPostReview } from "@/lib/review-actions";
 import type { AuthUser, Report, RunListItem } from "@/types/api";
 import { AlertBanner, Badge, Button, Card, ConfirmDialog, EmptyState, SeverityBadge } from "@/components/ui";
 
@@ -29,7 +29,7 @@ export function ApprovalCenter() {
     setError(null);
     try {
       const data = await listRuns();
-      setRuns(data.map(presentRunListItem));
+      setRuns(data);
       setSelectedRunId((current) => current && data.some((run) => run.id === current) ? current : data.find((run) => run.approval_status === "pending")?.id ?? data[0]?.id ?? null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load approval requests.");
@@ -51,10 +51,12 @@ export function ApprovalCenter() {
     setReportLoading(true);
     setReport(null);
     setFeedback(null);
+    let active = true;
     getReport(selectedRunId)
-      .then(setReport)
-      .catch((loadError: Error) => setError(loadError.message))
-      .finally(() => setReportLoading(false));
+      .then((data) => { if (active) setReport(data); })
+      .catch((loadError: Error) => { if (active) setError(loadError.message); })
+      .finally(() => { if (active) setReportLoading(false); });
+    return () => { active = false; };
   }, [selectedRunId]);
 
   const pendingRuns = useMemo(() => runs.filter((run) => run.approval_status === "pending"), [runs]);
@@ -62,7 +64,7 @@ export function ApprovalCenter() {
   const canReview = currentUser?.role === "reviewer" || currentUser?.role === "platform-admin";
 
   async function action(kind: "approve" | "reject" | "post") {
-    if (!selectedRunId) return;
+    if (!selected || !report || report.run_id !== selectedRunId) return;
     if (kind === "reject" && !notes.trim()) {
       setFeedback({ tone: "danger", text: "Add a rejection reason before requesting changes." });
       return;
@@ -71,11 +73,11 @@ export function ApprovalCenter() {
     setFeedback(null);
     try {
       if (kind === "approve") {
-        await approveRun(selectedRunId, notes);
+        await approveRun(selected.id, notes, report.review_snapshot_hash);
         setFeedback({ tone: "success", text: "Draft approved and recorded in the audit trail." });
       }
       if (kind === "reject") {
-        await rejectRun(selectedRunId, notes);
+        await rejectRun(selected.id, notes, report.review_snapshot_hash);
         setFeedback({ tone: "success", text: "Changes requested and the reason was recorded." });
       }
       if (kind === "post") {
@@ -83,6 +85,8 @@ export function ApprovalCenter() {
         setFeedback({ tone: "success", text: result.comment_url ? "Comment posted to GitHub." : result.message, href: result.comment_url ?? undefined });
       }
       await loadRuns();
+      const refreshedReport = await getReport(selected.id);
+      setReport((current) => current?.run_id === refreshedReport.run_id ? refreshedReport : current);
     } catch (actionError) {
       setFeedback({ tone: "danger", text: actionError instanceof Error ? actionError.message : "Action failed." });
     } finally {
@@ -150,7 +154,7 @@ export function ApprovalCenter() {
               <div className="h-8 w-56 animate-pulse rounded bg-[#17263d]" />
               <div className="h-[420px] animate-pulse rounded-md bg-[#101b2d]" />
             </div>
-          ) : selected && report ? (
+          ) : selected && report && report.run_id === selected.id ? (
             <div>
               <div className="mb-5 flex flex-col justify-between gap-3 md:flex-row md:items-start">
                 <div>
@@ -162,6 +166,7 @@ export function ApprovalCenter() {
                 </Link>
               </div>
               <pre className="max-h-[560px] overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-4 text-xs leading-6 text-slate-100">{report.pr_comment_draft}</pre>
+              {report.decision_blocker ? <p className="mt-3 text-sm text-amber-200">{report.decision_blocker}</p> : null}
               <label className="mt-4 block">
                 <span className="text-sm font-medium text-slate-200">Decision notes</span>
                 <textarea
@@ -172,13 +177,13 @@ export function ApprovalCenter() {
                 />
               </label>
               <div className="mt-4 flex flex-wrap gap-3">
-                <Button onClick={() => void action("approve")} disabled={actionLoading || !canReview || selected.approval_status === "approved"}>
+                <Button onClick={() => void action("approve")} disabled={actionLoading || !canReview || !canDecideReview(selected, report) || report.approval_valid}>
                   <CheckCircle2 className="h-4 w-4" /> Approve
                 </Button>
-                <Button variant="danger" onClick={() => setConfirmation("reject")} disabled={actionLoading || !canReview || selected.approval_status === "rejected"}>
+                <Button variant="danger" onClick={() => setConfirmation("reject")} disabled={actionLoading || !canReview || !canDecideReview(selected, report) || selected.approval_status === "rejected"}>
                   <XCircle className="h-4 w-4" /> Reject
                 </Button>
-                <Button variant="secondary" disabled={actionLoading || !canReview || selected.approval_status !== "approved"} onClick={() => setConfirmation("post")}>
+                <Button variant="secondary" disabled={actionLoading || !canReview || !canPostReview(selected, report)} onClick={() => setConfirmation("post")}>
                   <GitPullRequest className="h-4 w-4" /> Post to GitHub
                 </Button>
               </div>

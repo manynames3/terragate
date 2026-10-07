@@ -63,13 +63,23 @@ from app.schemas.review import (
 )
 from app.services.github_context import redact_github_patch_context
 from app.services.fix_patches import suggested_fix_patches
-from app.services.policy_packs import get_policy_pack, list_policy_packs, save_policy_pack
+from app.services.policy_packs import get_policy_pack, list_policy_packs, load_policy_pack, save_policy_pack
+from app.services.review_approval import POSTED_STATES, approval_is_current, decision_error, patch_snapshot_hash, review_snapshot_hash
 from app.services.risk import severity_counts
 from app.services.terraform_plan import TerraformPlanError, validate_terraform_plan
 from app.services.terraform_sandbox import TerraformSandboxError, TerraformSandboxRunner
 
 
 router = APIRouter(prefix="/api/v1", tags=["terraform reviews"])
+
+
+async def _verify_reviewed_head(run: RunModel) -> None:
+    settings = get_settings()
+    if settings.public_demo_mode and settings.public_demo_mock_github_writes:
+        return
+    error = await _github_client(settings).verify_pr_head(run.repo_owner, run.repo_name, run.pull_number, run.reviewed_head_sha)
+    if error:
+        raise HTTPException(status_code=409, detail=error)
 
 
 DEMO_SAMPLE_PLANS: dict[str, dict[str, str]] = {
@@ -569,6 +579,9 @@ def get_report(
         pr_comment_draft=run.pr_comment_draft,
         remediation_summary=run.remediation_summary,
         risk_score=RiskScore(**risk),
+        review_snapshot_hash=review_snapshot_hash(run),
+        approval_valid=approval_is_current(run),
+        decision_blocker=decision_error(run, review_snapshot_hash(run)),
     )
 
 
@@ -580,17 +593,26 @@ def approve_run(
     user: DevUser = Depends(get_current_user),
 ) -> DecisionResponse:
     require_role(user, {"reviewer", "platform-admin"})
-    run = _get_run_or_404(db, run_id, user=user)
+    run = _get_run_or_404(db, run_id, user=user, lock=True)
+    error = decision_error(run, request.review_snapshot_hash)
+    if error:
+        raise HTTPException(status_code=409, detail=error)
+    _run_async(_verify_reviewed_head(run))
+    if approval_is_current(run):
+        return DecisionResponse(run_id=run.id, decision="approved", status=run.status)
     run.status = "approved"
     run.approval_status = "approved"
-    db.add(ApprovalModel(run_id=run.id, decision="approved", notes=request.notes))
+    run.approved_snapshot_hash = request.review_snapshot_hash
+    db.add(ApprovalModel(run_id=run.id, decision="approved", notes=request.notes,
+                         snapshot_hash=request.review_snapshot_hash, actor_id=user.id, actor_email=user.email))
     _record_audit(
         db,
         action="approval.approved",
         run_id=run.id,
         actor=user,
         target_id=run.id,
-        metadata={"notes": request.notes},
+        metadata={"notes": request.notes, "review_snapshot_hash": request.review_snapshot_hash,
+                  "reviewed_head_sha": run.reviewed_head_sha},
     )
     db.add(run)
     db.commit()
@@ -605,17 +627,26 @@ def reject_run(
     user: DevUser = Depends(get_current_user),
 ) -> DecisionResponse:
     require_role(user, {"reviewer", "platform-admin"})
-    run = _get_run_or_404(db, run_id, user=user)
+    run = _get_run_or_404(db, run_id, user=user, lock=True)
+    error = decision_error(run, request.review_snapshot_hash)
+    if error:
+        raise HTTPException(status_code=409, detail=error)
+    if not request.notes or not request.notes.strip():
+        raise HTTPException(status_code=422, detail="Add a rejection reason for the change author.")
+    if run.approval_status == "rejected":
+        return DecisionResponse(run_id=run.id, decision="rejected", status=run.status)
     run.status = "rejected"
     run.approval_status = "rejected"
-    db.add(ApprovalModel(run_id=run.id, decision="rejected", notes=request.notes))
+    run.approved_snapshot_hash = None
+    db.add(ApprovalModel(run_id=run.id, decision="rejected", notes=request.notes,
+                         snapshot_hash=request.review_snapshot_hash, actor_id=user.id, actor_email=user.email))
     _record_audit(
         db,
         action="approval.rejected",
         run_id=run.id,
         actor=user,
         target_id=run.id,
-        metadata={"notes": request.notes},
+        metadata={"notes": request.notes, "review_snapshot_hash": request.review_snapshot_hash},
     )
     db.add(run)
     db.commit()
@@ -623,18 +654,28 @@ def reject_run(
 
 
 @router.post("/runs/{run_id}/github-comment", response_model=GitHubCommentResponse)
-async def post_github_comment(
+def post_github_comment(
     run_id: str,
     db: Session = Depends(get_db),
     user: DevUser = Depends(get_current_user),
 ) -> GitHubCommentResponse:
     require_role(user, {"reviewer", "platform-admin"})
-    run = _get_run_or_404(db, run_id, user=user)
-    if run.approval_status != "approved":
+    run = _get_run_or_404(db, run_id, user=user, lock=True)
+    if not approval_is_current(run):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Human approval is required before posting a GitHub comment.",
+            detail="Current human approval is required. Refresh and approve the exact review before posting.",
         )
+    if run.status in POSTED_STATES:
+        previous = db.scalar(select(GitHubCommentModel).where(GitHubCommentModel.run_id == run.id)
+                             .order_by(GitHubCommentModel.posted_at.desc()))
+        return GitHubCommentResponse(run_id=run.id, posted=run.status == "comment_posted",
+                                     mock=run.status == "mock_comment_ready",
+                                     message="This approved draft was already processed; no additional comment was posted.",
+                                     comment_url=previous.comment_url if previous else None)
+    if run.status != "approved":
+        raise HTTPException(status_code=409, detail="Only an approved completed review can be posted.")
+    _run_async(_verify_reviewed_head(run))
     settings = get_settings()
     if settings.public_demo_mode and settings.public_demo_mock_github_writes:
         result = GitHubPostResult(
@@ -646,12 +687,14 @@ async def post_github_comment(
             ),
         )
     else:
-        result = await _github_client(settings).post_pr_comment(
+        result = _run_async(_github_client(settings).post_pr_comment(
             run.repo_owner,
             run.repo_name,
             run.pull_number,
             run.pr_comment_draft,
-        )
+        ))
+    if not result.posted and not result.mock:
+        raise HTTPException(status_code=502, detail=result.message)
     if result.comment_url or result.mock:
         db.add(
             GitHubCommentModel(
@@ -667,7 +710,8 @@ async def post_github_comment(
             action="github.comment_posted" if result.posted else "github.comment_mocked",
             run_id=run.id,
             actor=user,
-            metadata={"message": result.message, "comment_url": result.comment_url},
+            metadata={"message": result.message, "comment_url": result.comment_url,
+                      "review_snapshot_hash": run.approved_snapshot_hash, "reviewed_head_sha": run.reviewed_head_sha},
         )
         run.status = "comment_posted" if result.posted else "mock_comment_ready"
         db.add(run)
@@ -793,11 +837,12 @@ def get_fix_patches(
 def approve_fix_patch(
     run_id: str,
     patch_id: str,
+    request: ApprovalRequest,
     db: Session = Depends(get_db),
     user: DevUser = Depends(get_current_user),
 ) -> FixPatch:
     require_role(user, {"reviewer", "platform-admin"})
-    _get_run_or_404(db, run_id, user=user)
+    run = _get_run_or_404(db, run_id, user=user, lock=True)
     patch = db.scalar(
         select(FixPatchModel)
         .where(FixPatchModel.run_id == run_id)
@@ -805,7 +850,15 @@ def approve_fix_patch(
     )
     if not patch:
         raise HTTPException(status_code=404, detail="Fix patch not found.")
+    if patch.kind != "patch":
+        raise HTTPException(status_code=409, detail="This is a remediation snippet, not an applicable patch. Export and adapt it in your repository.")
+    error = decision_error(run, review_snapshot_hash(run))
+    if error:
+        raise HTTPException(status_code=409, detail=error)
+    if patch.status == "committed" or patch_snapshot_hash(run, patch) != request.review_snapshot_hash:
+        raise HTTPException(status_code=409, detail="The patch changed or was already committed. Refresh the review before approving.")
     patch.status = "approved"
+    patch.approved_snapshot_hash = request.review_snapshot_hash
     patch.approved_at = datetime.now(timezone.utc)
     db.add(patch)
     _record_audit(
@@ -815,7 +868,7 @@ def approve_fix_patch(
         actor=user,
         target_type="fix_patch",
         target_id=patch.id,
-        metadata={"summary": patch.summary},
+        metadata={"summary": patch.summary, "patch_snapshot_hash": request.review_snapshot_hash},
     )
     db.commit()
     return _fix_patch_schema(patch)
@@ -829,7 +882,7 @@ def commit_fix_patch_to_github(
     user: DevUser = Depends(get_current_user),
 ) -> PatchCommitResponse:
     require_role(user, {"platform-admin"})
-    run = _get_run_or_404(db, run_id, user=user)
+    run = _get_run_or_404(db, run_id, user=user, lock=True)
     patch = db.scalar(
         select(FixPatchModel)
         .where(FixPatchModel.run_id == run_id)
@@ -837,11 +890,17 @@ def commit_fix_patch_to_github(
     )
     if not patch:
         raise HTTPException(status_code=404, detail="Fix patch not found.")
+    if patch.kind != "patch":
+        raise HTTPException(status_code=409, detail="Snippet drafts cannot be committed. Export and validate the remediation in your repository.")
     if patch.status != "approved":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Patch approval is required before committing a suggested fix.",
         )
+    if not approval_is_current(run):
+        raise HTTPException(status_code=409, detail="Current review approval is required before committing a fix.")
+    if not patch.approved_snapshot_hash or patch.approved_snapshot_hash != patch_snapshot_hash(run, patch):
+        raise HTTPException(status_code=409, detail="The approved patch or review changed. Refresh and approve the current patch.")
 
     settings = get_settings()
     if settings.public_demo_mode and settings.public_demo_mock_github_writes:
@@ -862,13 +921,20 @@ def commit_fix_patch_to_github(
                 patch.pr_file_path,
                 patch.diff,
                 commit_message=f"fix(terraform): apply TerraGate remediation for {run.id}",
+                expected_head_sha=run.reviewed_head_sha,
             )
         )
+    if not result.committed and not result.mock:
+        raise HTTPException(status_code=409, detail=result.message)
     if result.committed:
         patch.status = "committed"
         patch.commit_url = result.commit_url
         patch.committed_at = datetime.now(timezone.utc)
         db.add(patch)
+        run.approved_snapshot_hash = None
+        run.approval_status = "pending"
+        run.status = "approval_pending"
+        db.add(run)
     _record_audit(
         db,
         action="fix_patch.committed" if result.committed else "fix_patch.commit_mocked",
@@ -968,6 +1034,9 @@ async def _create_and_queue_review(
     )
     if github_pr_context:
         repo_context["github_pr_context"] = github_pr_context
+        if github_pr_context.get("available") and not github_pr_context.get("mock"):
+            run.reviewed_head_sha = github_pr_context.get("latest_commit_sha")
+            db.add(run)
         github_artifact = db.scalar(
             select(ArtifactModel)
             .where(ArtifactModel.run_id == run.id)
@@ -990,6 +1059,7 @@ async def _create_and_queue_review(
         "input_artifacts": input_artifacts,
         "repo_context": repo_context,
         "policy_profile": policy_profile,
+        "policy_pack": load_policy_pack(policy_profile).to_dict(),
         "environment": environment,
         "cloud_provider": cloud_provider,
         "raw_plan_ref": raw_uri,
@@ -1100,12 +1170,16 @@ def _persist_final_state(db: Session, run: RunModel, final_state: dict[str, Any]
                 pr_file_path=patch.get("pr_file_path"),
                 summary=patch.get("summary", ""),
                 diff=patch.get("diff", ""),
+                kind="snippet",
+                snippet=patch.get("snippet", ""),
             )
         )
 
     risk_score = final_state.get("risk_score", {})
     run.status = "approval_pending"
     run.approval_status = final_state.get("approval_status", "pending")
+    run.approved_snapshot_hash = None
+    run.policy_snapshot = final_state.get("policy_pack", {})
     run.risk_score = risk_score.get("overall_score", 0)
     run.risk_level = risk_score.get("risk_level", "low")
     run.risk_score_detail = risk_score
@@ -1331,9 +1405,12 @@ def _get_run_or_404(
     run_id: str,
     with_findings: bool = False,
     user: DevUser | None = None,
+    lock: bool = False,
 ) -> RunModel:
     query = select(RunModel).where(RunModel.id == run_id)
     query = _scope_run_query(query, user)
+    if lock:
+        query = query.with_for_update(of=RunModel)
     if with_findings:
         query = query.options(
             selectinload(RunModel.artifacts),
@@ -1348,6 +1425,8 @@ def _get_run_or_404(
     else:
         query = query.options(
             selectinload(RunModel.artifacts),
+            selectinload(RunModel.findings).selectinload(FindingModel.evidence),
+            selectinload(RunModel.findings).selectinload(FindingModel.remediations),
             selectinload(RunModel.jobs),
             selectinload(RunModel.github_checks),
             selectinload(RunModel.fix_patches),
@@ -1378,6 +1457,7 @@ def _run_detail(run: RunModel) -> RunDetail:
         blast_radius=run.blast_radius or {},
         terraform_execution=run.terraform_execution or {},
         approval_status=run.approval_status,
+        approval_valid=approval_is_current(run),
         repo_owner=run.repo_owner,
         repo_name=run.repo_name,
         pull_number=run.pull_number,
@@ -1536,6 +1616,9 @@ def _fix_patch_schema(patch: FixPatchModel) -> dict[str, Any]:
         "pr_file_path": patch.pr_file_path,
         "summary": patch.summary,
         "diff": patch.diff,
+        "kind": patch.kind,
+        "snippet": patch.snippet,
+        "review_snapshot_hash": patch_snapshot_hash(patch.run, patch),
         "created_at": patch.created_at,
         "approved_at": patch.approved_at,
         "commit_url": patch.commit_url,

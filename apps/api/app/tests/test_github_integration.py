@@ -1,5 +1,8 @@
 import httpx
 import pytest
+import base64
+
+from app.integrations import github
 
 from app.integrations.github import GitHubClient
 
@@ -73,3 +76,81 @@ async def test_fetch_pr_context_without_token_returns_dev_placeholder() -> None:
     assert context.mock is True
     assert context.repo_full_name == "acme/infra"
     assert "GITHUB_TOKEN" in context.message
+
+
+@pytest.mark.asyncio
+async def test_patch_requires_immutable_reviewed_head_before_any_github_request() -> None:
+    def handler(request):
+        pytest.fail("Unreviewed patches must not contact GitHub")
+
+    result = await GitHubClient("token", transport=httpx.MockTransport(handler)).commit_patch_to_pr_branch(
+        "acme", "infra", 7, "main.tf", "@@\n+unsafe", commit_message="fix",
+    )
+    assert result.committed is False
+    assert result.mock is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ref_status", [200, 422])
+async def test_patch_commit_is_pinned_and_uses_non_force_atomic_branch_update(monkeypatch, ref_status) -> None:
+    import json
+
+    requests = []
+    head_sha = "a" * 40
+    updated = 'variable "retention" {\n  default = 7\n}\n'
+    monkeypatch.setattr(github, "apply_reviewed_patch", lambda original, diff, path: updated)
+
+    def handler(request):
+        requests.append(request)
+        path = request.url.path
+        if path.endswith("/pulls/7"):
+            return httpx.Response(200, json={"state": "open", "head": {"ref": "feature/db", "sha": head_sha, "repo": {"full_name": "acme/infra"}}})
+        if path.endswith("/contents/main.tf"):
+            assert request.url.params["ref"] == head_sha
+            return httpx.Response(200, json={"sha": "old_blob", "content": base64.b64encode(b"original").decode()})
+        if path.endswith(f"/git/commits/{head_sha}"):
+            return httpx.Response(200, json={"tree": {"sha": "old_tree"}})
+        if path.endswith("/git/blobs"):
+            assert json.loads(request.content)["content"] == updated
+            return httpx.Response(201, json={"sha": "new_blob"})
+        if path.endswith("/git/trees"):
+            assert json.loads(request.content)["base_tree"] == "old_tree"
+            return httpx.Response(201, json={"sha": "new_tree"})
+        if path.endswith("/git/commits"):
+            assert json.loads(request.content)["parents"] == [head_sha]
+            return httpx.Response(201, json={"sha": "new_commit", "html_url": "https://github.test/commit/1"})
+        if path.endswith("/git/refs/heads/feature/db"):
+            assert request.method == "PATCH"
+            assert json.loads(request.content) == {"sha": "new_commit", "force": False}
+            return httpx.Response(ref_status, json={"message": "Head changed"})
+        pytest.fail(f"Unexpected request: {request.method} {path}")
+
+    result = await GitHubClient("token", base_url="https://api.github.test", transport=httpx.MockTransport(handler)).commit_patch_to_pr_branch(
+        "acme", "infra", 7, "main.tf", "reviewed diff", commit_message="fix", expected_head_sha=head_sha,
+    )
+    assert result.committed is (ref_status == 200)
+    assert not any(request.method == "PUT" for request in requests)
+
+
+@pytest.mark.asyncio
+async def test_stale_pr_head_blocks_patch_before_content_or_writes() -> None:
+    def handler(request):
+        assert request.method == "GET" and request.url.path.endswith("/pulls/7")
+        return httpx.Response(200, json={"state": "open", "head": {"sha": "b" * 40, "ref": "feature"}})
+
+    result = await GitHubClient("token", transport=httpx.MockTransport(handler)).commit_patch_to_pr_branch(
+        "acme", "infra", 7, "main.tf", "diff", commit_message="fix", expected_head_sha="a" * 40,
+    )
+    assert result.committed is False
+    assert "head changed" in result.message
+
+
+@pytest.mark.asyncio
+async def test_live_pr_verification_rejects_missing_or_changed_reviewed_commit() -> None:
+    def handler(request):
+        return httpx.Response(200, json={"state": "open", "head": {"sha": "a" * 40}})
+
+    client = GitHubClient("token", transport=httpx.MockTransport(handler))
+    assert await client.verify_pr_head("acme", "infra", 7, "a" * 40) is None
+    assert "head changed" in await client.verify_pr_head("acme", "infra", 7, "b" * 40)
+    assert "No live PR commit" in await client.verify_pr_head("acme", "infra", 7, None)

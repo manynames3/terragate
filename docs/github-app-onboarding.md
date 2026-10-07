@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-The code supports GitHub PR metadata, webhooks, checks, approval-gated comments, and patch commits. The missing product layer is a guided installation and repository registration flow.
+The code supports GitHub PR metadata, webhooks, automatic checks, and versioned approval-gated comments. Generated remediation snippets are export-only; a source-verified patch generation flow is not available. The missing product layer is a guided installation and repository registration flow.
 
 ## Current Capabilities
 

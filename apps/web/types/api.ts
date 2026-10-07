@@ -130,6 +130,7 @@ export type RunListItem = {
 };
 
 export type RunDetail = RunListItem & {
+  approval_valid: boolean;
   policy_profile: string;
   trace_id: string | null;
   graph_progress: Array<{ node: string; status: string; timestamp: string }>;
@@ -229,6 +230,9 @@ export type FixPatch = {
   pr_file_path: string | null;
   summary: string;
   diff: string;
+  kind: "snippet" | "patch";
+  snippet: string;
+  review_snapshot_hash: string;
   created_at: string;
   approved_at: string | null;
   commit_url: string | null;
@@ -289,6 +293,9 @@ export type Report = {
   pr_comment_draft: string;
   remediation_summary: string;
   risk_score: RiskScore;
+  review_snapshot_hash: string;
+  approval_valid: boolean;
+  decision_blocker: string | null;
 };
 
 export type GitHubCommentResponse = {

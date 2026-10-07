@@ -194,6 +194,9 @@ class FixPatch(BaseModel):
     pr_file_path: str | None = None
     summary: str
     diff: str
+    kind: Literal["snippet", "patch"] = "snippet"
+    snippet: str = ""
+    review_snapshot_hash: str
     created_at: datetime
     approved_at: datetime | None = None
     commit_url: str | None = None
@@ -265,6 +268,7 @@ class RunDetail(BaseModel):
     blast_radius: dict[str, Any] = Field(default_factory=dict)
     terraform_execution: dict[str, Any] = Field(default_factory=dict)
     approval_status: str
+    approval_valid: bool = False
     repo_owner: str | None = None
     repo_name: str | None = None
     pull_number: int | None = None
@@ -287,10 +291,14 @@ class ReportResponse(BaseModel):
     pr_comment_draft: str
     remediation_summary: str
     risk_score: RiskScore
+    review_snapshot_hash: str
+    approval_valid: bool
+    decision_blocker: str | None = None
 
 
 class ApprovalRequest(BaseModel):
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+    review_snapshot_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
 class DecisionResponse(BaseModel):

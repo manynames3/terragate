@@ -10,7 +10,7 @@ The system can generate PR comments and suggested remediation patches. These act
 
 ## Decision
 
-Require human approval before posting GitHub PR comments. Require separate approval before committing suggested patch drafts. If credentials are missing, the PR is from a fork, or required metadata is unavailable, return a mock response instead of mutating GitHub.
+Require human approval of the exact persisted review before posting GitHub PR comments. Bind the decision to a hash of draft, findings, artifacts, policy inputs, and reviewed PR head; reject incomplete runs or changed versions. Verify the live PR head before approval/posting. Generated snippets and legacy patch drafts are export-only, not directly committable. A future source-verified patch requires separate content-bound approval and non-force branch updates. Missing credentials permit an explicit mock comment; stale heads and unsupported patches fail closed rather than simulating success.
 
 ## Consequences
 

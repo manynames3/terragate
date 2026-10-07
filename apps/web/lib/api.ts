@@ -177,17 +177,17 @@ export function getGitHubPrContext(repoOwner: string, repoName: string, pullNumb
   return request<GitHubPRContext>(`/api/v1/github/pr-context?${params.toString()}`);
 }
 
-export function approveRun(runId: string, notes: string): Promise<{ run_id: string; decision: string; status: string }> {
+export function approveRun(runId: string, notes: string, reviewSnapshotHash: string): Promise<{ run_id: string; decision: string; status: string }> {
   return request(`/api/v1/runs/${runId}/approve`, {
     method: "POST",
-    body: JSON.stringify({ notes })
+    body: JSON.stringify({ notes, review_snapshot_hash: reviewSnapshotHash })
   });
 }
 
-export function rejectRun(runId: string, notes: string): Promise<{ run_id: string; decision: string; status: string }> {
+export function rejectRun(runId: string, notes: string, reviewSnapshotHash: string): Promise<{ run_id: string; decision: string; status: string }> {
   return request(`/api/v1/runs/${runId}/reject`, {
     method: "POST",
-    body: JSON.stringify({ notes })
+    body: JSON.stringify({ notes, review_snapshot_hash: reviewSnapshotHash })
   });
 }
 
@@ -201,9 +201,10 @@ export function getFixPatches(runId: string): Promise<FixPatch[]> {
   return request<FixPatch[]>(`/api/v1/runs/${runId}/fix-patches`);
 }
 
-export function approveFixPatch(runId: string, patchId: string): Promise<FixPatch> {
+export function approveFixPatch(runId: string, patchId: string, reviewSnapshotHash: string): Promise<FixPatch> {
   return request<FixPatch>(`/api/v1/runs/${runId}/fix-patches/${patchId}/approve`, {
-    method: "POST"
+    method: "POST",
+    body: JSON.stringify({ review_snapshot_hash: reviewSnapshotHash })
   });
 }
 
