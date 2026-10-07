@@ -259,11 +259,11 @@ Returns structured findings:
 
 ## GET /api/v1/runs/{run_id}/report
 
-Returns report markdown, PR comment draft, remediation summary, and transparent risk score object.
+Returns report markdown, the exact persisted PR comment draft, remediation summary, risk score, `review_snapshot_hash` (SHA-256), `approval_valid`, and `decision_blocker` (null or an actionable reason decisions are unavailable). The hash binds report content, findings/evidence, artifact hashes, policy inputs, environment, and reviewed PR head. Send this hash back when deciding on the displayed draft.
 
 ## GET /api/v1/runs/{run_id}/fix-patches
 
-Returns suggested remediation patch drafts:
+Returns remediation drafts. Currently generated drafts have `kind: "snippet"` and cannot be approved or committed directly. Their `pr_file_path` is null unless a real mapping was saved; the API does not fabricate file paths.
 
 ```json
 {
@@ -273,7 +273,10 @@ Returns suggested remediation patch drafts:
   "status": "draft",
   "pr_file_path": "infra/security-groups.tf",
   "summary": "Public SSH ingress: Restrict SSH to approved CIDRs.",
-  "diff": "diff --git a/infra/security-groups.tf b/infra/security-groups.tf\n...",
+  "kind": "snippet",
+  "snippet": "cidr_blocks = var.approved_admin_cidrs",
+  "diff": "",
+  "review_snapshot_hash": "<64-character patch snapshot SHA-256>",
   "created_at": "2026-05-14T18:00:00Z",
   "approved_at": null,
   "commit_url": null,
@@ -283,11 +286,13 @@ Returns suggested remediation patch drafts:
 
 ## POST /api/v1/runs/{run_id}/fix-patches/{patch_id}/approve
 
-Marks a suggested patch approved and records an audit event. Requires a reviewer or platform-admin role.
+Requires a reviewer or platform-admin role and a JSON body containing the patch's `review_snapshot_hash`. Returns HTTP 409 for generated or legacy snippets. For a real patch, approval binds its exact contents and review provenance; changes invalidate that approval.
 
 ## POST /api/v1/runs/{run_id}/fix-patches/{patch_id}/github-commit
 
-Commits an approved suggested patch to the PR branch when GitHub credentials and same-repository PR metadata are available. Requires `platform-admin`. If credentials are missing or the PR comes from a fork, returns a mock response and does not mutate GitHub.
+Requires `platform-admin`, current review approval, exact patch approval, and `kind: "patch"`. Generated snippets return HTTP 409 even in public-demo mode. No automatic source-verified patch generator is available yet.
+
+The adapter requires an immutable reviewed head, a complete single-file diff, Git and Terraform tooling, matching hunk context, and passing Terraform syntax/format checks. It pins file reads to the reviewed commit and uses a non-force Git ref update to reject concurrent branch changes. Forks, stale heads, incomplete diffs, and validation failures are rejected. Syntax/format checks are not full module/provider validation.
 
 If patch approval is missing, returns HTTP 409.
 
@@ -314,11 +319,12 @@ Request:
 
 ```json
 {
-  "notes": "Approved after validating findings."
+  "notes": "Approved after validating findings.",
+  "review_snapshot_hash": "<copy the 64-character hash returned by GET report>"
 }
 ```
 
-Marks the PR comment draft approved.
+Approves only a completed review in `approval_pending`, `approved`, or `rejected` state. Returns 409 for changed snapshots, incomplete/failed runs, already posted runs, legacy runs without policy provenance, or live PR heads that changed. Approval records the actor and snapshot hash. Repeating approval of the same version does not add duplicate decisions.
 
 ## POST /api/v1/runs/{run_id}/reject
 
@@ -326,15 +332,16 @@ Request:
 
 ```json
 {
-  "notes": "Needs updates before posting."
+  "notes": "Needs updates before posting.",
+  "review_snapshot_hash": "<copy the 64-character hash returned by GET report>"
 }
 ```
 
-Marks the draft rejected.
+Rejects the displayed completed review and revokes approval. A nonempty reason is required. Uses the same snapshot and lifecycle checks as approval.
 
 ## POST /api/v1/runs/{run_id}/github-comment
 
-Posts the approved PR comment to GitHub. If approval is missing, returns HTTP 409. If credentials or repo metadata are missing, returns a mock/dev response.
+Posts the exact approved persisted draft. Missing/stale approval or a changed/closed live PR returns HTTP 409; upstream posting failures return 502. Completed repeat requests return the previous result without another external write. Per-run row locks serialize decisions/posts on PostgreSQL; this does not guarantee exactly-once delivery after a process crash or ambiguous network failure. Credentials-free and public-demo modes return explicit mock responses.
 
 Response:
 

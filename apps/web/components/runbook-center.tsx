@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { createDemoTerraformReview, getCurrentUser, getFindings, getRun, getRunbookProgress, getRuntimeCapabilities, listRuns, updateRunbookProgress } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import { demoScenarioReviewOptions, presentRunListItem } from "@/lib/showcase";
 import type { Finding, RunDetail, RunListItem, Severity } from "@/types/api";
 import { AlertBanner, Badge, Button, Card, EmptyState, LoadingPanel, SeverityBadge } from "@/components/ui";
 
@@ -90,7 +89,7 @@ export function RunbookCenter() {
   useEffect(() => {
     listRuns()
       .then((items) => {
-        const presented = items.map(presentRunListItem);
+        const presented = items;
         setRuns(presented);
         const requestedRun = searchParams.get("run");
         const firstRun = presented.find((item) => item.id === requestedRun) ?? presented.find((item) => item.mode === "terraform_pr_review");
@@ -129,7 +128,7 @@ export function RunbookCenter() {
     setError(null);
     try {
       const items = await listRuns();
-      const presented = items.map(presentRunListItem);
+      const presented = items;
       setRuns(presented);
       if (!selectedRunId && presented[0]) setSelectedRunId(presented[0].id);
     } catch (err) {
@@ -143,7 +142,7 @@ export function RunbookCenter() {
     setLaunching(true);
     setError(null);
     try {
-      const result = await createDemoTerraformReview("destructive-prod", demoScenarioReviewOptions("destructive-prod"));
+      const result = await createDemoTerraformReview("destructive-prod");
       router.push(`/runbooks?run=${result.run_id}`);
       setSelectedRunId(result.run_id);
     } catch (err) {

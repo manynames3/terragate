@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, ExternalLink, FileJson, GitPullRequest, Play, ShieldCheck, UploadCloud } from "lucide-react";
 import { createDemoTerraformReview, createTerraformReview, getCurrentUser, getGitHubPrContext, getRuntimeCapabilities, listPolicyPacks } from "@/lib/api";
-import { demoScenarioReviewOptions } from "@/lib/showcase";
 import type { GitHubPRContext, PolicyPack } from "@/types/api";
 import { AlertBanner, Button, Card, FieldLabel } from "@/components/ui";
 import { DeploymentStatusPanel } from "@/components/deployment-status-panel";
@@ -209,7 +208,7 @@ export function NewReviewForm() {
     setError(null);
     setStatusMessage("Creating hosted sample review...");
     try {
-      const result = await createDemoTerraformReview(sample, demoScenarioReviewOptions(sample));
+      const result = await createDemoTerraformReview(sample);
       router.push(`/runs/${result.run_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to launch example review.");

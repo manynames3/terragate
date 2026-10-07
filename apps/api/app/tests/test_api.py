@@ -106,7 +106,8 @@ def test_create_review_requires_approval_before_github_post() -> None:
         blocked = client.post(f"/api/v1/runs/{run_id}/github-comment")
         assert blocked.status_code == 409
 
-        approved = client.post(f"/api/v1/runs/{run_id}/approve", json={"notes": "demo approved"})
+        report = client.get(f"/api/v1/runs/{run_id}/report").json()
+        approved = client.post(f"/api/v1/runs/{run_id}/approve", json={"notes": "demo approved", "review_snapshot_hash": report["review_snapshot_hash"]})
         assert approved.status_code == 200
 
         posted = client.post(f"/api/v1/runs/{run_id}/github-comment")
@@ -118,7 +119,9 @@ def test_create_review_requires_approval_before_github_post() -> None:
         assert patches.status_code == 200
         assert patches.json()
         patch_id = patches.json()[0]["id"]
-        assert "Evidence:" in patches.json()[0]["diff"]
+        assert patches.json()[0]["kind"] == "snippet"
+        assert patches.json()[0]["snippet"]
+        assert patches.json()[0]["diff"] == ""
 
         progress_empty = client.get(f"/api/v1/runs/{run_id}/runbook-progress")
         assert progress_empty.status_code == 200
@@ -139,19 +142,17 @@ def test_create_review_requires_approval_before_github_post() -> None:
         blocked_patch_commit = client.post(f"/api/v1/runs/{run_id}/fix-patches/{patch_id}/github-commit")
         assert blocked_patch_commit.status_code == 409
 
-        patch_approval = client.post(f"/api/v1/runs/{run_id}/fix-patches/{patch_id}/approve")
-        assert patch_approval.status_code == 200
-        assert patch_approval.json()["status"] == "approved"
+        patch_approval = client.post(f"/api/v1/runs/{run_id}/fix-patches/{patch_id}/approve", json={"review_snapshot_hash": patches.json()[0]["review_snapshot_hash"]})
+        assert patch_approval.status_code == 409
+        assert "snippet" in patch_approval.json()["detail"]
 
         patch_commit = client.post(f"/api/v1/runs/{run_id}/fix-patches/{patch_id}/github-commit")
-        assert patch_commit.status_code == 200
-        assert patch_commit.json()["mock"] is True
-        assert "GITHUB_TOKEN" in patch_commit.json()["message"]
+        assert patch_commit.status_code == 409
 
         audit = client.get(f"/api/v1/runs/{run_id}/audit-log")
         assert audit.status_code == 200
         assert any(entry["action"] == "approval.approved" for entry in audit.json())
-        assert any(entry["action"] == "fix_patch.commit_mocked" for entry in audit.json())
+        assert not any(entry["action"] == "fix_patch.commit_mocked" for entry in audit.json())
         assert any(entry["action"] == "runbook.step_checked" for entry in audit.json())
 
 
@@ -198,7 +199,7 @@ def test_runs_are_scoped_to_authenticated_org() -> None:
             app.dependency_overrides[get_current_user] = lambda: beta_user
             beta_run = client.get(f"/api/v1/runs/{run_id}")
             beta_runs = client.get("/api/v1/runs")
-            beta_approval = client.post(f"/api/v1/runs/{run_id}/approve", json={"notes": "wrong org"})
+            beta_approval = client.post(f"/api/v1/runs/{run_id}/approve", json={"notes": "wrong org", "review_snapshot_hash": "0" * 64})
 
         assert beta_run.status_code == 404
         assert beta_approval.status_code == 404

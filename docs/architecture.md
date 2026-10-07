@@ -70,7 +70,7 @@ flowchart LR
 8. Deterministic checks create evidence-backed findings. Optional LLM reviewer nodes explain, group, and enrich findings without receiving raw plan content.
 9. The graph builds a risk score, remediation summary, suggested patches, runbook checklist items, and a PR comment draft.
 10. Results are persisted and the run enters `approval_pending`.
-11. A reviewer approves or rejects the PR comment. Suggested patch commits require separate approval.
+11. A reviewer approves or rejects the exact PR comment using the report's snapshot hash. Saved findings, artifact hashes, policy inputs, and reviewed head are bound to the decision. Before a live post, the API checks that the PR is still open at that head. Generated remediations are export-only snippets, not commit-ready patches.
 12. Approved actions can write to GitHub. Missing credentials or unsafe PR conditions return mock responses rather than mutating external systems.
 
 ## Deployment Shape

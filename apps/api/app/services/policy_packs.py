@@ -60,6 +60,10 @@ def load_policy_pack(name: str | None) -> PolicyPack:
     if not path.exists():
         path = POLICY_PACK_DIR / "default.json"
     payload = json.loads(path.read_text())
+    return policy_pack_from_dict(payload, profile)
+
+
+def policy_pack_from_dict(payload: dict[str, Any], profile: str = "default") -> PolicyPack:
     return PolicyPack(
         name=payload.get("name", profile),
         required_tags=set(payload.get("required_tags", [])) or PolicyPack(profile).required_tags,

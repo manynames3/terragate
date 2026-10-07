@@ -34,7 +34,9 @@ npm run lint
 npm run build
 ```
 
-These checks cover the showcase risk-score regression plus TypeScript, lint, and Next.js build failures. They do not replace browser e2e coverage.
+These checks cover approval eligibility, stale/mismatched drafts, and the absence of frontend scenario enrichment, plus TypeScript, lint, and Next.js build failures. They do not replace browser e2e coverage.
+
+Backend approval regressions cover incomplete reviews, changed draft/artifact/policy/head/score, actor persistence, rejection, exact draft posting, repeat-post handling, and patch tampering. GitHub transport tests do not use real credentials. Real patch application tests run Git plus `terraform fmt -check` when both binaries are installed; otherwise those integration cases are explicitly skipped. They verify replacement (not append), stale context, and invalid syntax. PostgreSQL concurrency and full module validation remain gaps.
 
 ## Migration Validation
 

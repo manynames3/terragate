@@ -1,4 +1,5 @@
 import base64
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -8,6 +9,7 @@ import httpx
 import jwt
 
 from app.services.terraform_plan import redact_sensitive_text
+from app.services.patch_application import PatchValidationError, apply_reviewed_patch
 
 
 @dataclass
@@ -362,6 +364,7 @@ class GitHubClient:
         diff: str,
         *,
         commit_message: str,
+        expected_head_sha: str | None = None,
     ) -> GitHubPatchCommitResult:
         if not repo_owner or not repo_name or not pull_number or not file_path:
             return GitHubPatchCommitResult(
@@ -369,12 +372,11 @@ class GitHubClient:
                 mock=True,
                 message="GitHub repo metadata, PR number, or patch file path is missing. Would commit the approved patch in production.",
             )
-        patch_body = _added_lines_from_diff(diff)
-        if not patch_body.strip():
+        if not expected_head_sha or not re.fullmatch(r"[a-f0-9]{40}", expected_head_sha):
             return GitHubPatchCommitResult(
                 committed=False,
-                mock=True,
-                message="Suggested patch did not contain commit-ready added lines.",
+                mock=False,
+                message="An immutable reviewed PR commit is required. Export snippets instead of committing unverified changes.",
             )
         token = await self._auth_token()
         if not token:
@@ -396,64 +398,85 @@ class GitHubClient:
                 pr = pr_response.json()
                 head = pr.get("head") or {}
                 head_ref = head.get("ref")
+                if pr.get("state") != "open" or not head_ref or head.get("sha") != expected_head_sha:
+                    return GitHubPatchCommitResult(False, False, "The PR is closed or its head changed. Run a fresh review before committing.")
                 head_repo = (head.get("repo") or {}).get("full_name") or f"{repo_owner}/{repo_name}"
                 if head_repo != f"{repo_owner}/{repo_name}":
                     return GitHubPatchCommitResult(
                         committed=False,
-                        mock=True,
-                        message="PR comes from a fork. Would open a maintainer-side fix PR in production.",
+                        mock=False,
+                        message="Fork PR commits are not supported. Export the remediation for the author.",
                     )
 
-                existing_content = ""
-                sha = None
                 content_response = await client.get(
                     f"/repos/{repo_owner}/{repo_name}/contents/{file_path}",
-                    params={"ref": head_ref},
+                    params={"ref": expected_head_sha},
                 )
                 if content_response.status_code == 200:
                     content_payload = content_response.json()
-                    sha = content_payload.get("sha")
                     encoded = content_payload.get("content") or ""
                     existing_content = base64.b64decode(encoded).decode()
-                elif content_response.status_code not in {404, 409}:
+                else:
                     return GitHubPatchCommitResult(
                         committed=False,
                         mock=False,
                         message=f"GitHub rejected file lookup with HTTP {content_response.status_code}: {_github_error_message(content_response)}",
                     )
 
-                new_content = _append_patch(existing_content, patch_body)
-                payload: dict[str, Any] = {
-                    "message": commit_message,
-                    "content": base64.b64encode(new_content.encode()).decode(),
-                    "branch": head_ref,
-                }
-                if sha:
-                    payload["sha"] = sha
-                response = await client.put(
-                    f"/repos/{repo_owner}/{repo_name}/contents/{file_path}",
-                    json=payload,
-                )
+                new_content = apply_reviewed_patch(existing_content, diff, file_path)
+                prefix = f"/repos/{repo_owner}/{repo_name}/git"
+                parent_response = await client.get(f"{prefix}/commits/{expected_head_sha}")
+                parent_response.raise_for_status()
+                blob_response = await client.post(f"{prefix}/blobs", json={"content": new_content, "encoding": "utf-8"})
+                blob_response.raise_for_status()
+                tree_response = await client.post(f"{prefix}/trees", json={
+                    "base_tree": parent_response.json()["tree"]["sha"],
+                    "tree": [{"path": file_path, "mode": "100644", "type": "blob", "sha": blob_response.json()["sha"]}],
+                })
+                tree_response.raise_for_status()
+                commit_response = await client.post(f"{prefix}/commits", json={
+                    "message": commit_message, "tree": tree_response.json()["sha"], "parents": [expected_head_sha],
+                })
+                commit_response.raise_for_status()
+                commit = commit_response.json()
+                # A non-force ref update rejects a concurrent commit instead of overwriting it.
+                response = await client.patch(f"{prefix}/refs/heads/{head_ref}", json={"sha": commit["sha"], "force": False})
                 if response.status_code >= 400:
-                    return GitHubPatchCommitResult(
-                        committed=False,
-                        mock=False,
-                        message=f"GitHub rejected patch commit with HTTP {response.status_code}: {_github_error_message(response)}",
-                    )
-                data = response.json()
-                commit = data.get("commit") or {}
+                    return GitHubPatchCommitResult(False, False, "GitHub rejected the branch update; it may have changed during validation. Run a fresh review.")
                 return GitHubPatchCommitResult(
                     committed=True,
                     mock=False,
                     message="Committed approved TerraGate patch to the PR branch.",
                     commit_url=commit.get("html_url"),
                 )
+        except (PatchValidationError, ValueError, KeyError) as exc:
+            return GitHubPatchCommitResult(False, False, f"Patch validation failed: {exc}")
         except httpx.HTTPError as exc:
             return GitHubPatchCommitResult(
                 committed=False,
                 mock=False,
                 message=f"GitHub patch commit request failed: {exc}",
             )
+
+    async def verify_pr_head(self, repo_owner: str | None, repo_name: str | None,
+                             pull_number: int | None, expected_head_sha: str | None) -> str | None:
+        if not repo_owner or not repo_name or not pull_number:
+            return None
+        token = await self._auth_token()
+        if not token:
+            return None  # Credentials-free mode never performs a live write.
+        if not expected_head_sha:
+            return "No live PR commit was captured by this review. Run a new review with GitHub access before posting."
+        try:
+            async with self._client(token) as client:
+                response = await client.get(f"/repos/{repo_owner}/{repo_name}/pulls/{pull_number}")
+                response.raise_for_status()
+                pr = response.json()
+                if pr.get("state") != "open" or (pr.get("head") or {}).get("sha") != expected_head_sha:
+                    return "The PR is closed or its head changed since review. Run a new review before approving or posting."
+        except (httpx.HTTPError, ValueError) as exc:
+            return f"GitHub could not verify the reviewed PR commit. No write was made: {exc}"
+        return None
 
     async def _fetch_pr_files(
         self,
@@ -571,21 +594,6 @@ def _truncate_patch(patch: str | None, limit: int = 4000) -> str | None:
     if len(redacted_patch) <= limit:
         return redacted_patch
     return f"{redacted_patch[:limit]}\n... [patch truncated]"
-
-
-def _added_lines_from_diff(diff: str) -> str:
-    lines: list[str] = []
-    for line in diff.splitlines():
-        if not line.startswith("+") or line.startswith("+++"):
-            continue
-        lines.append(line[1:])
-    return "\n".join(lines).strip() + "\n"
-
-
-def _append_patch(existing_content: str, patch_body: str) -> str:
-    existing = existing_content.rstrip()
-    block = "\n\n# TerraGate approved remediation\n" + patch_body.strip() + "\n"
-    return (existing + block) if existing else block.lstrip()
 
 
 def _github_error_message(response: httpx.Response) -> str:

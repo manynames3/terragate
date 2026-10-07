@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, ExternalLink, FileText, RefreshCcw } from "lucide-react";
 import { getReport, listRuns } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import { presentRunListItem } from "@/lib/showcase";
 import type { Report, RunListItem } from "@/types/api";
 import { AlertBanner, Badge, Button, Card, EmptyState, SeverityBadge } from "@/components/ui";
 
@@ -21,7 +20,7 @@ export function ReportsCenter() {
     setLoadingRuns(true);
     setError(null);
     try {
-      const items = (await listRuns()).map(presentRunListItem);
+      const items = await listRuns();
       setRuns(items);
       setSelectedRunId((current) => current && items.some((run) => run.id === current) ? current : items[0]?.id ?? null);
     } catch (loadError) {

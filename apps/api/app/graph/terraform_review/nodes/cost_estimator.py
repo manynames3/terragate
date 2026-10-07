@@ -2,11 +2,11 @@ from typing import Any
 
 from app.graph.terraform_review.nodes.common import make_evidence, make_finding, mark_node
 from app.services.cost_estimator import estimate_cost_delta
-from app.services.policy_packs import load_policy_pack
+from app.services.policy_packs import load_policy_pack, policy_pack_from_dict
 
 
 def estimate_cost_delta_node(state: dict[str, Any]) -> dict[str, Any]:
-    policy_pack = load_policy_pack(state.get("policy_profile", "default"))
+    policy_pack = policy_pack_from_dict(state["policy_pack"]) if state.get("policy_pack") else load_policy_pack(state.get("policy_profile", "default"))
     estimate = estimate_cost_delta(
         state.get("resource_changes", []),
         policy_pack,

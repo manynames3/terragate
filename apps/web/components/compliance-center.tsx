@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, ClipboardCheck, Download, ExternalLink, FileSearch, Play, RefreshCcw, ShieldAlert, TriangleAlert } from "lucide-react";
 import { createDemoTerraformReview, getFindings, getRun, getRuntimeCapabilities, listRuns } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import { demoScenarioReviewOptions, presentRunListItem } from "@/lib/showcase";
 import type { Finding, RunDetail, RunListItem, Severity } from "@/types/api";
 import { AlertBanner, Badge, Button, Card, EmptyState, LoadingPanel, SeverityBadge } from "@/components/ui";
 
@@ -109,7 +108,7 @@ export function ComplianceCenter() {
   useEffect(() => {
     listRuns()
       .then((items) => {
-        const presented = items.map(presentRunListItem);
+        const presented = items;
         setRuns(presented);
         const requestedRun = searchParams.get("run");
         const firstRun = presented.find((item) => item.id === requestedRun) ?? presented.find((item) => item.mode === "terraform_pr_review");
@@ -145,7 +144,7 @@ export function ComplianceCenter() {
     setError(null);
     try {
       const items = await listRuns();
-      const presented = items.map(presentRunListItem);
+      const presented = items;
       setRuns(presented);
       if (!selectedRunId && presented[0]) setSelectedRunId(presented[0].id);
     } catch (err) {
@@ -159,7 +158,7 @@ export function ComplianceCenter() {
     setLaunching(true);
     setError(null);
     try {
-      const result = await createDemoTerraformReview("risky-security", demoScenarioReviewOptions("risky-security"));
+      const result = await createDemoTerraformReview("risky-security");
       router.push(`/compliance?run=${result.run_id}`);
       setSelectedRunId(result.run_id);
     } catch (err) {

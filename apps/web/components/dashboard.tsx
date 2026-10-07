@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { listRuns } from "@/lib/api";
 import { cx, formatDate } from "@/lib/format";
-import { presentRunListItem } from "@/lib/showcase";
 import type { RunListItem } from "@/types/api";
 import { AlertBanner, Badge, Button, Card, EmptyState, SeverityBadge } from "@/components/ui";
 
@@ -90,7 +89,7 @@ export function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      setRuns((await listRuns()).map(presentRunListItem));
+      setRuns(await listRuns());
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load the review queue.");
     } finally {

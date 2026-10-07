@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  Download,
   Code2,
   Database,
   DollarSign,
@@ -33,13 +34,7 @@ import {
   rejectRun
 } from "@/lib/api";
 import { cx, formatDate } from "@/lib/format";
-import {
-  presentShowcaseAudit,
-  presentShowcaseFindings,
-  presentShowcasePatches,
-  presentShowcaseReport,
-  presentShowcaseRun
-} from "@/lib/showcase";
+import { canDecideReview, canPostReview } from "@/lib/review-actions";
 import type { AuditLogEntry, AuthUser, Category, Finding, FixPatch, GitHubCommentResponse, Report, RunDetail, Severity } from "@/types/api";
 import { AlertBanner, Badge, Button, Card, ConfirmDialog, EmptyState, LoadingPanel, SeverityBadge } from "@/components/ui";
 
@@ -91,12 +86,11 @@ export function RunDetailClient({ runId }: { runId: string }) {
         Promise.allSettled([getFixPatches(runId), getAuditLog(runId)] as const)
       ]);
       const [patchResult, auditResult] = optionalResults;
-      const presentedRun = presentShowcaseRun(runData);
-      setRun(presentedRun);
-      setFindings(presentShowcaseFindings(presentedRun, findingData));
-      setReport(presentShowcaseReport(presentedRun, reportData));
-      if (patchResult.status === "fulfilled") setFixPatches(presentShowcasePatches(presentedRun, patchResult.value));
-      if (auditResult.status === "fulfilled") setAuditLog(presentShowcaseAudit(presentedRun, auditResult.value));
+      setRun(runData);
+      setFindings(findingData);
+      setReport(reportData);
+      setFixPatches(patchResult.status === "fulfilled" ? patchResult.value : []);
+      setAuditLog(auditResult.status === "fulfilled" ? auditResult.value : []);
       const unavailable = [patchResult.status === "rejected" ? "suggested patches" : null, auditResult.status === "rejected" ? "audit history" : null].filter(Boolean);
       if (unavailable.length) setPartialWarning(`The run loaded, but ${unavailable.join(" and ")} could not be refreshed.`);
     } catch (err) {
@@ -162,11 +156,13 @@ export function RunDetailClient({ runId }: { runId: string }) {
     setFeedback(null);
     try {
       if (action === "approve") {
-        await approveRun(runId, notes);
+        if (!report) return;
+        await approveRun(runId, notes, report.review_snapshot_hash);
         setFeedback({ tone: "success", text: "PR comment draft approved." });
       }
       if (action === "reject") {
-        await rejectRun(runId, notes);
+        if (!report) return;
+        await rejectRun(runId, notes, report.review_snapshot_hash);
         setFeedback({ tone: "success", text: "PR comment draft rejected and the decision was added to the audit trail." });
       }
       if (action === "post") {
@@ -185,7 +181,9 @@ export function RunDetailClient({ runId }: { runId: string }) {
     setActionLoading(true);
     setFeedback(null);
     try {
-      await approveFixPatch(runId, patchId);
+      const patch = fixPatches.find((item) => item.id === patchId);
+      if (!patch || patch.kind !== "patch") return;
+      await approveFixPatch(runId, patchId, patch.review_snapshot_hash);
       setFeedback({ tone: "success", text: "Suggested patch approved for implementation." });
       await load(true);
     } catch (err) {
@@ -271,6 +269,7 @@ export function RunDetailClient({ runId }: { runId: string }) {
         <div className="space-y-4">
           <ApprovalRail
             run={run}
+            report={report}
             notes={notes}
             setNotes={setNotes}
             feedback={feedback}
@@ -320,7 +319,7 @@ function RunHeader({ run, refreshing, onRefresh }: { run: RunDetail; refreshing:
             <h1 className="min-w-0 break-words text-2xl font-semibold tracking-normal text-white md:text-3xl">{title}</h1>
           </div>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-400">{run.summary}</p>
-          <div className="mt-5 grid gap-4 text-xs text-slate-400 sm:grid-cols-2 lg:grid-cols-6">
+          <div className="mt-5 grid grid-cols-2 gap-4 text-xs text-slate-400 sm:grid-cols-3 2xl:grid-cols-6">
             <HeaderMeta label="Repository" value={repo || "not attached"} />
             <HeaderMeta label="Environment" value={run.environment} badgeTone={run.environment === "prod" ? "danger" : "neutral"} />
             <HeaderMeta label="Provider" value={run.cloud_provider.toUpperCase()} />
@@ -353,7 +352,7 @@ function RunHeader({ run, refreshing, onRefresh }: { run: RunDetail; refreshing:
 function HeaderMeta({ label, value, badgeTone }: { label: string; value: string; badgeTone?: "neutral" | "success" | "warn" | "danger" | "info" }) {
   return (
     <div className="min-w-0 border-l border-[#25364d] pl-3 first:border-l-0 first:pl-0 sm:first:border-l sm:first:pl-3 lg:first:border-l-0 lg:first:pl-0">
-      <p className="uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      <p className="break-words uppercase tracking-normal text-slate-500">{label}</p>
       {badgeTone ? (
         <div className="mt-1">
           <Badge tone={badgeTone}>{value}</Badge>
@@ -377,9 +376,11 @@ function CheckState({ run }: { run: RunDetail }) {
 }
 
 function RiskCommandStrip({ run, findings }: { run: RunDetail; findings: Finding[] }) {
+  const hasCost = typeof run.cost_estimate.monthly_delta === "number" && Number.isFinite(run.cost_estimate.monthly_delta);
+  const hasBlastAnalysis = Boolean(run.blast_radius.summary);
   const criticalStateful = run.blast_radius.stateful_changes?.filter((item) => item.severity === "critical").length ?? 0;
   const blastResourceCount = run.blast_radius.stateful_changes?.length ?? 0;
-  const blastResourceLabel = blastResourceCount === 0
+  const blastResourceLabel = !hasBlastAnalysis ? "Not analyzed" : blastResourceCount === 0
     ? "No stateful destructive changes"
     : `${criticalStateful || blastResourceCount} ${criticalStateful ? "critical" : "stateful"} resources`;
   const rawArtifacts = run.artifacts.filter((artifact) => !artifact.redacted).length;
@@ -407,16 +408,17 @@ function RiskCommandStrip({ run, findings }: { run: RunDetail; findings: Finding
 
       <SummaryTile label="Cost delta (AWS)" icon={<DollarSign className="h-4 w-4" />}>
         <p className="text-3xl font-semibold text-amber-100">
-          {formatMoney(run.cost_estimate.monthly_delta ?? 0)}
-          <span className="ml-1 text-sm font-normal text-slate-400">/mo</span>
+          {hasCost ? formatMoney(run.cost_estimate.monthly_delta!) : "Not estimated"}
+          {hasCost ? <span className="ml-1 text-sm font-normal text-slate-400">/mo</span> : null}
         </p>
-        <p className="mt-2 text-sm text-amber-200">{formatMoney(run.cost_estimate.annual_delta ?? Number(run.cost_estimate.monthly_delta ?? 0) * 12)} /yr</p>
+        {hasCost ? <p className="mt-2 text-sm text-amber-200">{formatMoney(run.cost_estimate.annual_delta ?? run.cost_estimate.monthly_delta! * 12)} /yr</p> : null}
+        <p className="mt-2 text-xs text-slate-400">{run.cost_estimate.source?.replaceAll("_", " ") ?? "No cost result returned"}</p>
       </SummaryTile>
 
       <SummaryTile label="Blast radius" icon={<Database className="h-4 w-4" />}>
         <p className="text-base font-semibold text-red-100">{blastResourceLabel}</p>
-        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{run.blast_radius.summary ?? "No destructive stateful changes detected."}</p>
-        <p className="mt-2 text-sm font-semibold capitalize text-red-200">{run.blast_radius.level ?? "low"}</p>
+        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{run.blast_radius.summary ?? "No blast-radius result returned."}</p>
+        {hasBlastAnalysis ? <p className="mt-2 text-sm font-semibold capitalize text-red-200">{run.blast_radius.level}</p> : null}
       </SummaryTile>
 
       <SummaryTile label="Data handling" icon={<LockKeyhole className="h-4 w-4" />}>
@@ -605,6 +607,7 @@ function FindingsCommandTable({
 
 function ApprovalRail({
   run,
+  report,
   notes,
   setNotes,
   feedback,
@@ -615,6 +618,7 @@ function ApprovalRail({
   onPost
 }: {
   run: RunDetail;
+  report: Report;
   notes: string;
   setNotes: (notes: string) => void;
   feedback: Feedback | null;
@@ -629,25 +633,26 @@ function ApprovalRail({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Approval status</p>
-          <h2 className="mt-2 text-lg font-semibold text-amber-100">{run.approval_status === "approved" ? "Approved" : run.approval_status === "rejected" ? "Rejected" : "Approval required"}</h2>
+          <h2 className="mt-2 text-lg font-semibold text-amber-100">{run.approval_status === "approved" ? report.approval_valid ? "Approved" : "Approval expired" : run.approval_status === "rejected" ? "Rejected" : "Approval required"}</h2>
         </div>
         <Badge tone={run.approval_status === "approved" ? "success" : run.approval_status === "rejected" ? "danger" : "warn"}>{run.approval_status}</Badge>
       </div>
       <p className="mt-2 text-sm leading-5 text-slate-400">
         {run.approval_status === "approved"
-          ? "Approved runs can post the generated comment or commit approved fixes."
+          ? report.approval_valid ? "Approval covers this exact saved draft, artifact hashes, policy snapshot, and reviewed PR commit." : "The review changed or its approval predates versioned checks. Inspect the current draft and approve again."
           : run.approval_status === "rejected"
             ? "This review has been rejected. Record new approval notes before re-approving."
-            : "A human must approve before posting to GitHub or committing suggested fixes."}
+            : "A reviewer must approve the saved draft before posting to GitHub. Remediation snippets are export-only."}
       </p>
+      {report.decision_blocker ? <p className="mt-3 text-xs leading-5 text-amber-200">{report.decision_blocker}</p> : null}
       <div className="mt-4 grid gap-2">
-        <Button onClick={onApprove} disabled={actionLoading || !canReview || run.approval_status === "approved"} className="w-full">
-          <CheckCircle2 className="h-4 w-4" /> {run.approval_status === "approved" ? "Approved" : "Approve comment"}
+        <Button onClick={onApprove} disabled={actionLoading || !canReview || !canDecideReview(run, report) || report.approval_valid} className="w-full">
+          <CheckCircle2 className="h-4 w-4" /> {report.approval_valid ? "Approved" : "Approve comment"}
         </Button>
-        <Button variant="secondary" onClick={onReject} disabled={actionLoading || !canReview || run.approval_status === "rejected"} className="w-full">
+        <Button variant="secondary" onClick={onReject} disabled={actionLoading || !canReview || !canDecideReview(run, report) || run.approval_status === "rejected"} className="w-full">
           <XCircle className="h-4 w-4" /> {run.approval_status === "rejected" ? "Rejected" : "Request changes"}
         </Button>
-        <Button variant="secondary" onClick={onPost} disabled={actionLoading || !canReview || run.approval_status !== "approved"} className="w-full">
+        <Button variant="secondary" onClick={onPost} disabled={actionLoading || !canReview || !canPostReview(run, report)} className="w-full">
           <GitPullRequest className="h-4 w-4" /> Post to GitHub
         </Button>
       </div>
@@ -878,7 +883,7 @@ function GraphProgressPanel({ run }: { run: RunDetail }) {
       </div>
       <div className="mt-7 flex items-start gap-1 overflow-x-auto pb-1">
         {steps.map((step, index) => {
-          const complete = step.status === "completed" || index < steps.length - 1;
+          const complete = step.status === "completed";
           return (
             <div key={`${step.node}-${step.timestamp}-${index}`} className="flex min-w-[70px] flex-1 flex-col items-center">
               <div className="flex w-full items-center">
@@ -889,12 +894,12 @@ function GraphProgressPanel({ run }: { run: RunDetail }) {
                 <span className={cx("h-px flex-1", index === steps.length - 1 ? "bg-transparent" : "bg-[#26435e]")} />
               </div>
               <p className="mt-2 truncate text-center text-[10px] font-medium text-slate-300">{graphNodeLabels[step.node] ?? step.node.replaceAll("_", " ")}</p>
-              <p className="mt-1 text-center text-[10px] text-slate-500">{shortDuration(index + 1)}</p>
+              <p className="mt-1 text-center text-[10px] text-slate-500">{step.status.replaceAll("_", " ")}</p>
             </div>
           );
         })}
       </div>
-      <p className="mt-4 text-xs text-slate-500">Completed {Math.max(0, steps.length - 1)} / {steps.length} / {computeDuration(run.created_at, run.completed_at)}</p>
+      <p className="mt-4 text-xs text-slate-500">Completed {steps.filter((step) => step.status === "completed").length} / {steps.length} / {computeDuration(run.created_at, run.completed_at)}</p>
     </Card>
   );
 }
@@ -965,28 +970,34 @@ function PatchWorkflowPanel({
         <h2 className="text-sm font-semibold text-white">Suggested fix workflow</h2>
       </div>
       {patches.length ? (
-        <div className="space-y-3">
-          {patches.slice(0, 3).map((patch) => (
+        <div className="max-h-[560px] space-y-3 overflow-y-auto">
+          {patches.map((patch) => (
             <div key={patch.id} className="rounded-md border border-[#26364d] bg-[#091424] p-3">
               <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
                 <div className="min-w-0">
-                  <Badge tone={patch.status === "approved" || patch.status === "committed" ? "success" : "neutral"}>{patch.status}</Badge>
+                  <Badge tone={patch.kind === "patch" && (patch.status === "approved" || patch.status === "committed") ? "success" : "neutral"}>{patch.kind === "snippet" ? "Guidance" : patch.status}</Badge>
                   <p className="mt-2 text-sm font-semibold text-white">{patch.summary}</p>
                   <p className="mt-1 truncate font-mono text-xs text-slate-500">{patch.pr_file_path ?? "file not mapped"}</p>
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button variant="secondary" className="min-h-8 px-3 text-xs" onClick={() => downloadRemediation(patch)}>
+                    <Download className="h-3.5 w-3.5" /> Export {patch.kind === "snippet" ? "snippet" : "patch"}
+                  </Button>
+                  {patch.kind === "patch" ? <>
                   <Button variant="secondary" className="min-h-8 px-3 text-xs" disabled={actionLoading || !canApprove || patch.status === "approved" || patch.status === "committed"} onClick={() => void onApprove(patch.id)}>
                     Approve
                   </Button>
                   <Button className="min-h-8 px-3 text-xs" disabled={actionLoading || !canCommit || patch.status !== "approved"} onClick={() => void onCommit(patch.id)}>
                     Commit
                   </Button>
+                  </> : null}
                 </div>
               </div>
               <details className="mt-3 rounded-md border border-[#25364d] bg-[#07101d]">
-                <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-300">View patch diff</summary>
-                <pre className="max-h-72 overflow-auto border-t border-[#25364d] p-3 text-[11px] leading-5 text-slate-200">{patch.diff}</pre>
+                <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-300">{patch.kind === "snippet" ? "View remediation snippet" : "View patch diff"}</summary>
+                <pre className="max-h-72 overflow-auto border-t border-[#25364d] p-3 text-[11px] leading-5 text-slate-200">{patch.kind === "snippet" ? patch.snippet || patch.diff : patch.diff}</pre>
               </details>
+              {patch.kind === "snippet" ? <p className="mt-2 text-xs leading-5 text-slate-400">Guidance only. Adapt this snippet to the existing resource and validate it locally; direct commits are disabled.</p> : null}
             </div>
           ))}
         </div>
@@ -1068,8 +1079,14 @@ function computeDuration(start: string | null, end: string | null): string {
   return `${minutes}m ${seconds % 60}s`;
 }
 
-function shortDuration(index: number): string {
-  return `${Math.max(1, index)}.${index % 10}s`;
+function downloadRemediation(patch: FixPatch) {
+  const blob = new Blob([patch.kind === "snippet" ? patch.snippet || patch.diff : patch.diff], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${patch.id}.${patch.kind === "snippet" ? "tf" : "patch"}`;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function severityTextTone(severity: Severity | string): string {

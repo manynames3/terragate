@@ -50,7 +50,7 @@ The repo uses `@opennextjs/cloudflare` and `wrangler.jsonc`. Frontend deployment
 
 ## GitHub App Setup Path
 
-The code supports GitHub token/App-style configuration, PR metadata reads, webhooks, checks, comments, and approval-gated patch commits. A production onboarding flow should:
+The code supports GitHub token/App-style configuration, PR metadata reads, webhooks, automatic checks, and versioned approval-gated comments. Generated remediation is export-only; automatic source-verified patch generation is not implemented. A production onboarding flow should:
 
 1. Create a GitHub App with pull request read, checks write, contents write, and metadata read permissions.
 2. Register the webhook URL `/api/v1/github/webhook`.

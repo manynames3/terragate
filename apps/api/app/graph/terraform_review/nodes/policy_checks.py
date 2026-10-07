@@ -10,7 +10,7 @@ from app.graph.terraform_review.nodes.common import (
     mark_node,
     resource_json_path,
 )
-from app.services.policy_packs import PolicyPack, load_policy_pack
+from app.services.policy_packs import PolicyPack, load_policy_pack, policy_pack_from_dict
 from app.services.terraform_plan import get_attr, get_tags, is_create_or_update, is_delete_or_replace
 
 
@@ -36,7 +36,7 @@ RESTRICTED_PROFILE_ALLOWLIST = {
 
 
 def deterministic_policy_checks(state: dict[str, Any]) -> dict[str, Any]:
-    policy_pack = load_policy_pack(state.get("policy_profile", "default"))
+    policy_pack = policy_pack_from_dict(state["policy_pack"]) if state.get("policy_pack") else load_policy_pack(state.get("policy_profile", "default"))
     findings = run_policy_checks(
         state.get("resource_changes", []),
         environment=state.get("environment", "dev"),
