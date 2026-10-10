@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test lib/*.test.mjs",
+    "test:cloudflare": "opennextjs-cloudflare build --skipNextBuild && node e2e/cloudflare-runtime.cjs",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "preview:cloudflare": "NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-https://hwnk8hnyk1.execute-api.us-east-1.amazonaws.com} NEXT_PUBLIC_AUTH_PROVIDER=${NEXT_PUBLIC_AUTH_PROVIDER:-dev} opennextjs-cloudflare build && opennextjs-cloudflare preview",
@@ -15,18 +16,18 @@
   },
   "dependencies": {
     "lucide-react": "1.14.0",
-    "next": "16.4.0",
+    "next": "16.3.8",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.19.10",
+    "@opennextjs/cloudflare": "1.20.10",
     "@tailwindcss/postcss": "4.3.0",
     "@types/node": "25.0.2",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.3.8",
     "tailwindcss": "4.3.0",
     "typescript": "6.0.3",
     "wrangler": "^4.91.0"

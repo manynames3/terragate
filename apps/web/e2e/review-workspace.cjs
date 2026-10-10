@@ -118,6 +118,10 @@ async function screenshot(page, name, fullPage = false) {
     await page.goto(web + "/overview?status=all");
     const brand = page.getByRole("link", { name: "TerraGate", exact: true });
     const mark = brand.locator('img[src="/brand/terragate-mark.svg"]');
+    await page.waitForFunction(() => {
+      const image = document.querySelector('img[src="/brand/terragate-mark.svg"]');
+      return image?.complete && image.naturalWidth > 0;
+    });
     assert.equal(await mark.evaluate((el) => el.complete && el.naturalWidth > 0), true);
     assert.equal((await mark.boundingBox()).width, 40);
     const favicon = await page.locator('link[rel="icon"]').getAttribute("href");

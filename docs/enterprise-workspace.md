@@ -2,7 +2,7 @@
 
 ## Scope And Verification
 
-The first vertical slice improves review correctness, evidence inspection, scoped decisions, and the work queue; it is not a claim of customer-ready SaaS. See the [deployment record](deployment.md#verified-public-demo-release) for verified release status. No new direct production dependencies were added. Existing Next.js/ESLint packages were upgraded to 16.4.0 and affected locked packages refreshed to address known advisories.
+The first vertical slice improves review correctness, evidence inspection, scoped decisions, and the work queue; it is not a claim of customer-ready SaaS. See the [deployment record](deployment.md#verified-public-demo-release) for verified release status. No new direct production dependencies were added. Existing Next.js/ESLint packages are pinned to patched 16.3.8 and OpenNext to 1.20.10 after a runtime incompatibility with 16.4.0; affected locked packages were refreshed and Worker rendering is now checked in CI.
 
 | Capability | Implemented here | Remaining boundary |
 | --- | --- | --- |
