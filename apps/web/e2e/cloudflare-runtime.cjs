@@ -43,7 +43,7 @@ const exited = new Promise((resolve) => worker.once("exit", resolve));
       assert.equal(response.status, 200, `${route} must render an application shell`);
       assert.ok((await response.text()).includes("TerraGate"));
     }
-    const mark = await fetch(origin + "/brand/terragate-mark.svg");
+    const mark = await fetch(origin + "/brand/terragate-mark.svg", { signal: AbortSignal.timeout(10000) });
     assert.equal(mark.status, 200);
     assert.ok(mark.headers.get("content-type").includes("image/svg+xml"));
     assert.ok((await mark.text()).includes('viewBox="0 0 40 30"'));
