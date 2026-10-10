@@ -330,9 +330,11 @@ GitHub Actions runs backend pytest plus the frontend regression test, typecheck,
 
 CI also validates Alembic migrations and Terraform formatting/validation for the AWS public-demo stack.
 
-### Latest Local Validation
+### Latest Validation
 
-Results for the workspace update are recorded in [testing](docs/testing.md). The earlier review-integrity validation below is retained as historical evidence, not evidence that this feature branch is deployed:
+The workspace release passed 97 backend tests (including isolated PostgreSQL migration preservation), five frontend tests, typecheck, lint, production build, and Terraform CI validation. A Cloudflare `workerd` runtime smoke now checks route rendering and the Stratum asset in CI, rather than treating a successful bundle build as proof of runtime compatibility. See [testing](docs/testing.md) and the [verified deployment record](docs/deployment.md#verified-public-demo-release).
+
+The earlier review-integrity validation below is retained as historical evidence:
 
 | Check | Result |
 | --- | --- |
@@ -342,7 +344,7 @@ Results for the workspace update are recorded in [testing](docs/testing.md). The
 | Local Playwright smoke | Desktop/mobile review, API-matching draft and snippet download, approval, mock post, repeat-post disabled; no page errors or mobile page overflow |
 | Whitespace and changed-document local links | Passed |
 
-The earlier approval/export/mock-post journey was subsequently verified on the AWS/Cloudflare deployment. The new workspace browser smoke is checked in but not in CI, and its new features have only local verification. Live GitHub writes were not tested. See the [deployment record](docs/deployment.md#verified-public-demo-release) and [testing details and remaining gaps](docs/testing.md).
+The hosted workspace journey also passed: fixture uploads, redacted evidence, snippet export, independent risk exceptions, separate comment approval/mock posting, history, navigation, error states, and responsive branding. The full browser journey is separate from CI's Worker-runtime smoke. Live GitHub writes and private Cognito deployment were not tested. Hosted plan files remain ephemeral: a different Lambda instance can return an explicit artifact-expired response even while persisted findings, approvals, and history remain available.
 
 ## Deployment Overview
 

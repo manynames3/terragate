@@ -76,7 +76,37 @@ It does not run `terraform apply` or deploy Cloudflare Workers. That is delibera
 
 ## Verified Public Demo Release
 
-Validated October 7, 2026. This records a specific release, not continuous availability or customer readiness.
+These records describe specific releases, not continuous availability or customer readiness.
+
+### Workspace And Stratum Release: October 10, 2026
+
+| Release component | Evidence |
+| --- | --- |
+| Backend/workspace revision | `42902e4a5d709e038b857669e65311b00fbbb652`, merged through [PR #6](https://github.com/manynames3/terragate/pull/6); main merge `8ff7d86d751dc8c4e335240343a949f018aef2b5` |
+| CI | [Run 38027392087](https://github.com/manynames3/terragate/actions/runs/38027392087) passed backend, frontend and infrastructure checks, including disposable PostgreSQL migration preservation |
+| AWS image build | CodeBuild `terragate-demo-lambda-image:67915d74-0923-4ec9-b3fd-e7eca1af6525` succeeded after checking out the exact application revision |
+| Lambda image | `sha256:ca93d599a8a15964ceb6ae6207b548b3a1ab64a8438d962f7da49f01eba3f3df`; `terragate-demo-api` reported Active / Successful |
+| Database | Neon PostgreSQL 18.6 over TLS, Lambda outside a VPC; revision `0009_review_workspace`, 64 pre-existing runs retained before smoke-test fixtures |
+| Recovery rehearsal | A hosted-database backup was restored into isolated local PostgreSQL; upgrade/downgrade/re-upgrade preserved row digests across all 13 existing tables |
+| Frontend compatibility revision | `fe1acc0d263cc4f506696b2df14def98bde543e2`, Next.js 16.3.8 / OpenNext 1.20.10; see [PR #7](https://github.com/manynames3/terragate/pull/7) |
+| Cloudflare Worker | `terragate`, version `e314fdeb-d21f-499c-ba02-3cd75c6f205d`; `/overview` returned HTTP 200 after local Worker-runtime verification |
+| Readiness | Deployed API `/ready` returned HTTP 200 with the database reachable |
+
+The initial Next.js 16.4 bundle returned HTTP 500 despite a successful build. It was rolled back before deploying the compatible frontend; the new CI Worker-runtime smoke checks the failure boundary. AWS's account quota refused a temporary reserved-concurrency setting, so concurrency remained unchanged. The schema migration nevertheless completed successfully; concurrent migration execution is not validated.
+
+Hosted Playwright verification passed against the exact public demo URLs using repository fixtures and dev identities. Example: [run_487486f288034160a3](https://terragate.hangi87.workers.dev/runs/run_487486f288034160a3).
+
+- Real safe/cost/security plan uploads, safe score zero, redacted plan evidence and saved-snippet export.
+- Full-row keyboard navigation; independent administrator approval of a finding-scoped exception reduced blockers without changing raw risk or approving the comment.
+- Separate comment approval, confirmed mock posting, repeat-post prevention, and persisted exception audit history.
+- Navigation pages, search empty state, simulated HTTP 503 stale/retry state, and desktop/tablet/mobile overflow checks.
+- Stratum SVG branding at desktop/mobile sizes, SVG favicon, and mobile navigation Escape/focus restoration; no browser page errors.
+
+The final journey retrieved its redacted plan successfully. An earlier attempt reproduced the real ephemeral-artifact limitation with HTTP 410; later success does not remove that limitation. Hosted screenshots were inspected separately; README screenshots remain the labelled local captures.
+
+No infrastructure was provisioned or Terraform applied. The existing live Neon/outside-VPC configuration was preserved; the repository's RDS/VPC Terraform reference must be reconciled before a future apply. Findings, approvals and audit history persist in PostgreSQL, but raw/redacted plan files in Lambda `/tmp` do not survive instance changes. An expired plan returns HTTP 410; this is not durable artifact storage. Public-demo auth remains shared/dev, GitHub writes mocked, costs heuristic, sandbox execution disabled, and private Cognito/live GitHub integrations unverified.
+
+### Earlier Release: October 7, 2026
 
 | Release component | Evidence |
 | --- | --- |
