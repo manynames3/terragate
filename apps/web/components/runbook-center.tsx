@@ -17,7 +17,7 @@ import {
   UserCheck
 } from "lucide-react";
 import { createDemoTerraformReview, getCurrentUser, getFindings, getRun, getRunbookProgress, getRuntimeCapabilities, listRuns, updateRunbookProgress } from "@/lib/api";
-import { formatDate } from "@/lib/format";
+import { formatRisk, formatDate } from "@/lib/format";
 import type { Finding, RunDetail, RunListItem, Severity } from "@/types/api";
 import { AlertBanner, Badge, Button, Card, EmptyState, LoadingPanel, SeverityBadge } from "@/components/ui";
 
@@ -182,11 +182,11 @@ export function RunbookCenter() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 border-b border-[#24324a] pb-6 lg:flex-row lg:items-end">
+      <div className="flex flex-col justify-between gap-4 border-b border-[var(--border)] pb-6 lg:flex-row lg:items-end">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">Command mode</p>
-          <h1 className="mt-3 text-3xl font-semibold text-white">Generate Runbook</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+          <p className="text-sm font-semibold uppercase tracking-normal text-[#0f766e]">Command mode</p>
+          <h1 className="mt-3 text-3xl font-semibold text-slate-950">Generate Runbook</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             Convert Terraform risk findings and blast-radius evidence into an operational deployment runbook with approval-ready checklists.
           </p>
         </div>
@@ -206,12 +206,12 @@ export function RunbookCenter() {
       <Card className="p-5">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
           <div>
-            <label className="text-sm font-medium text-slate-200" htmlFor="runbook-run">Review run</label>
+            <label className="text-sm font-medium text-slate-700" htmlFor="runbook-run">Review run</label>
             <select
               id="runbook-run"
               value={selectedRunId}
               onChange={(event) => setSelectedRunId(event.target.value)}
-              className="mt-2 w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white"
+              className="mt-2 w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950"
               disabled={loadingRuns || runs.length === 0}
             >
               {runs.map((item) => (
@@ -225,7 +225,7 @@ export function RunbookCenter() {
                 <SeverityBadge severity={run.risk_level} />
                 <Badge tone={run.approval_status === "approved" ? "success" : "warn"}>{run.approval_status}</Badge>
                 <Badge tone="neutral">{run.policy_profile}</Badge>
-                <Link href={`/runs/${run.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-[#43c6ac]">
+                <Link href={`/runs/${run.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-[#0f766e]">
                   Open run <ExternalLink className="h-3.5 w-3.5" />
                 </Link>
               </div>
@@ -270,13 +270,13 @@ export function RunbookCenter() {
             <div className="min-w-0 space-y-4">
               <Card className="p-5">
                 <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-[#43c6ac]" />
-                  <h2 className="text-lg font-semibold text-white">Runbook context</h2>
+                  <FileText className="h-5 w-5 text-[#0f766e]" />
+                  <h2 className="text-lg font-semibold text-slate-950">Runbook context</h2>
                 </div>
                 <div className="mt-4 space-y-3">
                   <SmallRow label="Run" value={run.id} mono />
                   <SmallRow label="Environment" value={run.environment} />
-                  <SmallRow label="Risk" value={`${run.risk_level} (${run.risk_score})`} />
+                  <SmallRow label="Risk" value={formatRisk(run.risk_score, run.risk_level)} />
                   <SmallRow label="Policy" value={run.policy_profile} />
                   <SmallRow label="Generated" value={formatDate(run.completed_at ?? run.created_at)} />
                 </div>
@@ -284,17 +284,17 @@ export function RunbookCenter() {
 
               <Card className="p-5">
                 <div className="flex items-center gap-2">
-                  <ClipboardCheck className="h-5 w-5 text-[#6ea8fe]" />
-                  <h2 className="text-lg font-semibold text-white">Evidence used</h2>
+                  <ClipboardCheck className="h-5 w-5 text-[#2563eb]" />
+                  <h2 className="text-lg font-semibold text-slate-950">Evidence used</h2>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-slate-400">
+                <p className="mt-3 text-sm leading-6 text-slate-600">
                   The generated runbook is built from deterministic findings, finding-level runbook checklists, and stateful blast-radius metadata. It does not rely on free-form guessing.
                 </p>
                 <div className="mt-4 space-y-2">
                   {findings.slice(0, 5).map((finding) => (
-                    <Link key={finding.id} href={`/runs/${run.id}`} className="block rounded-md border border-[#26364d] bg-[#091424] p-3 hover:border-[#3e587a]">
+                    <Link key={finding.id} href={`/runs/${run.id}`} className="block rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3 hover:border-[#3e587a]">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-medium text-slate-100">{finding.title}</span>
+                        <span className="truncate text-sm font-medium text-slate-900">{finding.title}</span>
                         <SeverityBadge severity={finding.severity} />
                       </div>
                       <p className="mt-1 truncate font-mono text-xs text-slate-500">{finding.resource_address ?? "resource not mapped"}</p>
@@ -304,8 +304,8 @@ export function RunbookCenter() {
               </Card>
 
               <Card className="p-5">
-                <h2 className="text-lg font-semibold text-white">Export preview</h2>
-                <pre className="mt-4 max-h-[520px] overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-4 text-xs leading-6 text-slate-100">{runbook.markdown}</pre>
+                <h2 className="text-lg font-semibold text-slate-950">Export preview</h2>
+                <pre className="mt-4 max-h-[520px] overflow-auto rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-xs leading-6 text-slate-900">{runbook.markdown}</pre>
               </Card>
             </div>
           </div>
@@ -436,7 +436,7 @@ function buildRunbookMarkdown(run: RunDetail, sections: RunbookSection[], source
     "",
     `Run ID: ${run.id}`,
     `Environment: ${run.environment}`,
-    `Risk: ${run.risk_level} (${run.risk_score})`,
+    `Risk: ${formatRisk(run.risk_score, run.risk_level)}`,
     `Policy profile: ${run.policy_profile}`,
     `Approval status: ${run.approval_status}`,
     `Generated: ${formatDate(run.completed_at ?? run.created_at)}`,
@@ -480,26 +480,26 @@ function RunbookSectionCard({
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <Icon className="h-5 w-5 text-[#43c6ac]" />
+            <Icon className="h-5 w-5 text-[#0f766e]" />
             <Badge tone={required ? "warn" : "neutral"}>{required} required</Badge>
             <Badge tone="info">{section.steps.length} steps</Badge>
           </div>
-          <h2 className="mt-4 text-lg font-semibold text-white">{section.title}</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">{section.description}</p>
+          <h2 className="mt-4 text-lg font-semibold text-slate-950">{section.title}</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{section.description}</p>
         </div>
       </div>
       <div className="mt-5 space-y-3">
         {section.steps.map((step) => (
-          <label key={step.id} className="flex gap-3 rounded-md border border-[#26364d] bg-[#091424] p-3 text-sm hover:border-[#3e587a]">
+          <label key={step.id} className="flex gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm hover:border-[#3e587a]">
             <input
               type="checkbox"
               checked={Boolean(checkedSteps[step.id])}
               onChange={() => onToggle(step.id)}
               disabled={disabled}
-              className="mt-1 h-4 w-4 shrink-0 rounded border-[#31445f] bg-[#07101d] accent-[#43c6ac]"
+              className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--border)] bg-[var(--surface-muted)] accent-[#0f766e]"
             />
             <span className="min-w-0">
-              <span className={checkedSteps[step.id] ? "block text-slate-500 line-through" : "block text-slate-100"}>{step.text}</span>
+              <span className={checkedSteps[step.id] ? "block text-slate-500 line-through" : "block text-slate-900"}>{step.text}</span>
               <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <Badge tone={step.priority === "required" ? "warn" : "neutral"}>{step.priority}</Badge>
                 {step.source ? <span className="truncate">Source: {step.source}</span> : null}
@@ -517,8 +517,8 @@ function MetricCard({ label, value, detail, tone = "neutral" }: { label: string;
     <Card className="p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-slate-400">{label}</p>
-          <p className="mt-2 text-3xl font-semibold text-white">{value}</p>
+          <p className="text-sm text-slate-600">{label}</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{value}</p>
           <p className="mt-2 text-xs text-slate-500">{detail}</p>
         </div>
         {tone !== "neutral" ? <Badge tone={tone}>{tone}</Badge> : null}
@@ -529,9 +529,9 @@ function MetricCard({ label, value, detail, tone = "neutral" }: { label: string;
 
 function SmallRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-[#26364d] bg-[#091424] px-3 py-2 text-sm">
-      <span className="text-slate-400">{label}</span>
-      <span className={mono ? "truncate font-mono text-xs text-slate-100" : "truncate text-slate-100"}>{value}</span>
+    <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-sm">
+      <span className="text-slate-600">{label}</span>
+      <span className={mono ? "truncate font-mono text-xs text-slate-900" : "truncate text-slate-900"}>{value}</span>
     </div>
   );
 }

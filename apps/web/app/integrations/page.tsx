@@ -1,0 +1,3 @@
+import { DeploymentStatusPanel } from "@/components/deployment-status-panel";
+import { AlertBanner } from "@/components/ui";
+export default function Page() { return <div className="space-y-6"><header><h1 className="text-2xl font-semibold">Integrations</h1><p className="mt-2 text-sm text-slate-600">Capabilities reported by this API environment.</p></header><DeploymentStatusPanel /><AlertBanner title="Repository onboarding is not yet turnkey">GitHub App credentials and webhook settings are configured by the operator. Installation-to-organization registration, CI artifact authentication, and merge-enforcement verification are not implemented. Do not treat a configured credential or completed check as enforced branch protection.</AlertBanner></div>; }

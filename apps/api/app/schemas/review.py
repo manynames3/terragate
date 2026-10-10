@@ -26,6 +26,7 @@ class Remediation(BaseModel):
 
 
 class Finding(BaseModel):
+    rule_version: str | None = None
     id: str
     title: str
     description: str
@@ -240,13 +241,19 @@ class RunListItem(BaseModel):
     status: str
     environment: str
     cloud_provider: str
-    risk_score: int
+    risk_score: int | None
     risk_level: str
     summary: str
     approval_status: str
     created_at: datetime
     completed_at: datetime | None = None
     severity_counts: dict[str, int] = Field(default_factory=dict)
+    repo_owner: str | None = None
+    repo_name: str | None = None
+    pull_number: int | None = None
+    reviewed_head_sha: str | None = None
+    policy_version: str | None = None
+    assessment_state: str = "not_assessed"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -258,7 +265,7 @@ class RunDetail(BaseModel):
     environment: str
     cloud_provider: str
     policy_profile: str
-    risk_score: int
+    risk_score: int | None
     risk_level: str
     summary: str
     trace_id: str | None = None
@@ -281,6 +288,13 @@ class RunDetail(BaseModel):
     created_at: datetime
     completed_at: datetime | None = None
     severity_counts: dict[str, int] = Field(default_factory=dict)
+    reviewed_head_sha: str | None = None
+    policy_version: str | None = None
+    assessment_state: str = "not_assessed"
+    policy_decision: str = "not_assessed"
+    blocking_findings: int = 0
+    accepted_findings: int = 0
+    merge_enforcement: str = "not_verified"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -290,7 +304,7 @@ class ReportResponse(BaseModel):
     report_markdown: str
     pr_comment_draft: str
     remediation_summary: str
-    risk_score: RiskScore
+    risk_score: RiskScore | None
     review_snapshot_hash: str
     approval_valid: bool
     decision_blocker: str | None = None

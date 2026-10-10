@@ -14,6 +14,8 @@ Observability is split between application-level review progress/audit records a
 | Review node progress | Persisted on run records and shown in the UI |
 | Audit events | Database records written by `apps/api/app/services/audit.py` |
 | Optional traces | LangSmith env vars and integration adapter |
+| Request correlation | `X-Request-ID`, sanitized unexpected-error `trace_id`, JSON failure logs in `app/main.py` |
+| Readiness | `/health` checks liveness; `/ready` checks database reachability only |
 
 ## Operational Questions It Can Answer
 
@@ -21,6 +23,7 @@ Observability is split between application-level review progress/audit records a
 - Which graph node failed or is currently running?
 - What findings and evidence were generated?
 - Who approved or rejected a PR comment draft?
+- Who requested, accepted, denied, or revoked an exception, for which finding/snapshot and expiration?
 - Was a GitHub write attempted, mocked, or posted?
 - Which artifact and policy profile were used?
 
@@ -37,5 +40,5 @@ Observability is split between application-level review progress/audit records a
 1. Add CloudWatch alarms for API 5xx, Lambda errors, Lambda duration, RDS CPU/storage, and CodeBuild failures.
 2. Add a lightweight `/health` synthetic check.
 3. Surface LangSmith trace IDs in run detail when tracing is enabled.
-4. Add structured JSON logs for run ID, org ID, node name, and GitHub action IDs.
+4. Extend existing sanitized request-failure JSON logs with safe worker/run/node/action correlation, without raw plans or credentials.
 5. Add dead-letter queue metrics once the worker moves to SQS or another durable queue.

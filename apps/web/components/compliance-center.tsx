@@ -180,11 +180,11 @@ export function ComplianceCenter() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 border-b border-[#24324a] pb-6 lg:flex-row lg:items-end">
+      <div className="flex flex-col justify-between gap-4 border-b border-[var(--border)] pb-6 lg:flex-row lg:items-end">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">Command mode</p>
-          <h1 className="mt-3 text-3xl font-semibold text-white">Compliance Check</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+          <p className="text-sm font-semibold uppercase tracking-normal text-[#0f766e]">Command mode</p>
+          <h1 className="mt-3 text-3xl font-semibold text-slate-950">Compliance Check</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             CIS/NIST-style checklist mapped to Terraform review findings, resource evidence, policy profile, and approval state.
           </p>
         </div>
@@ -203,12 +203,12 @@ export function ComplianceCenter() {
       <Card className="p-5">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div>
-            <label className="text-sm font-medium text-slate-200" htmlFor="compliance-run">Review run</label>
+            <label className="text-sm font-medium text-slate-700" htmlFor="compliance-run">Review run</label>
             <select
               id="compliance-run"
               value={selectedRunId}
               onChange={(event) => setSelectedRunId(event.target.value)}
-              className="mt-2 w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white"
+              className="mt-2 w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950"
               disabled={loadingRuns || runs.length === 0}
             >
               {runs.map((item) => (
@@ -222,7 +222,7 @@ export function ComplianceCenter() {
                 <SeverityBadge severity={run.risk_level} />
                 <Badge tone={run.approval_status === "approved" ? "success" : "warn"}>{run.approval_status}</Badge>
                 <Badge tone="neutral">{run.policy_profile}</Badge>
-                <Link href={`/runs/${run.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-[#43c6ac]">
+                <Link href={`/runs/${run.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-[#0f766e]">
                   Open run <ExternalLink className="h-3.5 w-3.5" />
                 </Link>
               </div>
@@ -260,8 +260,8 @@ export function ComplianceCenter() {
             <div className="min-w-0 space-y-4">
               <Card className="p-5">
                 <div className="flex items-center gap-2">
-                  <ClipboardCheck className="h-5 w-5 text-[#43c6ac]" />
-                  <h2 className="text-lg font-semibold text-white">Checklist summary</h2>
+                  <ClipboardCheck className="h-5 w-5 text-[#0f766e]" />
+                  <h2 className="text-lg font-semibold text-slate-950">Checklist summary</h2>
                 </div>
                 <div className="mt-4 space-y-3">
                   <SmallRow label="Run" value={run.id} mono />
@@ -273,10 +273,10 @@ export function ComplianceCenter() {
               </Card>
               <Card className="p-5">
                 <div className="flex items-center gap-2">
-                  <FileSearch className="h-5 w-5 text-[#6ea8fe]" />
-                  <h2 className="text-lg font-semibold text-white">Evidence coverage</h2>
+                  <FileSearch className="h-5 w-5 text-[#2563eb]" />
+                  <h2 className="text-lg font-semibold text-slate-950">Evidence coverage</h2>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-slate-400">
+                <p className="mt-3 text-sm leading-6 text-slate-600">
                   Each failing or review-needed control links back to deterministic findings with resource address, JSON path evidence, observed value, and remediation guidance.
                 </p>
                 <div className="mt-4 space-y-2">
@@ -286,8 +286,8 @@ export function ComplianceCenter() {
                 </div>
               </Card>
               <Card className="p-5">
-                <h2 className="text-lg font-semibold text-white">Export preview</h2>
-                <pre className="mt-4 max-h-96 overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-4 text-xs leading-6 text-slate-100">{exportMarkdown}</pre>
+                <h2 className="text-lg font-semibold text-slate-950">Export preview</h2>
+                <pre className="mt-4 max-h-96 overflow-auto rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-xs leading-6 text-slate-900">{exportMarkdown}</pre>
               </Card>
             </div>
           </div>
@@ -386,40 +386,40 @@ function ControlCard({ control }: { control: ControlResult }) {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Icon className={`h-5 w-5 ${control.status === "pass" ? "text-[#43c6ac]" : control.status === "fail" ? "text-red-300" : "text-amber-300"}`} />
+            <Icon className={`h-5 w-5 ${control.status === "pass" ? "text-[#0f766e]" : control.status === "fail" ? "text-red-300" : "text-amber-300"}`} />
             <Badge tone={statusTone(control.status)}>{statusLabel(control.status)}</Badge>
             <Badge tone="neutral">{control.framework}</Badge>
             {control.severity !== "none" ? <SeverityBadge severity={control.severity} /> : null}
           </div>
-          <h2 className="mt-4 text-lg font-semibold text-white">{control.title}</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">{control.intent}</p>
+          <h2 className="mt-4 text-lg font-semibold text-slate-950">{control.title}</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{control.intent}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {control.refs.map((ref) => (
-              <span key={ref} className="rounded-full border border-[#31445f] bg-[#091424] px-2.5 py-1 text-xs text-slate-300">{ref}</span>
+              <span key={ref} className="rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-2.5 py-1 text-xs text-slate-600">{ref}</span>
             ))}
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-3xl font-semibold text-white">{control.findings.length}</p>
+          <p className="text-3xl font-semibold text-slate-950">{control.findings.length}</p>
           <p className="text-xs text-slate-500">mapped findings</p>
         </div>
       </div>
       {control.findings.length ? (
         <div className="mt-5 space-y-3">
           {control.findings.map((finding) => (
-            <div key={finding.id} className="min-w-0 overflow-hidden rounded-md border border-[#26364d] bg-[#091424] p-4">
+            <div key={finding.id} className="min-w-0 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-4">
               <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
                 <div className="min-w-0">
                   <SeverityBadge severity={finding.severity} />
-                  <p className="mt-2 text-sm font-semibold text-white">{finding.title}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-950">{finding.title}</p>
                   <p className="mt-1 break-all font-mono text-xs text-slate-500">{finding.resource_address ?? "resource not mapped"}</p>
                 </div>
                 <Badge tone={finding.requires_human_review ? "warn" : "info"}>{finding.requires_human_review ? "Human review" : finding.source}</Badge>
               </div>
-              <p className="mt-3 text-sm leading-6 text-slate-400">{finding.recommendation}</p>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{finding.recommendation}</p>
               {finding.evidence[0] ? (
-                <div className="mt-3 min-w-0 rounded-md border border-[#20314a] bg-[#07101d] p-3 text-xs">
-                  <p className="break-all font-mono text-slate-300">{finding.evidence[0].json_path}</p>
+                <div className="mt-3 min-w-0 rounded-md border border-[#20314a] bg-[var(--surface-muted)] p-3 text-xs">
+                  <p className="break-all font-mono text-slate-600">{finding.evidence[0].json_path}</p>
                   <p className="mt-1 break-words text-slate-500">Observed: {stringValue(finding.evidence[0].observed_value)}</p>
                   {finding.evidence[0].expected_value !== null ? <p className="mt-1 break-words text-slate-500">Expected: {stringValue(finding.evidence[0].expected_value)}</p> : null}
                 </div>
@@ -428,7 +428,7 @@ function ControlCard({ control }: { control: ControlResult }) {
           ))}
         </div>
       ) : (
-        <p className="mt-5 rounded-md border border-[#26364d] bg-[#091424] p-3 text-sm text-slate-400">No mapped findings for this control in the selected review.</p>
+        <p className="mt-5 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-slate-600">No mapped findings for this control in the selected review.</p>
       )}
     </Card>
   );
@@ -439,8 +439,8 @@ function MetricCard({ label, value, detail, tone = "neutral" }: { label: string;
     <Card className="p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-slate-400">{label}</p>
-          <p className="mt-2 text-3xl font-semibold text-white">{value}</p>
+          <p className="text-sm text-slate-600">{label}</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">{value}</p>
           <p className="mt-2 text-xs text-slate-500">{detail}</p>
         </div>
         {tone !== "neutral" ? <Badge tone={tone}>{tone}</Badge> : null}
@@ -451,9 +451,9 @@ function MetricCard({ label, value, detail, tone = "neutral" }: { label: string;
 
 function SmallRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-[#26364d] bg-[#091424] px-3 py-2 text-sm">
-      <span className="text-slate-400">{label}</span>
-      <span className={mono ? "truncate font-mono text-xs text-slate-100" : "truncate text-slate-100"}>{value}</span>
+    <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-sm">
+      <span className="text-slate-600">{label}</span>
+      <span className={mono ? "truncate font-mono text-xs text-slate-900" : "truncate text-slate-900"}>{value}</span>
     </div>
   );
 }

@@ -14,6 +14,8 @@ TerraGate is a production-style Terraform PR risk gate for reviewing infrastruct
 
 **Release scope:** This is a public-demo engineering work sample, not a claim of production customer readiness. GitHub CI validates changes; AWS and Cloudflare releases are separate, manual operations. Local verification below is not evidence that a particular revision is deployed.
 
+**Workspace upgrade:** Searchable review queues, tabbed evidence inspection, policy/rule provenance, expiring risk exceptions, persisted Cognito organization membership, and the custom Stratum identity are implemented. Turnkey GitHub onboarding and durable storage/execution remain unfinished. See [implementation scope and setup](docs/enterprise-workspace.md) and the [verified deployment record](docs/deployment.md#verified-public-demo-release) for release status.
+
 ## Problem
 
 Terraform PR review is slow because reviewers have to reconstruct blast radius, security exposure, cost impact, and operational risk from scattered plan output, code diffs, tags, and tribal knowledge. Generic AI review is not trustworthy enough on its own because Terraform plan JSON can contain sensitive values and because hallucinated infrastructure findings create review noise.
@@ -44,11 +46,15 @@ The core product philosophy is deterministic first, AI second:
 
 ## Screenshots And Diagrams
 
-The public-demo architecture diagram is generated from repository-owned source and reflects the AWS/Cloudflare deployment shape defined in this repo.
+The architecture diagram reflects the repository's Terraform-defined RDS/VPC reference stack, not the current hosted demo. The live demo uses Neon PostgreSQL and Lambda outside a VPC; see the deployment record for observed configuration.
 
 ![AWS Architecture](docs/architecture_aws.png)
 
-UI screenshots are intentionally not checked in unless generated from the running app. Use the live demo link above or the local quickstart below to inspect the current dashboard.
+The following screenshots are captured from the running local workspace with repository sample plans and explicitly mocked GitHub writes, not generated mockups or evidence of a deployed release:
+
+![Local review workspace](docs/screenshots/reviews-desktop.png)
+
+[Finding inspection](docs/screenshots/finding-desktop.png) · [Mobile workspace](docs/screenshots/reviews-mobile.png)
 
 ## Tech Stack
 
@@ -57,9 +63,9 @@ UI screenshots are intentionally not checked in unless generated from the runnin
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS, lucide-react |
 | Backend API | FastAPI, Pydantic, SQLAlchemy |
 | Agent workflow | LangGraph, LangChain, optional OpenAI model calls |
-| Database | PostgreSQL in Docker Compose, SQLite fallback for local/manual runs |
+| Database | PostgreSQL in Docker Compose, Neon PostgreSQL for the hosted demo, SQLite fallback for local/manual runs |
 | Migrations | Alembic |
-| Auth | Dev role-header fallback, Amazon Cognito JWT/Hosted UI integration path |
+| Auth | Dev/public-demo headers; Cognito JWT/Hosted UI with active database subject/org/role membership for private mode |
 | Artifact storage | Local filesystem adapter for dev, structured for future object storage |
 | GitHub | PR metadata, webhook endpoint, check runs, versioned comment approvals, snippet export, mock fallback |
 | Cost | Optional Infracost CLI, deterministic heuristic fallback |
@@ -75,6 +81,8 @@ UI screenshots are intentionally not checked in unless generated from the runnin
 - **LangGraph workflow:** Runs named review nodes for ingestion, redaction, normalization, policy checks, cost estimate, blast-radius analysis, reviewer enrichment, merge/dedupe, PR mapping, remediation, compliance mapping, reporting, and approval gating.
 - **Versioned human approval:** Decisions bind the displayed draft to artifact hashes, the saved policy inputs, findings, and the reviewed PR commit. Changed reviews and live PR heads cannot reuse old approval.
 - **Truthful presentation:** Run scores, cost deltas, reports, audit records, and findings come directly from the API. Missing results remain unavailable, rather than being replaced with scenario data or invented timings.
+- **Scoped risk acceptance:** Finding-bound exceptions require justification, expiry, and a different administrator. Acceptance retains evidence and raw scores, becomes stale when review content changes, and is separate from comment or deployment approval.
+- **Evidence workspace:** Search/filter/paginate the review queue, inspect saved redacted before/after data, and see actual rule implementation hashes and evaluated policy content versions. Unknown/sensitive inputs require verification rather than silently passing.
 - **Production-style persistence:** Stores runs, artifacts, findings, evidence, remediations, approvals, GitHub checks/comments, fix patches, review jobs, and audit events.
 - **Async-capable execution:** Supports inline execution, FastAPI background tasks, and a worker process that claims queued review jobs from the database.
 - **Operational risk analysis:** Detects destructive stateful changes and generates runbook-grade checklists for backup, maintenance window, rollback, owner signoff, and post-apply validation.
@@ -107,12 +115,12 @@ Implementation evidence: [approval provenance](apps/api/app/services/review_appr
 
 ## Architecture
 
-The implemented public-demo path serves the Next.js/OpenNext frontend from Cloudflare Workers. Browser requests call an AWS API Gateway HTTP API, which invokes a Mangum-wrapped FastAPI Lambda in private subnets. The backend runs the deterministic-first LangGraph review inline, stores ephemeral artifacts in Lambda `/tmp`, and persists review state and audit events in private, encrypted RDS PostgreSQL.
+The hosted public demo serves the Next.js/OpenNext frontend from Cloudflare Workers. Browser requests call an AWS API Gateway HTTP API, which invokes a Mangum-wrapped FastAPI Lambda outside a VPC. The backend runs the deterministic-first LangGraph review inline, stores ephemeral artifacts in Lambda `/tmp`, and persists review state and audit events in Neon PostgreSQL with TLS. The repository's Terraform RDS/VPC stack is a reference deployment and currently differs from the live configuration; do not apply it blindly to the hosted demo.
 
-- **Request flow:** The reviewer loads the UI from Cloudflare Workers; the browser sends API calls directly to API Gateway -> FastAPI/Lambda -> review engine -> RDS. Optional GitHub, OpenAI, LangSmith, and Infracost adapters are disabled, mocked, or credential-dependent in the public-demo path.
+- **Request flow:** The reviewer loads the UI from Cloudflare Workers; the browser sends API calls directly to API Gateway -> FastAPI/Lambda -> review engine -> Neon PostgreSQL. Optional GitHub, OpenAI, LangSmith, and Infracost adapters are disabled, mocked, or credential-dependent in the public-demo path.
 - **Deployment flow:** Terraform provisions the AWS backend and starts CodeBuild, which clones the selected Git ref, builds `Dockerfile.lambda`, pushes to ECR, and supplies Lambda by image digest. The Cloudflare frontend deploy is a separate manual npm script. GitHub Actions runs tests and builds only; it does not deploy.
-- **Security:** Lambda and RDS run in private subnets, RDS accepts port 5432 only from the Lambda security group, and raw plans are redacted before optional AI review. PR comments require versioned human approval; GitHub checks update automatically. Cognito support is optional and is not provisioned by the demo Terraform; the public demo uses dev auth.
-- **Cost controls:** The stack uses request-driven Lambda/API Gateway, inline execution with no idle worker, no NAT gateway, a small RDS default, and 14-day log retention. Stopping RDS outside demos is a documented manual control, not an automated schedule.
+- **Security:** The hosted demo uses a TLS database connection, shared dev auth and mocked GitHub writes. Private-subnet/RDS security-group boundaries belong to the reference Terraform stack, not the live demo. Raw plans are redacted before optional AI review; comments require versioned human approval.
+- **Cost controls:** The hosted app uses request-driven Lambda/API Gateway, inline execution with no idle worker, no NAT gateway, and managed Neon PostgreSQL. RDS stop/start instructions apply only to the reference stack.
 
 Architecture docs:
 
@@ -121,6 +129,7 @@ Architecture docs:
 - [Mermaid diagram source](docs/architecture.mmd)
 - [Architecture diagram notes and evidence](docs/architecture-notes.md)
 - [Architecture overview and C4-style diagram](docs/architecture.md)
+- [Enterprise workspace: implementation boundaries and private setup](docs/enterprise-workspace.md)
 - [Hiring manager reviewer guide](docs/reviewer-guide.md)
 - [Deployment guide](docs/deployment.md)
 - [Operations runbook](docs/runbook.md)
@@ -155,7 +164,7 @@ Architecture docs:
 - Generate a markdown GitHub PR comment draft.
 - Require versioned approval before posting comments; export remediation snippets for local validation.
 - Persist review history, audit log events, and graph progress.
-- Filter run history and actions by the user's organization claim; this is not yet a persisted membership or complete tenant-authorization model.
+- Scope run history and actions to an active Cognito subject/org membership, with roles enforced from the database. Global policy ownership, GitHub installation ownership, and database row-level security remain unfinished.
 - Run locally without OpenAI or GitHub credentials using deterministic and mock fallbacks.
 - Launch bundled public-demo sample reviews without requiring visitors to upload Terraform plans.
 
@@ -265,7 +274,7 @@ Copy `.env.example` to `.env`. Important variables:
 | `REVIEW_EXECUTION_MODE` | `inline`, `background`, or worker-backed execution |
 | `PUBLIC_DEMO_*` | Enables hosted-demo guardrails, sample-review flow, upload limits, and mock external writes |
 
-For Cognito, create a public app client without a client secret, enable authorization-code + PKCE, add `http://localhost:3000/auth/callback` as an allowed callback URL, and add `http://localhost:3000` as an allowed sign-out URL. Groups map to app roles by default: `terragate-admins`, `terragate-reviewers`, and `terragate-viewers`.
+For Cognito, create a public app client without a client secret, enable authorization-code + PKCE, configure callback/sign-out URLs and a trusted organization attribute, and provision active database membership. `COGNITO_APP_CLIENT_ID` is required. Token groups cannot grant permissions on their own. See [operator provisioning and migration](docs/enterprise-workspace.md#migration-and-private-auth-setup).
 
 ## Generating Terraform Plan JSON
 
@@ -285,7 +294,7 @@ Terraform plan JSON can expose secrets and provider-generated values. Treat it a
 - Low-confidence or high-risk findings can require human review.
 - GitHub comments are approval-gated. Generated snippets cannot be committed directly.
 - Missing external credentials return mock/dev responses instead of failing the demo.
-- Cognito mode validates signed JWTs and maps groups/custom claims to platform roles.
+- Cognito mode validates issuer, signature, expiry, and client, then requires active persisted organization membership and enforces its role.
 
 ## GitHub Integration
 
@@ -323,7 +332,7 @@ CI also validates Alembic migrations and Terraform formatting/validation for the
 
 ### Latest Local Validation
 
-Results for the review-integrity changes, not evidence of a new cloud deployment:
+Results for the workspace update are recorded in [testing](docs/testing.md). The earlier review-integrity validation below is retained as historical evidence, not evidence that this feature branch is deployed:
 
 | Check | Result |
 | --- | --- |
@@ -333,13 +342,13 @@ Results for the review-integrity changes, not evidence of a new cloud deployment
 | Local Playwright smoke | Desktop/mobile review, API-matching draft and snippet download, approval, mock post, repeat-post disabled; no page errors or mobile page overflow |
 | Whitespace and changed-document local links | Passed |
 
-The local browser smoke is not a checked-in CI e2e suite. The same approval/export/mock-post journey was subsequently verified on the AWS/Cloudflare deployment, on desktop and mobile. Live GitHub writes were not tested. See the [deployment record](docs/deployment.md#verified-public-demo-release) and [testing details and remaining gaps](docs/testing.md).
+The earlier approval/export/mock-post journey was subsequently verified on the AWS/Cloudflare deployment. The new workspace browser smoke is checked in but not in CI, and its new features have only local verification. Live GitHub writes were not tested. See the [deployment record](docs/deployment.md#verified-public-demo-release) and [testing details and remaining gaps](docs/testing.md).
 
 ## Deployment Overview
 
 - **Local:** Docker Compose runs API, web, worker, and PostgreSQL. Manual mode can use SQLite for quick API runs.
 - **Public demo frontend:** Cloudflare Workers through OpenNext and Wrangler. The current repository includes `apps/web/wrangler.jsonc` and npm scripts for preview/deploy.
-- **Public demo backend:** AWS API Gateway invokes a Mangum-wrapped FastAPI Lambda container. Terraform provisions private RDS PostgreSQL, ECR, CodeBuild, VPC networking, and log groups.
+- **Public demo backend:** AWS API Gateway invokes a Mangum-wrapped FastAPI Lambda container using Neon PostgreSQL over TLS, outside a VPC. Terraform defines an alternative RDS/VPC reference stack; it is not an exact inventory of the current live setup.
 - **CI:** GitHub Actions validates code and Terraform but intentionally does not auto-deploy.
 
 See [docs/deployment.md](docs/deployment.md) and [docs/public-demo.md](docs/public-demo.md).
@@ -404,15 +413,15 @@ See [docs/teardown.md](docs/teardown.md).
 - Cost estimates are strongest when Infracost is installed and configured; fallback estimates are intentionally labeled heuristic.
 - Generated remediations are snippets requiring local adaptation and validation. Automatic source-verified patch generation is not implemented.
 - Policy packs are editable JSON files, not yet a full approval/versioning workflow.
-- Cognito auth is wired for JWT validation and Hosted UI, but persisted org membership and row-level authorization are future work.
+- Private Cognito mode requires persisted organization membership; invitations, installation-to-org mapping, organization-owned policies, and PostgreSQL row-level security remain unfinished. Live Cognito onboarding is not verified by offline JWT tests.
 - The public demo uses dev auth and shared review visibility. Do not upload private infrastructure plans; redaction is not a substitute for access control or private storage.
 - Lambda artifacts use ephemeral `/tmp`; durable encrypted storage, retention, and deletion controls remain unfinished.
-- The pinned frontend dependency tree reported six production audit findings, including critical Next.js advisories. Dependency remediation and a fresh audit are required before customer deployment; reachability has not been assessed.
+- The local workspace branch upgrades Next.js to 16.4.0 and refreshes affected locked packages: `npm audit --omit=dev` reports no findings. The full tooling audit still reports 18 findings (14 high, 1 moderate, 3 low); this is not a clean whole-repository security assessment. See [validation evidence](docs/testing.md#workspace-validation-record).
 - Browser e2e coverage is not yet in CI, and PostgreSQL concurrency/crash recovery need dedicated integration tests.
 
 ## Roadmap
 
-- Remediate dependency advisories and replace dev identity with persisted organization membership before accepting customer data.
+- Remediate remaining tooling advisories, verify Cognito membership provisioning end to end, and complete private artifact/storage and repository ownership boundaries before accepting customer data.
 - Durable queue backend such as SQS or Temporal for customer-scale review execution.
 - Tenant-isolated Terraform execution with short-lived cloud credentials and stronger sandbox boundaries.
 - Policy-pack approval/versioning workflow; per-run evaluated policy snapshots are already saved.

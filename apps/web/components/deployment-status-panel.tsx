@@ -45,7 +45,7 @@ export function DeploymentStatusPanel() {
       { label: "Frontend", value: frontendTarget, detail: frontendHost, tone: "success", icon: Cloud },
       { label: "API", value: apiTarget, detail: `${capabilities.environment} / ${capabilities.review_execution_mode} execution`, tone: "success", icon: Server },
       { label: "Identity", value: capabilities.auth_provider === "cognito" ? "Amazon Cognito" : "Development identity", detail: user ? `${user.email} / ${user.role}` : "Identity unavailable", tone: capabilities.auth_provider === "cognito" ? "success" : "warn", icon: KeyRound },
-      { label: "GitHub writes", value: labelValue(capabilities.github_writes), detail: capabilities.github_writes === "live" ? "Approval gate remains enforced" : capabilities.github_writes === "mocked" ? "External mutation is blocked" : "No server credential configured", tone: capabilities.github_writes === "live" ? "success" : capabilities.github_writes === "mocked" ? "info" : "neutral", icon: GitPullRequest },
+      { label: "GitHub writes", value: labelValue(capabilities.github_writes), detail: capabilities.github_writes === "live" ? "Comments approval-gated; checks automatic" : capabilities.github_writes === "mocked" ? "External mutation is blocked" : "No server credential configured", tone: capabilities.github_writes === "live" ? "success" : capabilities.github_writes === "mocked" ? "info" : "neutral", icon: GitPullRequest },
       { label: "Terraform sandbox", value: labelValue(capabilities.terraform_sandbox), detail: capabilities.terraform_sandbox_driver ? `${capabilities.terraform_sandbox_driver} isolation driver` : "Upload plan JSON instead", tone: capabilities.terraform_sandbox === "enabled" ? "success" : "neutral", icon: ShieldCheck },
       { label: "Cost estimates", value: capabilities.cost_estimation === "infracost" ? "Infracost" : "Heuristic", detail: capabilities.cost_estimation === "infracost" ? "Provider-backed estimate" : "Clearly labeled fallback", tone: capabilities.cost_estimation === "infracost" ? "success" : "neutral", icon: WalletCards },
       { label: "AI enrichment", value: labelValue(capabilities.llm_enrichment), detail: capabilities.llm_enrichment === "enabled" ? `Tracing ${capabilities.tracing}` : "Deterministic review remains active", tone: capabilities.llm_enrichment === "enabled" ? "success" : "neutral", icon: BrainCircuit }
@@ -56,8 +56,8 @@ export function DeploymentStatusPanel() {
     <Card className="p-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
-          <p className="text-sm font-semibold text-white">Runtime capabilities</p>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">Values below are reported by this environment. They describe active behavior without exposing credentials or secret configuration.</p>
+          <p className="text-sm font-semibold text-slate-950">Runtime capabilities</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Values below are reported by this environment. They describe active behavior without exposing credentials or secret configuration.</p>
         </div>
         <Badge tone={capabilities?.public_demo ? "info" : "success"}>{capabilities?.public_demo ? "Public demo" : "Private runtime"}</Badge>
       </div>
@@ -66,14 +66,14 @@ export function DeploymentStatusPanel() {
         {statusItems.map((item) => {
           const Icon = item.icon;
           return (
-            <div key={item.label} className="rounded-md border border-[#26364d] bg-[#07101d] p-3">
+            <div key={item.label} className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    <Icon className="h-3.5 w-3.5 text-[#6ea8fe]" aria-hidden="true" />
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-normal text-slate-500">
+                    <Icon className="h-3.5 w-3.5 text-[#2563eb]" aria-hidden="true" />
                     {item.label}
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-slate-100">{item.value}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">{item.value}</p>
                   <p className="mt-1 truncate text-xs text-slate-500" title={item.detail}>{item.detail}</p>
                 </div>
                 <Badge tone={item.tone}>{statusLabel(item.tone)}</Badge>

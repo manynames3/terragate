@@ -19,11 +19,16 @@ export function formatDate(value: string | null): string {
 export function severityTone(severity: Severity | string): string {
   return (
     {
-      critical: "border-red-400/50 bg-red-500/15 text-red-100",
-      high: "border-orange-400/50 bg-orange-500/15 text-orange-100",
-      medium: "border-amber-300/50 bg-amber-400/15 text-amber-100",
-      low: "border-sky-300/50 bg-sky-400/15 text-sky-100",
-      info: "border-slate-300/40 bg-slate-500/15 text-slate-100"
-    }[severity] ?? "border-slate-300/40 bg-slate-500/15 text-slate-100"
+      critical: "border-red-200 bg-red-50 text-red-800",
+      high: "border-orange-200 bg-orange-50 text-orange-800",
+      medium: "border-amber-200 bg-amber-50 text-amber-800",
+      low: "border-sky-200 bg-sky-50 text-sky-800",
+      info: "border-slate-200 bg-slate-50 text-slate-700"
+    }[severity] ?? "border-slate-200 bg-slate-50 text-slate-700"
   );
+}
+
+export function formatRisk(score: number | null, level: string): string {
+  if (score === null) return level === "unavailable" ? "Unavailable" : "Not assessed";
+  return `${level} (${score}/100)`;
 }

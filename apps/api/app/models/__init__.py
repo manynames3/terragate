@@ -12,6 +12,8 @@ from app.models.entities import (
     RunModel,
     RunbookProgressModel,
     UserModel,
+    MembershipModel,
+    RiskExceptionModel,
 )
 
 __all__ = [
@@ -28,4 +30,6 @@ __all__ = [
     "RunModel",
     "RunbookProgressModel",
     "UserModel",
+    "MembershipModel",
+    "RiskExceptionModel",
 ]

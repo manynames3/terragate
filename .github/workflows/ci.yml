@@ -8,6 +8,20 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: terragate_ci
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: terragate_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U terragate_ci -d terragate_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: apps/api
@@ -26,6 +40,8 @@ jobs:
           ARTIFACT_STORAGE_DIR=./ci_artifacts \
           alembic upgrade head
       - run: pytest -q
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg://terragate_ci:ci_only_password@127.0.0.1:5432/terragate_ci
 
   frontend:
     runs-on: ubuntu-latest

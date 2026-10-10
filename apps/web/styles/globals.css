@@ -6,16 +6,15 @@
 }
 
 :root {
-  color-scheme: dark;
-  --background: #09111f;
-  --panel: #0d1728;
-  --panel-strong: #111d31;
-  --border: #24324a;
-  --muted: #91a3ba;
-  --text: #e5edf6;
-  --accent: #43c6ac;
-  --accent-2: #6ea8fe;
-  --focus: #7de8d2;
+  color-scheme: light;
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #dce2e9;
+  --muted: #475569;
+  --text: #172033;
+  --accent: #0f766e;
+  --focus: #0f766e;
 }
 
 * {
@@ -31,9 +30,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(14, 28, 48, 0.96), rgba(7, 13, 24, 1) 44%),
-    #09111f;
+  background: var(--background);
   color: var(--text);
   font-family: var(--font-sans);
 }
@@ -66,7 +63,7 @@ textarea:disabled {
 input,
 select,
 textarea {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 code,

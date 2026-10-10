@@ -27,8 +27,8 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
             aria-pressed={category === item}
             className={`rounded-md border px-3 py-2 text-sm capitalize transition ${
               category === item
-                ? "border-[#43c6ac] bg-[#43c6ac]/14 text-[#bdf4e9]"
-                : "border-[#31445f] bg-[#0d1728] text-slate-300 hover:bg-[#13213a]"
+                ? "border-[#0f766e] bg-[#0f766e]/14 text-[#0f766e]"
+                : "border-[var(--border)] bg-[var(--surface)] text-slate-600 hover:bg-[var(--surface-muted)]"
             }`}
           >
             {item}
@@ -43,7 +43,7 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1120px] text-left text-sm">
-              <thead className="border-b border-[#24324a] bg-[#101b2d] text-xs uppercase tracking-[0.12em] text-slate-400">
+              <thead className="border-b border-[var(--border)] bg-[var(--surface-muted)] text-xs uppercase tracking-normal text-slate-600">
                 <tr>
                   <th className="px-4 py-3">Severity</th>
                   <th className="px-4 py-3">Category</th>
@@ -59,14 +59,14 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
               </thead>
               <tbody>
                 {filtered.map((finding) => (
-                  <tr key={finding.id} className="border-b border-[#1d2a3f] last:border-0">
+                  <tr key={finding.id} className="border-b border-[var(--border)] last:border-0">
                     <td className="px-4 py-4"><SeverityBadge severity={finding.severity} /></td>
-                    <td className="px-4 py-4 capitalize text-slate-300">{finding.category}</td>
-                    <td className="max-w-56 truncate px-4 py-4 font-mono text-xs text-slate-300">{finding.resource_address ?? "n/a"}</td>
-                    <td className="max-w-56 truncate px-4 py-4 font-mono text-xs text-slate-400">
+                    <td className="px-4 py-4 capitalize text-slate-600">{finding.category}</td>
+                    <td className="max-w-56 truncate px-4 py-4 font-mono text-xs text-slate-600">{finding.resource_address ?? "n/a"}</td>
+                    <td className="max-w-56 truncate px-4 py-4 font-mono text-xs text-slate-600">
                       {finding.pr_file_path ? (
                         finding.pr_file_url ? (
-                          <a href={finding.pr_file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#9eeadf] hover:text-white">
+                          <a href={finding.pr_file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#0f766e] hover:text-slate-950">
                             {finding.pr_file_path}
                             <ExternalLink className="h-3 w-3" />
                           </a>
@@ -77,11 +77,11 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
                         "n/a"
                       )}
                     </td>
-                    <td className="px-4 py-4 font-mono text-xs text-slate-400">{finding.change_actions.join(", ") || "n/a"}</td>
-                    <td className="px-4 py-4 text-white">{finding.title}</td>
-                    <td className="px-4 py-4 text-slate-300">{Math.round(finding.confidence * 100)}%</td>
-                    <td className="px-4 py-4 text-slate-400">{finding.source.replaceAll("_", " ")}</td>
-                    <td className="px-4 py-4 text-slate-400">{finding.reviewer_node}</td>
+                    <td className="px-4 py-4 font-mono text-xs text-slate-600">{finding.change_actions.join(", ") || "n/a"}</td>
+                    <td className="px-4 py-4 text-slate-950">{finding.title}</td>
+                    <td className="px-4 py-4 text-slate-600">{Math.round(finding.confidence * 100)}%</td>
+                    <td className="px-4 py-4 text-slate-600">{finding.source.replaceAll("_", " ")}</td>
+                    <td className="px-4 py-4 text-slate-600">{finding.reviewer_node}</td>
                     <td className="px-4 py-4">
                       <Button variant="secondary" onClick={() => setSelected(finding)} className="min-h-9 px-3">
                         <Eye className="h-4 w-4" /> View
@@ -125,14 +125,14 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button type="button" className="absolute inset-0 bg-black/65" onClick={onClose} aria-label="Close finding detail" />
-      <aside ref={drawerRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} className="relative h-full w-full max-w-2xl overflow-y-auto border-l border-[#31445f] bg-[#081120] p-5 shadow-2xl sm:p-6">
+      <aside ref={drawerRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} className="relative h-full w-full max-w-2xl overflow-y-auto border-l border-[var(--border)] bg-[var(--surface-muted)] p-5 shadow-2xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <SeverityBadge severity={finding.severity} />
-            <h2 id={titleId} className="mt-4 text-2xl font-semibold text-white">{finding.title}</h2>
-            <p id={descriptionId} className="mt-2 text-sm leading-6 text-slate-400">{finding.description}</p>
+            <h2 id={titleId} className="mt-4 text-2xl font-semibold text-slate-950">{finding.title}</h2>
+            <p id={descriptionId} className="mt-2 text-sm leading-6 text-slate-600">{finding.description}</p>
           </div>
-          <button ref={closeRef} type="button" onClick={onClose} className="rounded-md p-2 text-slate-400 hover:bg-white/8 hover:text-white" aria-label="Close finding detail">
+          <button ref={closeRef} type="button" onClick={onClose} className="rounded-md p-2 text-slate-600 hover:bg-white/8 hover:text-slate-950" aria-label="Close finding detail">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -145,7 +145,7 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
               <ImpactMetric label="Changed file" value={finding.pr_file_path ?? "not mapped to a PR file"} mono />
               <ImpactMetric label="Primary evidence" value={evidence?.json_path ?? "no JSON path"} mono />
             </div>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
+            <p className="mt-3 text-sm leading-6 text-slate-600">
               {finding.impact || "This finding is tied to deployable Terraform evidence and should be reviewed before apply."}
             </p>
           </DetailBlock>
@@ -155,19 +155,19 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
             <dl className="grid gap-3 text-sm">
               <div>
                 <dt className="text-slate-500">JSON path</dt>
-                <dd className="mt-1 font-mono text-slate-200">{evidence?.json_path ?? "n/a"}</dd>
+                <dd className="mt-1 font-mono text-slate-700">{evidence?.json_path ?? "n/a"}</dd>
               </div>
               <div>
                 <dt className="text-slate-500">Observed</dt>
-                <dd className="mt-1 rounded-md bg-[#07101d] p-3 font-mono text-xs text-slate-200">{String(evidence?.observed_value ?? "n/a")}</dd>
+                <dd className="mt-1 rounded-md bg-[var(--surface-muted)] p-3 font-mono text-xs text-slate-700">{String(evidence?.observed_value ?? "n/a")}</dd>
               </div>
               <div>
                 <dt className="text-slate-500">Expected</dt>
-                <dd className="mt-1 rounded-md bg-[#07101d] p-3 font-mono text-xs text-slate-200">{String(evidence?.expected_value ?? "n/a")}</dd>
+                <dd className="mt-1 rounded-md bg-[var(--surface-muted)] p-3 font-mono text-xs text-slate-700">{String(evidence?.expected_value ?? "n/a")}</dd>
               </div>
               <div>
                 <dt className="text-slate-500">Rule</dt>
-                <dd className="mt-1 text-slate-200">{evidence?.rule_id ?? "n/a"} - {evidence?.explanation ?? ""}</dd>
+                <dd className="mt-1 text-slate-700">{evidence?.rule_id ?? "n/a"} - {evidence?.explanation ?? ""}</dd>
               </div>
             </dl>
           </DetailBlock>
@@ -176,9 +176,9 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
               <dl className="grid gap-3 text-sm">
                 <div>
                   <dt className="text-slate-500">Changed file</dt>
-                  <dd className="mt-1 font-mono text-slate-200">
+                  <dd className="mt-1 font-mono text-slate-700">
                     {finding.pr_file_url ? (
-                      <a href={finding.pr_file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[#9eeadf] hover:text-white">
+                      <a href={finding.pr_file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[#0f766e] hover:text-slate-950">
                         {finding.pr_file_path}
                         <ExternalLink className="h-4 w-4" />
                       </a>
@@ -191,7 +191,7 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
                   <div>
                     <dt className="text-slate-500">Patch excerpt</dt>
                     <dd>
-                      <pre className="mt-1 max-h-80 overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-3 text-xs leading-6 text-slate-200">{finding.pr_patch}</pre>
+                      <pre className="mt-1 max-h-80 overflow-auto rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-xs leading-6 text-slate-700">{finding.pr_patch}</pre>
                     </dd>
                   </div>
                 ) : null}
@@ -200,17 +200,17 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
           ) : null}
           {finding.remediation ? (
             <DetailBlock title="Remediation">
-              <p className="text-sm leading-6 text-slate-400">{finding.remediation.explanation}</p>
-              <pre className="mt-3 overflow-x-auto rounded-md border border-[#25364d] bg-[#07101d] p-4 text-xs leading-6 text-slate-100">{finding.remediation.snippet}</pre>
+              <p className="text-sm leading-6 text-slate-600">{finding.remediation.explanation}</p>
+              <pre className="mt-3 overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-xs leading-6 text-slate-900">{finding.remediation.snippet}</pre>
               <p className="mt-3 text-xs text-slate-500">Risk of change: {finding.remediation.risk_of_change}</p>
             </DetailBlock>
           ) : null}
           {finding.runbook_checklist.length ? (
             <DetailBlock title="Operational checklist">
-              <ul className="space-y-2 text-sm text-slate-200">
+              <ul className="space-y-2 text-sm text-slate-700">
                 {finding.runbook_checklist.map((item) => (
                   <li key={item} className="flex gap-2">
-                    <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-[#43c6ac]" />
+                    <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-[#0f766e]" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -227,18 +227,18 @@ function FindingDrawer({ finding, onClose }: { finding: Finding; onClose: () => 
 
 function ImpactMetric({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-md border border-[#26364d] bg-[#07101d] p-3">
-      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className={mono ? "mt-1 truncate font-mono text-xs text-slate-100" : "mt-1 truncate text-sm font-medium text-slate-100"}>{value}</p>
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+      <p className="text-xs uppercase tracking-normal text-slate-500">{label}</p>
+      <p className={mono ? "mt-1 truncate font-mono text-xs text-slate-900" : "mt-1 truncate text-sm font-medium text-slate-900"}>{value}</p>
     </div>
   );
 }
 
 function DetailBlock({ title, body, children }: { title: string; body?: string; children?: ReactNode }) {
   return (
-    <section className="rounded-lg border border-[#25364d] bg-[#0d1728] p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-400">{title}</h3>
-      {body ? <p className="mt-3 text-sm leading-6 text-slate-200">{body}</p> : null}
+    <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+      <h3 className="text-sm font-semibold uppercase tracking-normal text-slate-600">{title}</h3>
+      {body ? <p className="mt-3 text-sm leading-6 text-slate-700">{body}</p> : null}
       {children ? <div className="mt-3">{children}</div> : null}
     </section>
   );
