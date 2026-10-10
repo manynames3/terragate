@@ -16,7 +16,7 @@ Key responsibilities:
 - **LangGraph workflow:** Redaction, normalization, deterministic checks, optional AI explanation, remediation, compliance mapping, report generation, and approval gate.
 - **Database:** Run history, review jobs, findings, evidence, remediations, approvals, suggested patches, GitHub check/comment records, and audit log events.
 
-The AWS public-demo diagram below is generated from `docs/architecture_aws.py` and reflects the Terraform-defined deployment path under `infra/terraform/aws-public-demo`.
+The AWS diagram below is generated from `docs/architecture_aws.py` and reflects the Terraform-defined RDS/VPC reference path under `infra/terraform/aws-public-demo`. The hosted demo currently uses Neon PostgreSQL over TLS and Lambda outside a VPC instead; it is not an exact diagram of the live configuration.
 
 ![AWS public-demo architecture](architecture_aws.png)
 
@@ -96,7 +96,7 @@ Low-cost public demo mode:
 - AWS API Gateway invokes the FastAPI app through Mangum on Lambda.
 - `REVIEW_EXECUTION_MODE=inline` is used for bundled sample reviews to avoid running an idle worker.
 - `PUBLIC_DEMO_MODE=true` enables upload limits, read-only policy packs, mock GitHub writes, and sandbox disablement.
-- RDS PostgreSQL can be stopped outside demos to keep idle cost low.
+- The hosted Lambda uses Neon PostgreSQL over TLS, outside a VPC. RDS stop/start applies only to the alternative Terraform reference stack.
 - See [public demo deployment](public-demo.md).
 
 Intended production direction:
@@ -111,20 +111,21 @@ Intended production direction:
 
 - Terraform plan JSON is sensitive, so raw artifacts are treated as sensitive and are not sent to LLMs.
 - The app does not trust LLM output as source of truth; deterministic checks create findings first.
-- GitHub writes are externally visible and must remain approval-gated.
+- GitHub comments are externally visible and require versioned approval. Checks update automatically; branch-protection enforcement is not verified.
 - Current worker mode is useful and observable, but not a durable queue system.
 - Current sandbox mode is suitable for local/trusted demos, not hardened multi-tenant execution.
 - Current policy packs are editable JSON files, not a mature approval/versioning workflow.
-- Cognito auth validates JWTs and roles, but persisted org membership and row-level authorization are future work.
+- Private Cognito auth validates issuer/client/expiry and requires active persisted subject/org membership; its role controls writes. Run-scoped APIs use application-level organization filters. Invitations, GitHub installation ownership, organization-owned policies, and PostgreSQL RLS remain unfinished.
 
 ## Main Data Stores
 
-- **PostgreSQL or SQLite:** Runs, jobs, findings, evidence, remediations, approvals, patches, checks, comments, and audit logs.
+- **PostgreSQL or SQLite:** Runs, jobs, findings, evidence, remediations, approvals, risk exceptions, organization memberships, patches, checks, comments, and audit logs.
 - **Local artifact storage:** Raw plan JSON, redacted plan JSON, and redacted GitHub PR context.
 - **Policy pack JSON:** Team-editable policy profiles under `apps/api/app/policies/policy_packs`.
 
 ## Related Docs
 
+- [Local enterprise workspace implementation and remaining phases](enterprise-workspace.md)
 - [ADR index](adrs/README.md)
 - [API contract](api-contract.md)
 - [Threat model](threat-model.md)

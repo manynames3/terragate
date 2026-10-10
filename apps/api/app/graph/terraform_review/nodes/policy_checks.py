@@ -11,7 +11,7 @@ from app.graph.terraform_review.nodes.common import (
     resource_json_path,
 )
 from app.services.policy_packs import PolicyPack, load_policy_pack, policy_pack_from_dict
-from app.services.terraform_plan import get_attr, get_tags, is_create_or_update, is_delete_or_replace
+from app.services.terraform_plan import get_attr, get_tags, is_create_or_update, is_delete_or_replace, attribute_is_unknown, contains_redacted
 
 
 DANGEROUS_PORTS = {22, 3389, 3306, 5432, 6379, 9200}
@@ -153,6 +153,29 @@ def run_policy_checks(
             )
         )
 
+    evaluated_keys = {"ingress", "from_port", "to_port", "cidr_ipv4", "cidr_ipv6", "publicly_accessible",
+        "storage_encrypted", "policy", "instance_type", "multi_az", "size", "iops", "tags", "tags_all",
+        "backup_retention_period", "deletion_protection", "health_check", "region", "name", "bucket", "identifier",
+        "block_public_acls", "block_public_policy", "ignore_public_acls", "restrict_public_buckets"}
+    for resource in resource_changes:
+        if not is_create_or_update(resource):
+            continue
+        after = resource.get("change", {}).get("after") or {}
+        uncertain = sorted(key for key in evaluated_keys if attribute_is_unknown(resource, key) or contains_redacted(after.get(key)))
+        if not uncertain:
+            continue
+        prefix = resource_json_path(resource, "change.after") + "."
+        findings = [finding for finding in findings if not (
+            finding.get("resource_address") == resource.get("address") and any(
+                evidence.get("json_path", "").startswith(prefix) and evidence["json_path"][len(prefix):].split(".")[0].split("[")[0] in uncertain
+                for evidence in finding.get("evidence", [])))]
+        findings.append(make_finding(
+            title="Policy inputs require verification", severity="medium", category="governance", resource=resource,
+            description="Some policy inputs are unknown until apply or were redacted. Their controls cannot be confirmed from this plan.",
+            evidence=[make_evidence(resource_json_path(resource, f"change.after.{key}"), "Unknown until apply" if attribute_is_unknown(resource, key) else "[REDACTED]", "A known, non-sensitive control value", "GOV-EVIDENCE-001", "Do not interpret unknown or hidden configuration as a confirmed pass or failure.") for key in uncertain],
+            impact="A reviewer cannot establish whether these controls meet the selected policy.",
+            recommendation="Verify these inputs in trusted CI or with the resource owner before proceeding; never publish sensitive values.",
+            confidence=0.5, requires_human_review=True))
     return findings
 
 

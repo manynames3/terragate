@@ -7,7 +7,7 @@ export default function CognitoCallbackPage() {
     <Suspense
       fallback={
         <div className="flex min-h-[60vh] items-center justify-center">
-          <Card className="w-full max-w-md p-6 text-center text-sm text-slate-400">Loading Cognito callback...</Card>
+          <Card className="w-full max-w-md p-6 text-center text-sm text-slate-600">Loading Cognito callback...</Card>
         </div>
       }
     >

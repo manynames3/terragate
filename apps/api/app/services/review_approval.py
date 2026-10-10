@@ -36,6 +36,7 @@ def review_snapshot_hash(run: RunModel) -> str:
                 "impact": f.impact, "recommendation": f.recommendation,
                 "compliance": f.compliance_refs, "confidence": f.confidence,
                 "source": f.source, "reviewer": f.reviewer_node,
+                **({"rule_version": f.rule_version} if f.rule_version else {}),
                 "human_review": f.requires_human_review,
                 "pr_context": [f.pr_file_path, f.pr_file_url, f.pr_patch],
                 "runbook": f.runbook_checklist,

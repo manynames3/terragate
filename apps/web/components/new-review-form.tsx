@@ -37,7 +37,7 @@ const reviewFlowSteps = [
   "Redact secret-like values before reviewer nodes use the artifact.",
   "Run deterministic security, cost, reliability, governance, and compliance checks.",
   "Generate evidence-backed findings, remediations, runbook steps, and a PR comment draft.",
-  "Require approval before posting a GitHub comment or committing a suggested patch."
+  "Review the evidence and approve the exact PR comment before posting. Remediation snippets are export-only."
 ];
 
 export function NewReviewForm() {
@@ -220,10 +220,10 @@ export function NewReviewForm() {
 
   return (
     <div className="space-y-6">
-      <div className="border-b border-[#24324a] pb-6">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">Terraform PR review</p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">Start a risk review</h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+      <div className="border-b border-[var(--border)] pb-6">
+        <p className="text-sm font-semibold uppercase tracking-normal text-[#0f766e]">Terraform PR review</p>
+        <h1 className="mt-3 text-3xl font-semibold text-slate-950">Start a risk review</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
           Upload Terraform plan JSON, choose the policy context, and optionally attach the GitHub pull request that produced the change.
         </p>
       </div>
@@ -237,22 +237,22 @@ export function NewReviewForm() {
           {samplesAvailable ? <Card className="order-2 p-6">
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#43c6ac]/40 bg-[#43c6ac]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#9aeadc]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#0f766e]/40 bg-[#0f766e]/10 px-3 py-1 text-xs font-semibold uppercase tracking-normal text-[#0f766e]">
                   <Play className="h-3.5 w-3.5" />
                   Example data
                 </div>
-                <h2 className="mt-4 text-xl font-semibold text-white">Explore with a sample plan</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                <h2 className="mt-4 text-xl font-semibold text-slate-950">Explore with a sample plan</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                   Creates a clearly labeled sample run using bundled Terraform data. It never reads a real repository or performs a GitHub write.
                 </p>
               </div>
             </div>
             <div className="mt-5 grid gap-3 lg:grid-cols-3">
               {sampleReviews.map((sample) => (
-                <div key={sample.sample} className="rounded-lg border border-[#26364d] bg-[#091424] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6ea8fe]">{sample.badge}</p>
-                  <h3 className="mt-3 text-base font-semibold text-white">{sample.title}</h3>
-                  <p className="mt-2 min-h-16 text-sm leading-6 text-slate-400">{sample.description}</p>
+                <div key={sample.sample} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-normal text-[#2563eb]">{sample.badge}</p>
+                  <h3 className="mt-3 text-base font-semibold text-slate-950">{sample.title}</h3>
+                  <p className="mt-2 min-h-16 text-sm leading-6 text-slate-600">{sample.description}</p>
                   <Button
                     type="button"
                     className="mt-4 w-full"
@@ -270,25 +270,25 @@ export function NewReviewForm() {
 
           <Card className="order-1 p-6">
             <div className="mb-6 flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-md border border-[#31445f] bg-[#111d31]">
-                <FileJson className="h-5 w-5 text-[#43c6ac]" />
+              <span className="flex h-11 w-11 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface-muted)]">
+                <FileJson className="h-5 w-5 text-[#0f766e]" />
               </span>
               <div>
-                <h2 className="text-xl font-semibold text-white">Review a Terraform plan</h2>
-                <p className="mt-1 text-sm text-slate-400">Use JSON produced by <code className="text-slate-300">terraform show -json</code>.</p>
+                <h2 className="text-xl font-semibold text-slate-950">Review a Terraform plan</h2>
+                <p className="mt-1 text-sm text-slate-600">Use JSON produced by <code className="text-slate-600">terraform show -json</code>.</p>
               </div>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-6">
               <div ref={uploadSectionRef}>
                 <label htmlFor="terraform-plan-file"><FieldLabel>Terraform plan JSON</FieldLabel></label>
-                <label htmlFor="terraform-plan-file" className={`mt-2 flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-[#091424] px-6 py-8 text-center transition hover:border-[#43c6ac] ${uploadError ? "border-red-300/70 ring-2 ring-red-400/20" : "border-[#3a506d]"}`}>
-                  <UploadCloud className="h-8 w-8 text-[#6ea8fe]" />
-                  <span className="mt-3 text-sm font-medium text-white">{file ? file.name : "Choose tfplan.json"}</span>
-                  <span id="terraform-plan-help" className="mt-2 max-w-xl text-xs leading-5 text-slate-400">
+                <label htmlFor="terraform-plan-file" className={`mt-2 flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-[var(--surface-muted)] px-6 py-8 text-center transition hover:border-[#0f766e] ${uploadError ? "border-red-300/70 ring-2 ring-red-400/20" : "border-[#3a506d]"}`}>
+                  <UploadCloud className="h-8 w-8 text-[#2563eb]" />
+                  <span className="mt-3 text-sm font-medium text-slate-950">{file ? file.name : "Choose tfplan.json"}</span>
+                  <span id="terraform-plan-help" className="mt-2 max-w-xl text-xs leading-5 text-slate-600">
                     JSON only{maxPlanBytes ? `, up to ${formatFileSize(maxPlanBytes)}` : ""}. TerraGate validates the shape and redacts sensitive values before reviewer enrichment.
                   </span>
-                  {file ? <span className="mt-2 text-xs font-medium text-[#9aeadc]">{formatFileSize(file.size)} selected</span> : null}
+                  {file ? <span className="mt-2 text-xs font-medium text-[#0f766e]">{formatFileSize(file.size)} selected</span> : null}
                   <input
                     id="terraform-plan-file"
                     name="terraform-plan-file"
@@ -312,15 +312,15 @@ export function NewReviewForm() {
                   />
                 </label>
                 {uploadError ? (
-                  <div id="terraform-plan-error" className="mt-3 rounded-md border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-100" role="alert">
+                  <div id="terraform-plan-error" className="mt-3 rounded-md border border-red-400/40 bg-red-500/12 px-4 py-3 text-sm text-red-800" role="alert">
                     {uploadError}
                   </div>
                 ) : null}
               </div>
 
               {sandboxAvailable ? (
-                <details className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-100">Advanced: sandbox Terraform plan</summary>
+                <details className="rounded-lg border border-[#2b3d58] bg-[var(--surface-muted)] p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-900">Advanced: sandbox Terraform plan</summary>
                   <div className="mt-4 grid gap-3">
                     <button
                       type="button"
@@ -328,7 +328,7 @@ export function NewReviewForm() {
                         setExecutionMode(executionMode === "sandbox_plan" ? "uploaded_plan" : "sandbox_plan");
                         setUploadError(null);
                       }}
-                      className={`rounded-md border px-4 py-3 text-left text-sm ${executionMode === "sandbox_plan" ? "border-[#43c6ac] bg-[#102033] text-white" : "border-[#26364d] bg-[#091424] text-slate-300"}`}
+                      className={`rounded-md border px-4 py-3 text-left text-sm ${executionMode === "sandbox_plan" ? "border-[#0f766e] bg-[#102033] text-slate-950" : "border-[var(--border)] bg-[var(--surface-muted)] text-slate-600"}`}
                     >
                       {executionMode === "sandbox_plan" ? "Sandbox plan selected" : "Use sandbox plan source"}
                       <span className="mt-1 block text-xs text-slate-500">Private deployment path under TERRAFORM_SANDBOX_ROOT.</span>
@@ -336,36 +336,36 @@ export function NewReviewForm() {
                     {executionMode === "sandbox_plan" ? (
                       <>
                         <label className="space-y-2">
-                          <span className="text-xs font-medium text-slate-300">Working directory</span>
+                          <span className="text-xs font-medium text-slate-600">Working directory</span>
                           <input
                             value={terraformWorkingDir}
                             onChange={(event) => setTerraformWorkingDir(event.target.value)}
                             placeholder="relative path under sandbox root"
-                            className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                            className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-500"
                           />
                         </label>
                         <div className="grid gap-3 md:grid-cols-2">
                           <label className="space-y-2">
-                            <span className="text-xs font-medium text-slate-300">Workspace (optional)</span>
-                            <input value={terraformWorkspace} onChange={(event) => setTerraformWorkspace(event.target.value)} placeholder="default" className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                            <span className="text-xs font-medium text-slate-600">Workspace (optional)</span>
+                            <input value={terraformWorkspace} onChange={(event) => setTerraformWorkspace(event.target.value)} placeholder="default" className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-500" />
                           </label>
                           <label className="space-y-2">
-                            <span className="text-xs font-medium text-slate-300">Variable file (optional)</span>
-                            <input value={terraformVarFile} onChange={(event) => setTerraformVarFile(event.target.value)} placeholder="prod.tfvars" className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                            <span className="text-xs font-medium text-slate-600">Variable file (optional)</span>
+                            <input value={terraformVarFile} onChange={(event) => setTerraformVarFile(event.target.value)} placeholder="prod.tfvars" className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-500" />
                           </label>
                         </div>
                         <label className="space-y-2">
-                          <span className="text-xs font-medium text-slate-300">Environment variables JSON (optional)</span>
-                          <textarea value={terraformEnvVarsJson} onChange={(event) => setTerraformEnvVarsJson(event.target.value)} placeholder='{"TF_VAR_region":"us-east-1"}' className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500" />
+                          <span className="text-xs font-medium text-slate-600">Environment variables JSON (optional)</span>
+                          <textarea value={terraformEnvVarsJson} onChange={(event) => setTerraformEnvVarsJson(event.target.value)} placeholder='{"TF_VAR_region":"us-east-1"}' className="min-h-20 w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 font-mono text-xs text-slate-950 placeholder:text-slate-500" />
                         </label>
-                        <label className="flex items-center gap-2 text-sm text-slate-300">
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
                           <input type="checkbox" checked={terraformBackendEnabled} onChange={(event) => setTerraformBackendEnabled(event.target.checked)} />
                           Enable backend config for sandbox init
                         </label>
                         {terraformBackendEnabled ? (
                           <label className="space-y-2">
-                            <span className="text-xs font-medium text-slate-300">Backend configuration JSON</span>
-                            <textarea value={terraformBackendConfigJson} onChange={(event) => setTerraformBackendConfigJson(event.target.value)} placeholder='{"bucket":"tf-state"}' className="min-h-20 w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 font-mono text-xs text-white placeholder:text-slate-500" />
+                            <span className="text-xs font-medium text-slate-600">Backend configuration JSON</span>
+                            <textarea value={terraformBackendConfigJson} onChange={(event) => setTerraformBackendConfigJson(event.target.value)} placeholder='{"bucket":"tf-state"}' className="min-h-20 w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 font-mono text-xs text-slate-950 placeholder:text-slate-500" />
                           </label>
                         ) : null}
                       </>
@@ -377,7 +377,7 @@ export function NewReviewForm() {
               <div className="grid gap-4 md:grid-cols-3">
                 <label className="space-y-2">
                   <FieldLabel>Environment</FieldLabel>
-                  <select value={environment} onChange={(event) => setEnvironment(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
+                  <select value={environment} onChange={(event) => setEnvironment(event.target.value)} className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950">
                     <option value="dev">dev</option>
                     <option value="staging">staging</option>
                     <option value="prod">prod</option>
@@ -385,7 +385,7 @@ export function NewReviewForm() {
                 </label>
                 <label className="space-y-2">
                   <FieldLabel>Cloud provider</FieldLabel>
-                  <select value={cloudProvider} onChange={(event) => setCloudProvider(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
+                  <select value={cloudProvider} onChange={(event) => setCloudProvider(event.target.value)} className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950">
                     <option value="aws">AWS</option>
                     <option value="azure">Azure</option>
                     <option value="gcp">GCP</option>
@@ -394,7 +394,7 @@ export function NewReviewForm() {
                 </label>
                 <label className="space-y-2">
                   <FieldLabel>Policy profile</FieldLabel>
-                  <select value={policyProfile} onChange={(event) => setPolicyProfile(event.target.value)} className="w-full rounded-md border border-[#31445f] bg-[#0a1424] px-3 py-2.5 text-sm text-white">
+                  <select value={policyProfile} onChange={(event) => setPolicyProfile(event.target.value)} className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950">
                     {(policyPacks.length ? policyPacks : [{ name: "default" }] as PolicyPack[]).map((pack) => (
                       <option key={pack.name} value={pack.name}>{pack.name}</option>
                     ))}
@@ -402,17 +402,17 @@ export function NewReviewForm() {
                 </label>
               </div>
 
-              <div className="rounded-lg border border-[#2b3d58] bg-[#0a1424] p-4">
+              <div className="rounded-lg border border-[#2b3d58] bg-[var(--surface-muted)] p-4">
                 <div className="mb-4">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-                    <GitPullRequest className="h-4 w-4 text-[#6ea8fe]" />
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <GitPullRequest className="h-4 w-4 text-[#2563eb]" />
                     Optional GitHub PR context
                   </div>
                   <p className="mt-2 text-xs leading-5 text-slate-500">Attach changed-file and redacted patch evidence to this plan review. A PR URL does not replace the Terraform plan.</p>
                 </div>
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
                   <label className="space-y-2">
-                    <span className="text-xs font-medium text-slate-300">Pull request URL</span>
+                    <span className="text-xs font-medium text-slate-600">Pull request URL</span>
                     <input
                       id="github-pr-url"
                       type="url"
@@ -420,7 +420,7 @@ export function NewReviewForm() {
                       onChange={(event) => setPrUrl(event.target.value)}
                       placeholder="https://github.com/org/repo/pull/123"
                       autoComplete="url"
-                      className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+                      className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-500"
                     />
                   </label>
                   <div className="flex items-end">
@@ -431,16 +431,16 @@ export function NewReviewForm() {
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
                   <label className="mt-4 space-y-2">
-                    <span className="text-xs font-medium text-slate-300">Repository owner</span>
-                    <input value={repoOwner} onChange={(event) => setRepoOwner(event.target.value)} placeholder="acme" autoComplete="off" className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                    <span className="text-xs font-medium text-slate-600">Repository owner</span>
+                    <input value={repoOwner} onChange={(event) => setRepoOwner(event.target.value)} placeholder="acme" autoComplete="off" className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-500" />
                   </label>
                   <label className="mt-4 space-y-2">
-                    <span className="text-xs font-medium text-slate-300">Repository name</span>
-                    <input value={repoName} onChange={(event) => setRepoName(event.target.value)} placeholder="infrastructure" autoComplete="off" className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                    <span className="text-xs font-medium text-slate-600">Repository name</span>
+                    <input value={repoName} onChange={(event) => setRepoName(event.target.value)} placeholder="infrastructure" autoComplete="off" className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-500" />
                   </label>
                   <label className="mt-4 space-y-2">
-                    <span className="text-xs font-medium text-slate-300">Pull request number</span>
-                    <input value={pullNumber} onChange={(event) => setPullNumber(event.target.value.replace(/[^0-9]/g, ""))} placeholder="42" inputMode="numeric" pattern="[0-9]*" className="w-full rounded-md border border-[#31445f] bg-[#09111f] px-3 py-2.5 text-sm text-white placeholder:text-slate-500" />
+                    <span className="text-xs font-medium text-slate-600">Pull request number</span>
+                    <input value={pullNumber} onChange={(event) => setPullNumber(event.target.value.replace(/[^0-9]/g, ""))} placeholder="42" inputMode="numeric" pattern="[0-9]*" className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-500" />
                   </label>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -467,8 +467,8 @@ export function NewReviewForm() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-1 h-5 w-5 text-amber-300" />
               <div>
-                <h2 className="text-base font-semibold text-white">Plan privacy</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <h2 className="text-base font-semibold text-slate-950">Plan privacy</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Terraform plans can expose secrets, resource names, provider values, and topology. Uploaded plans are stored as review artifacts and redacted before any optional AI enrichment.
                 </p>
               </div>
@@ -476,13 +476,13 @@ export function NewReviewForm() {
           </Card>
           <Card className="p-5">
             <div className="flex items-start gap-3">
-              <ShieldCheck className="mt-1 h-5 w-5 text-[#43c6ac]" />
+              <ShieldCheck className="mt-1 h-5 w-5 text-[#0f766e]" />
               <div>
-                <h2 className="text-base font-semibold text-white">What happens after submit</h2>
+                <h2 className="text-base font-semibold text-slate-950">What happens after submit</h2>
                 <div className="mt-4 space-y-3">
                   {reviewFlowSteps.map((step) => (
-                    <div key={step} className="flex gap-2 text-sm leading-5 text-slate-400">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#43c6ac]" />
+                    <div key={step} className="flex gap-2 text-sm leading-5 text-slate-600">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#0f766e]" />
                       <span>{step}</span>
                     </div>
                   ))}
@@ -491,8 +491,8 @@ export function NewReviewForm() {
             </div>
           </Card>
           <Card className="p-5">
-            <h2 className="text-base font-semibold text-white">Generate a plan file</h2>
-            <pre className="mt-4 overflow-x-auto rounded-md border border-[#25364d] bg-[#07101d] p-4 text-xs leading-6 text-slate-200">
+            <h2 className="text-base font-semibold text-slate-950">Generate a plan file</h2>
+            <pre className="mt-4 overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-xs leading-6 text-slate-700">
 {`terraform plan -out=tfplan.binary
 terraform show -json tfplan.binary > tfplan.json`}
             </pre>
@@ -569,16 +569,16 @@ function formatFileSize(bytes: number): string {
 function GitHubContextPreview({ context }: { context: GitHubPRContext }) {
   const terraformFiles = context.terraform_files.length;
   return (
-    <div className="mt-4 rounded-lg border border-[#26364d] bg-[#091424] p-4">
+    <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
       <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
         <div>
-          <p className="text-sm font-semibold text-white">
+          <p className="text-sm font-semibold text-slate-950">
             {context.title ?? `${context.repo_full_name ?? "GitHub PR"}#${context.pull_number ?? ""}`}
           </p>
-          <p className="mt-1 text-xs text-slate-400">{context.message}</p>
+          <p className="mt-1 text-xs text-slate-600">{context.message}</p>
         </div>
         {context.html_url ? (
-          <a href={context.html_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#43c6ac]">
+          <a href={context.html_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#0f766e]">
             Open PR <ExternalLink className="h-3.5 w-3.5" />
           </a>
         ) : null}
@@ -592,8 +592,8 @@ function GitHubContextPreview({ context }: { context: GitHubPRContext }) {
       {context.terraform_files.length > 0 ? (
         <div className="mt-4 space-y-2">
           {context.terraform_files.slice(0, 4).map((file) => (
-            <div key={file.filename} className="flex items-center justify-between rounded-md border border-[#26364d] bg-[#07101d] px-3 py-2 text-xs">
-              <span className="font-mono text-slate-200">{file.filename}</span>
+            <div key={file.filename} className="flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs">
+              <span className="font-mono text-slate-700">{file.filename}</span>
               <span className="text-slate-500">+{file.additions} / -{file.deletions}</span>
             </div>
           ))}
@@ -605,9 +605,9 @@ function GitHubContextPreview({ context }: { context: GitHubPRContext }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#26364d] bg-[#07101d] p-3">
-      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <p className="mt-1 font-semibold text-slate-100">{value}</p>
+    <div className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+      <p className="text-xs uppercase tracking-normal text-slate-500">{label}</p>
+      <p className="mt-1 font-semibold text-slate-900">{value}</p>
     </div>
   );
 }

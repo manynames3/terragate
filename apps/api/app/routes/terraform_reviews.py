@@ -66,6 +66,7 @@ from app.services.fix_patches import suggested_fix_patches
 from app.services.policy_packs import get_policy_pack, list_policy_packs, load_policy_pack, save_policy_pack
 from app.services.review_approval import POSTED_STATES, approval_is_current, decision_error, patch_snapshot_hash, review_snapshot_hash
 from app.services.risk import severity_counts
+from app.services.review_workspace import assessment, policy_version, rule_revision, policy_decision
 from app.services.terraform_plan import TerraformPlanError, validate_terraform_plan
 from app.services.terraform_sandbox import TerraformSandboxError, TerraformSandboxRunner
 
@@ -394,7 +395,12 @@ async def github_webhook(
     settings = get_settings()
     body = await request.body()
     _verify_github_signature(body, x_hub_signature_256, settings.github_webhook_secret)
-    payload = json.loads(body or b"{}")
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(status_code=400, detail="GitHub webhook body must be valid JSON.") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="GitHub webhook body must be a JSON object.")
     if x_github_event == "ping":
         return {"accepted": True, "event": "ping"}
     if x_github_event != "pull_request":
@@ -494,6 +500,8 @@ def update_policy_pack(
             status_code=403,
             detail="Policy packs are read-only in public demo mode. Fork the repo or run locally to edit policy files.",
         )
+    if user.auth_provider == "cognito":
+        raise HTTPException(status_code=403, detail="These policy files are shared operator configuration. Organization-owned policy editing is not implemented.")
     try:
         saved = save_policy_pack(name, payload)
     except ValueError as exc:
@@ -514,12 +522,14 @@ def update_policy_pack(
 def list_runs(
     db: Session = Depends(get_db),
     user: DevUser = Depends(get_current_user),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
 ) -> list[RunListItem]:
     runs = db.scalars(
         _scope_run_query(select(RunModel), user)
         .options(selectinload(RunModel.findings))
         .order_by(RunModel.created_at.desc())
-        .limit(25)
+        .limit(limit).offset(offset)
     ).all()
     return [
         RunListItem(
@@ -528,8 +538,11 @@ def list_runs(
             status=run.status,
             environment=run.environment,
             cloud_provider=run.cloud_provider,
-            risk_score=run.risk_score,
-            risk_level=run.risk_level,
+            risk_score=run.risk_score if assessment(run) == "assessed" else None,
+            risk_level=run.risk_level if assessment(run) == "assessed" else assessment(run),
+            assessment_state=assessment(run),
+            repo_owner=run.repo_owner, repo_name=run.repo_name, pull_number=run.pull_number,
+            reviewed_head_sha=run.reviewed_head_sha, policy_version=policy_version(run),
             summary=run.summary,
             approval_status=run.approval_status,
             created_at=run.created_at,
@@ -578,7 +591,7 @@ def get_report(
         report_markdown=run.report_markdown,
         pr_comment_draft=run.pr_comment_draft,
         remediation_summary=run.remediation_summary,
-        risk_score=RiskScore(**risk),
+        risk_score=RiskScore(**risk) if assessment(run) == "assessed" else None,
         review_snapshot_hash=review_snapshot_hash(run),
         approval_valid=approval_is_current(run),
         decision_blocker=decision_error(run, review_snapshot_hash(run)),
@@ -971,6 +984,7 @@ async def _create_and_queue_review(
     terraform_execution: dict[str, Any],
 ) -> RunModel:
     settings = get_settings()
+    terraform_execution = {**terraform_execution, "source_filename": Path(source_filename).name[:255]}
     _ensure_user_record(db, user)
     run = RunModel(
         user_id=user.id if user else None,
@@ -991,7 +1005,7 @@ async def _create_and_queue_review(
     db.flush()
 
     store = FileSystemArtifactStore(settings.artifact_root)
-    raw_uri, raw_sha = store.write_bytes(run.id, source_filename, raw_bytes)
+    raw_uri, raw_sha = store.write_bytes(run.id, "tfplan.raw.json", raw_bytes)
     raw_artifact = ArtifactModel(
         run_id=run.id,
         type="terraform_plan_raw",
@@ -1114,6 +1128,7 @@ def _persist_final_state(db: Session, run: RunModel, final_state: dict[str, Any]
         )
 
     findings = final_state.get("merged_findings", [])
+    revision = rule_revision()
     for item in findings:
         finding = FindingModel(
             id=item["id"],
@@ -1132,6 +1147,7 @@ def _persist_final_state(db: Session, run: RunModel, final_state: dict[str, Any]
             confidence=item.get("confidence", 1.0),
             source=item.get("source", "deterministic_rule"),
             reviewer_node=item.get("reviewer_node", "deterministic_policy_checks"),
+            rule_version=revision if item.get("source", "deterministic_rule") == "deterministic_rule" else None,
             requires_human_review=item.get("requires_human_review", False),
             pr_file_path=item.get("pr_file_path"),
             pr_file_url=item.get("pr_file_url"),
@@ -1264,15 +1280,15 @@ def _execute_review_job(run_id: str, initial_state: dict[str, Any]) -> None:
         )
         db.commit()
 
-        raw_plan = _read_raw_plan(db, run_id)
-        state = {
-            **initial_state,
-            "raw_plan": raw_plan,
-            "trace_id": configure_langsmith(settings),
-        }
-        _record_github_check(db, run, status="in_progress", summary="TerraGate Terraform review started.")
-        final_state: dict[str, Any] = {}
         try:
+            raw_plan = _read_raw_plan(db, run_id)
+            state = {
+                **initial_state,
+                "raw_plan": raw_plan,
+                "trace_id": configure_langsmith(settings),
+            }
+            _record_github_check(db, run, status="in_progress", summary="TerraGate Terraform review started.")
+            final_state: dict[str, Any] = {}
             for state_update in stream_terraform_review(state):
                 final_state = state_update
                 progress = state_update.get("graph_progress")
@@ -1328,7 +1344,7 @@ def _read_raw_plan(db: Session, run_id: str) -> dict[str, Any]:
     )
     if not artifact:
         raise RuntimeError("Raw Terraform plan artifact not found.")
-    return json.loads(Path(artifact.storage_uri).read_text())
+    return FileSystemArtifactStore(get_settings().artifact_root).read_json(artifact.storage_uri, artifact.sha256)
 
 
 def _record_github_check(
@@ -1352,17 +1368,22 @@ def _record_github_check(
             external_id=run.id,
         )
     else:
-        result = _run_async(
-            _github_client(settings).create_check_run(
-                run.repo_owner,
-                run.repo_name,
-                head_sha,
-                status=status,
-                conclusion=conclusion,
-                summary=summary,
-                external_id=run.id,
+        try:
+            result = _run_async(
+                _github_client(settings).create_check_run(
+                    run.repo_owner,
+                    run.repo_name,
+                    head_sha,
+                    status=status,
+                    conclusion=conclusion,
+                    summary=summary,
+                    external_id=run.id,
+                )
             )
-        )
+        except Exception:
+            result = GitHubCheckResult(posted=False, mock=False, status=status,
+                conclusion=conclusion, external_id=run.id,
+                message="GitHub check publication is unavailable. No check result is verified; investigate before relying on merge enforcement.")
     db.add(
         GitHubCheckModel(
             run_id=run.id,
@@ -1375,7 +1396,7 @@ def _record_github_check(
     )
     _record_audit(
         db,
-        action="github.check_posted" if result.posted else "github.check_mocked",
+        action="github.check_posted" if result.posted else "github.check_mocked" if result.mock else "github.check_failed",
         run_id=run.id,
         metadata={"message": result.message, "status": result.status, "conclusion": result.conclusion},
     )
@@ -1390,7 +1411,6 @@ def _scope_run_query(query: Any, user: DevUser | None) -> Any:
             or_(
                 RunModel.org_id == "dev",
                 RunModel.org_id == "public-demo",
-                RunModel.org_id.is_(None),
             )
         )
     if user.org_id:
@@ -1398,6 +1418,19 @@ def _scope_run_query(query: Any, user: DevUser | None) -> Any:
     if user.id:
         return query.where(RunModel.user_id == user.id)
     return query.where(RunModel.user_id.is_(None))
+
+
+def _run_load_options():
+    return (
+        selectinload(RunModel.artifacts),
+        selectinload(RunModel.findings).selectinload(FindingModel.evidence),
+        selectinload(RunModel.findings).selectinload(FindingModel.remediations),
+        selectinload(RunModel.jobs),
+        selectinload(RunModel.github_checks),
+        selectinload(RunModel.fix_patches),
+        selectinload(RunModel.audit_logs),
+        selectinload(RunModel.runbook_progress),
+    )
 
 
 def _get_run_or_404(
@@ -1411,35 +1444,19 @@ def _get_run_or_404(
     query = _scope_run_query(query, user)
     if lock:
         query = query.with_for_update(of=RunModel)
-    if with_findings:
-        query = query.options(
-            selectinload(RunModel.artifacts),
-            selectinload(RunModel.findings).selectinload(FindingModel.evidence),
-            selectinload(RunModel.findings).selectinload(FindingModel.remediations),
-            selectinload(RunModel.jobs),
-            selectinload(RunModel.github_checks),
-            selectinload(RunModel.fix_patches),
-            selectinload(RunModel.audit_logs),
-            selectinload(RunModel.runbook_progress),
-        )
-    else:
-        query = query.options(
-            selectinload(RunModel.artifacts),
-            selectinload(RunModel.findings).selectinload(FindingModel.evidence),
-            selectinload(RunModel.findings).selectinload(FindingModel.remediations),
-            selectinload(RunModel.jobs),
-            selectinload(RunModel.github_checks),
-            selectinload(RunModel.fix_patches),
-            selectinload(RunModel.audit_logs),
-            selectinload(RunModel.runbook_progress),
-        )
+    query = query.options(*_run_load_options())
     run = db.scalar(query)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found.")
     return run
 
 
-def _run_detail(run: RunModel) -> RunDetail:
+def _run_detail(run: RunModel, exceptions: list | None = None) -> RunDetail:
+    from app.models import RiskExceptionModel
+    from sqlalchemy.orm import object_session
+    db = object_session(run)
+    if exceptions is None:
+        exceptions = list(db.scalars(select(RiskExceptionModel).where(RiskExceptionModel.run_id == run.id))) if db else []
     return RunDetail(
         id=run.id,
         mode=run.mode,
@@ -1447,8 +1464,11 @@ def _run_detail(run: RunModel) -> RunDetail:
         environment=run.environment,
         cloud_provider=run.cloud_provider,
         policy_profile=run.policy_profile,
-        risk_score=run.risk_score,
-        risk_level=run.risk_level,
+        risk_score=run.risk_score if assessment(run) == "assessed" else None,
+        risk_level=run.risk_level if assessment(run) == "assessed" else assessment(run),
+        assessment_state=assessment(run), policy_version=policy_version(run),
+        reviewed_head_sha=run.reviewed_head_sha,
+        **policy_decision(run, exceptions),
         summary=run.summary,
         trace_id=run.trace_id,
         graph_progress=run.graph_progress or [],
@@ -1500,7 +1520,9 @@ def _github_context_schema(run: RunModel) -> GitHubPRContext | None:
             )
         return None
     try:
-        payload = json.loads(Path(artifact.storage_uri).read_text())
+        if not artifact.redacted:
+            raise ValueError("PR context is not redacted.")
+        payload = FileSystemArtifactStore(get_settings().artifact_root).read_json(artifact.storage_uri, artifact.sha256)
     except Exception:
         return GitHubPRContext(
             available=False,
@@ -1552,6 +1574,7 @@ def _finding_schema(finding: FindingModel) -> Finding:
         confidence=finding.confidence,
         source=finding.source,
         reviewer_node=finding.reviewer_node,
+        rule_version=finding.rule_version,
         requires_human_review=finding.requires_human_review,
         pr_file_path=finding.pr_file_path,
         pr_file_url=finding.pr_file_url,
@@ -1752,7 +1775,7 @@ def _json_object_form(value: str | None, field_name: str) -> dict[str, str] | No
 
 def _verify_github_signature(body: bytes, signature: str | None, secret: str | None) -> None:
     if not secret:
-        return
+        raise HTTPException(status_code=503, detail="GitHub webhooks are disabled until GITHUB_WEBHOOK_SECRET is configured.")
     if not signature or not signature.startswith("sha256="):
         raise HTTPException(status_code=401, detail="Missing GitHub webhook signature.")
     expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()

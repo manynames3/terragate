@@ -70,12 +70,30 @@ async def get_current_user(
     settings: Settings = Depends(get_settings),
 ) -> DevUser:
     if settings.auth_mode.lower() == "cognito":
-        return await _get_cognito_user(authorization, settings)
+        return enforce_membership(await _get_cognito_user(authorization, settings))
+    if settings.app_env.lower() in {"production", "prod"} and not settings.public_demo_mode:
+        raise HTTPException(status_code=503, detail="Private production deployments require Cognito authentication.")
     return _get_dev_user(
         x_terragate_user_email or x_cloudops_user_email,
         x_terragate_user_name or x_cloudops_user_name,
         x_terragate_role or x_cloudops_role,
     )
+
+
+def enforce_membership(user: DevUser) -> DevUser:
+    from sqlalchemy import select
+    from app.db.session import SessionLocal
+    from app.models import MembershipModel
+    if not user.org_id or not user.id:
+        raise HTTPException(status_code=403, detail="An active organization membership is required.")
+    with SessionLocal() as db:
+        membership = db.scalar(select(MembershipModel).where(
+            MembershipModel.subject_id == user.id, MembershipModel.org_id == user.org_id,
+            MembershipModel.active.is_(True)))
+        if not membership or membership.role not in VALID_ROLES:
+            raise HTTPException(status_code=403, detail="An active organization membership is required.")
+        user.role = membership.role
+    return user
 
 
 def _get_dev_user(email_header: str | None, name_header: str | None, role_header: str | None) -> DevUser:
@@ -98,10 +116,10 @@ async def _get_cognito_user(authorization: str | None, settings: Settings) -> De
     token = _bearer_token(authorization)
     issuer = settings.resolved_cognito_issuer
     jwks_url = settings.resolved_cognito_jwks_url
-    if not issuer or not jwks_url:
+    if not issuer or not jwks_url or not settings.cognito_app_client_id:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Cognito auth is enabled but COGNITO_REGION/COGNITO_USER_POOL_ID or COGNITO_ISSUER is not configured.",
+            detail="Cognito requires an issuer/JWKS configuration and COGNITO_APP_CLIENT_ID.",
         )
     try:
         header = jwt.get_unverified_header(token)
@@ -115,16 +133,18 @@ async def _get_cognito_user(authorization: str | None, settings: Settings) -> De
             signing_key,
             algorithms=["RS256"],
             issuer=issuer,
-            options={"verify_aud": False},
+            options={"verify_aud": False, "require": ["exp", "sub"]},
         )
         _validate_cognito_client(claims, settings)
         return user_from_cognito_claims(claims, settings)
     except HTTPException:
         raise
-    except (InvalidTokenError, httpx.HTTPError, ValueError, KeyError) as exc:
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail="The identity provider is unavailable. Retry sign-in later.") from exc
+    except (InvalidTokenError, ValueError, KeyError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid Cognito token: {exc}",
+            detail="Invalid or expired Cognito token. Sign in again.",
         ) from exc
 
 
@@ -149,7 +169,7 @@ def _validate_cognito_client(claims: dict[str, Any], settings: Settings) -> None
         raise InvalidTokenError("Cognito token_use must be access or id.")
     client_id = settings.cognito_app_client_id
     if not client_id:
-        return
+        raise InvalidTokenError("COGNITO_APP_CLIENT_ID must be configured.")
     if token_use == "id" and claims.get("aud") != client_id:
         raise InvalidTokenError("Cognito ID token audience does not match COGNITO_APP_CLIENT_ID.")
     if token_use == "access" and claims.get("client_id") != client_id:

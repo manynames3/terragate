@@ -51,7 +51,8 @@ export function getStoredAuthSession(): AuthSession | null {
 
 export function getAuthHeaders(): Record<string, string> {
   const session = getStoredAuthSession();
-  return session ? { Authorization: `Bearer ${session.accessToken}` } : {};
+  // Cognito ID tokens carry organization attributes; ordinary access tokens do not.
+  return session ? { Authorization: `Bearer ${session.idToken || session.accessToken}` } : {};
 }
 
 export async function startCognitoLogin(): Promise<void> {
@@ -72,6 +73,8 @@ export async function startCognitoLogin(): Promise<void> {
     code_challenge: challenge,
     state
   });
+  // Hosted UI is external; authentication requires a full browser navigation.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign(`${domain}/oauth2/authorize?${params.toString()}`);
 }
 
@@ -138,6 +141,8 @@ export function signOut(): void {
       client_id: clientId,
       logout_uri: logout
     });
+    // End the external Cognito session, not just the local Next.js route.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign(`${domain}/logout?${params.toString()}`);
   }
 }

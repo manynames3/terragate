@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -20,7 +20,7 @@ def prefixed_id(prefix: str) -> str:
 class UserModel(Base):
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("usr"))
+    id: Mapped[str] = mapped_column(String(255), primary_key=True, default=lambda: prefixed_id("usr"))
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
@@ -28,11 +28,39 @@ class UserModel(Base):
     runs: Mapped[list[RunModel]] = relationship(back_populates="user")
 
 
+class MembershipModel(Base):
+    __tablename__ = "organization_memberships"
+    __table_args__ = (UniqueConstraint("subject_id", "org_id"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("mem"))
+    subject_id: Mapped[str] = mapped_column(String(255), index=True)
+    org_id: Mapped[str] = mapped_column(String(120), index=True)
+    role: Mapped[str] = mapped_column(String(40))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class RiskExceptionModel(Base):
+    __tablename__ = "risk_exceptions"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("exc"))
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
+    finding_id: Mapped[str] = mapped_column(ForeignKey("findings.id"), index=True)
+    review_hash: Mapped[str] = mapped_column(String(64))
+    justification: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    requested_by: Mapped[str] = mapped_column(String(255))
+    requester_email: Mapped[str] = mapped_column(String(255))
+    decided_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    approver_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    decision_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class RunModel(Base):
     __tablename__ = "runs"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: prefixed_id("run"))
-    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    user_id: Mapped[str | None] = mapped_column(String(255), ForeignKey("users.id"), nullable=True)
     org_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
     mode: Mapped[str] = mapped_column(String(80), default="terraform_pr_review", index=True)
     status: Mapped[str] = mapped_column(String(40), default="queued", index=True)
@@ -125,6 +153,7 @@ class FindingModel(Base):
     confidence: Mapped[float] = mapped_column(default=1.0)
     source: Mapped[str] = mapped_column(String(80), default="deterministic_rule")
     reviewer_node: Mapped[str] = mapped_column(String(120), default="deterministic_policy_checks")
+    rule_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     requires_human_review: Mapped[bool] = mapped_column(default=False)
     pr_file_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     pr_file_url: Mapped[str | None] = mapped_column(Text, nullable=True)

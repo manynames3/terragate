@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-Local development uses Docker Compose. The low-cost public demo deploys the frontend to Cloudflare Workers through OpenNext and the backend to AWS API Gateway/Lambda/RDS through Terraform. CI validates code and Terraform but does not deploy automatically.
+Local development uses Docker Compose. The hosted public demo uses Cloudflare Workers/OpenNext, AWS API Gateway/Lambda, and Neon PostgreSQL over TLS. The repository's Terraform RDS/VPC stack is a reference deployment, not the live inventory. CI validates code and Terraform but does not deploy automatically.
 
 ## Local Deployment
 
@@ -14,6 +14,8 @@ docker compose -f infra/docker-compose.yml up --build
 Use this for the fullest local workflow because it includes PostgreSQL, API, worker, and web services.
 
 ## AWS Public Demo Backend
+
+**Reference stack:** The commands below provision the RDS/VPC alternative. Do not run `terraform apply` against the existing hosted demo without reconciling the live Neon/outside-VPC configuration. The current release process updates the existing Lambda by an exact ECR image digest built by CodeBuild; it does not provision replacement database/network resources.
 
 ```bash
 cd infra/terraform/aws-public-demo

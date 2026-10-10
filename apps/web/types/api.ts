@@ -90,6 +90,7 @@ export type DemoSamplePlan = {
 };
 
 export type Finding = {
+  rule_version: string | null;
   id: string;
   title: string;
   description: string;
@@ -120,16 +121,26 @@ export type RunListItem = {
   status: string;
   environment: string;
   cloud_provider: string;
-  risk_score: number;
+  risk_score: number | null;
   risk_level: string;
   summary: string;
   approval_status: string;
   created_at: string;
   completed_at: string | null;
   severity_counts: Record<string, number>;
+  assessment_state: "not_assessed" | "unavailable" | "assessed";
+  repo_owner: string | null;
+  repo_name: string | null;
+  pull_number: number | null;
+  reviewed_head_sha: string | null;
+  policy_version: string | null;
 };
 
 export type RunDetail = RunListItem & {
+  policy_decision: "not_assessed" | "unavailable" | "blocked" | "passed" | "accepted_risk";
+  blocking_findings: number;
+  accepted_findings: number;
+  merge_enforcement: "not_verified";
   approval_valid: boolean;
   policy_profile: string;
   trace_id: string | null;
@@ -181,6 +192,7 @@ export type RunDetail = RunListItem & {
     }>;
   };
   terraform_execution: {
+    source_filename?: string;
     mode?: string;
     enabled?: boolean;
     sample?: string;
@@ -292,7 +304,7 @@ export type Report = {
   report_markdown: string;
   pr_comment_draft: string;
   remediation_summary: string;
-  risk_score: RiskScore;
+  risk_score: RiskScore | null;
   review_snapshot_hash: string;
   approval_valid: boolean;
   decision_blocker: string | null;
@@ -314,3 +326,15 @@ export type PatchCommitResponse = {
   message: string;
   commit_url: string | null;
 };
+
+export type RiskException = {
+  id: string; run_id: string; finding_id: string;
+  finding_title: string | null; resource_address: string | null;
+  status: "pending" | "approved" | "denied" | "expired" | "stale" | "revoked";
+  justification: string; expires_at: string; requester_email: string;
+  approver_email: string | null; decision_notes: string | null;
+  review_snapshot_hash: string; created_at: string; decided_at: string | null;
+};
+export type ReviewPage = {items: RunDetail[]; total: number; offset: number; limit: number};
+export type Repository = {full_name: string; review_count: number; last_review_at: string; connection: "observed_only"; merge_enforcement: "not_verified"};
+export type PlanPage = {items: Array<{address: string; type: string; change: {actions: string[]; before: unknown; after: unknown; after_unknown: unknown}}>; total: number; redacted: true; sha256: string};

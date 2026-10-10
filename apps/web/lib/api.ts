@@ -15,6 +15,7 @@ import type {
   RunListItem
 } from "@/types/api";
 import { getAuthHeaders } from "@/lib/auth";
+import type { ReviewPage, Repository, RiskException, PlanPage } from "@/types/api";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -38,7 +39,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => null) as { detail?: unknown; message?: unknown } | null;
+    const payload = await response.json().catch(() => null) as { detail?: unknown; message?: unknown; trace_id?: unknown } | null;
     const detail = formatApiError(payload?.detail ?? payload?.message);
     if (response.status === 401) {
       throw new Error(detail || "Your session is missing or expired. Sign in again and retry.");
@@ -46,7 +47,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if (response.status === 403) {
       throw new Error(detail || "Your account does not have permission to perform this action.");
     }
-    throw new Error(detail || response.statusText || `Request failed with status ${response.status}.`);
+    const trace = typeof payload?.trace_id === "string" ? payload.trace_id : response.headers.get("X-Request-ID");
+    const reference = response.status >= 500 && trace && /^[a-f0-9]{32}$/.test(trace) ? ` Reference: ${trace}.` : "";
+    throw new Error((detail || response.statusText || `Request failed with status ${response.status}.`) + reference);
   }
   return response.json() as Promise<T>;
 }
@@ -76,8 +79,26 @@ export function getRuntimeCapabilities(): Promise<RuntimeCapabilities> {
 }
 
 export function listRuns(): Promise<RunListItem[]> {
-  return request<RunListItem[]>("/api/v1/runs");
+  return request<RunListItem[]>("/api/v1/runs?limit=100");
 }
+
+export function listReviews(filters: Record<string, string>, signal?: AbortSignal): Promise<ReviewPage> {
+  return request<ReviewPage>(`/api/v1/reviews?${new URLSearchParams(filters)}`, {signal});
+}
+export function listRepositories(): Promise<Repository[]> { return request("/api/v1/repositories"); }
+export function listExceptions(runId?: string, offset = 0, findingId?: string): Promise<{items: RiskException[]; total: number}> {
+  return request(`/api/v1/exceptions?${new URLSearchParams({...(runId ? {run_id: runId} : {}), ...(findingId ? {finding_id: findingId} : {}), offset: String(offset)})}`);
+}
+export function requestException(runId: string, body: {finding_id: string; review_snapshot_hash: string; justification: string; expires_at: string}): Promise<RiskException> {
+  return request(`/api/v1/runs/${runId}/exceptions`, {method: "POST", body: JSON.stringify(body)});
+}
+export function decideException(id: string, decision: "approved" | "denied" | "revoked", notes: string): Promise<RiskException> {
+  return request(`/api/v1/exceptions/${id}/decision`, {method: "POST", body: JSON.stringify({decision, notes})});
+}
+export function listAuditEvents(offset = 0): Promise<{items: Array<AuditLogEntry & {run_id: string}>; total: number}> {
+  return request(`/api/v1/audit-log?offset=${offset}`);
+}
+export function getPlan(runId: string, offset = 0, resource?: string): Promise<PlanPage> { return request(`/api/v1/runs/${runId}/plan?${new URLSearchParams({offset: String(offset), ...(resource ? {resource} : {})})}`); }
 
 export function getRun(runId: string): Promise<RunDetail> {
   return request<RunDetail>(`/api/v1/runs/${runId}`);

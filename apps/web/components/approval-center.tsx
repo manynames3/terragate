@@ -103,10 +103,10 @@ export function ApprovalCenter() {
 
   return (
     <div className="space-y-6">
-      <div className="border-b border-[#24324a] pb-6">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#43c6ac]">Human in the loop</p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">Approval center</h1>
-        <p className="mt-2 text-sm text-slate-400">Review generated PR comments before anything can be posted externally.</p>
+      <div className="border-b border-[var(--border)] pb-6">
+        <p className="text-sm font-semibold uppercase tracking-normal text-[#0f766e]">Human in the loop</p>
+        <h1 className="mt-3 text-3xl font-semibold text-slate-950">Approval center</h1>
+        <p className="mt-2 text-sm text-slate-600">Review generated PR comments before anything can be posted externally.</p>
       </div>
 
       {error ? <AlertBanner tone="danger" title="Approval data unavailable" onDismiss={() => setError(null)}>{error}</AlertBanner> : null}
@@ -114,11 +114,11 @@ export function ApprovalCenter() {
       <div className="grid gap-6 xl:grid-cols-[400px_minmax(0,1fr)]">
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Review decisions</h2>
+            <h2 className="text-lg font-semibold text-slate-950">Review decisions</h2>
             <Badge tone="warn">{pendingRuns.length} pending</Badge>
           </div>
           {loading ? (
-            <p className="text-sm text-slate-400">Loading approvals...</p>
+            <p className="text-sm text-slate-600">Loading approvals...</p>
           ) : runs.length === 0 ? (
             <EmptyState title="No runs yet" body="Approval requests appear after a Terraform review completes." />
           ) : (
@@ -130,14 +130,14 @@ export function ApprovalCenter() {
                   onClick={() => setSelectedRunId(run.id)}
                   aria-pressed={selectedRunId === run.id}
                   className={`w-full rounded-lg border p-4 text-left transition ${
-                    selectedRunId === run.id ? "border-[#43c6ac] bg-[#102237]" : "border-[#26364d] bg-[#091424] hover:bg-[#101b2d]"
+                    selectedRunId === run.id ? "border-[#0f766e] bg-[#102237]" : "border-[var(--border)] bg-[var(--surface-muted)] hover:bg-[var(--surface-muted)]"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-mono text-xs text-slate-300">{run.id}</span>
+                    <span className="font-mono text-xs text-slate-600">{run.id}</span>
                     <SeverityBadge severity={run.risk_level} />
                   </div>
-                  <p className="mt-3 line-clamp-2 text-sm text-slate-300">{run.summary}</p>
+                  <p className="mt-3 line-clamp-2 text-sm text-slate-600">{run.summary}</p>
                   <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
                     <span>{run.approval_status}</span>
                     <span>{formatDate(run.completed_at)}</span>
@@ -151,29 +151,29 @@ export function ApprovalCenter() {
         <Card className="p-5">
           {reportLoading ? (
             <div className="space-y-3" aria-busy="true">
-              <div className="h-8 w-56 animate-pulse rounded bg-[#17263d]" />
-              <div className="h-[420px] animate-pulse rounded-md bg-[#101b2d]" />
+              <div className="h-8 w-56 animate-pulse rounded bg-[var(--surface-muted)]" />
+              <div className="h-[420px] animate-pulse rounded-md bg-[var(--surface-muted)]" />
             </div>
           ) : selected && report && report.run_id === selected.id ? (
             <div>
               <div className="mb-5 flex flex-col justify-between gap-3 md:flex-row md:items-start">
                 <div>
-                  <h2 className="text-xl font-semibold text-white">PR comment draft</h2>
-                  <p className="mt-1 text-sm text-slate-400">{selected.id} / {selected.environment}</p>
+                  <h2 className="text-xl font-semibold text-slate-950">PR comment draft</h2>
+                  <p className="mt-1 text-sm text-slate-600">{selected.id} / {selected.environment}</p>
                 </div>
-                <Link href={`/runs/${selected.id}`} className="inline-flex items-center gap-2 text-sm font-medium text-[#43c6ac]">
+                <Link href={`/runs/${selected.id}`} className="inline-flex items-center gap-2 text-sm font-medium text-[#0f766e]">
                   Run detail <ExternalLink className="h-4 w-4" />
                 </Link>
               </div>
-              <pre className="max-h-[560px] overflow-auto rounded-md border border-[#25364d] bg-[#07101d] p-4 text-xs leading-6 text-slate-100">{report.pr_comment_draft}</pre>
-              {report.decision_blocker ? <p className="mt-3 text-sm text-amber-200">{report.decision_blocker}</p> : null}
+              <pre className="max-h-[560px] overflow-auto rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-xs leading-6 text-slate-900">{report.pr_comment_draft}</pre>
+              {report.decision_blocker ? <p className="mt-3 text-sm text-amber-800">{report.decision_blocker}</p> : null}
               <label className="mt-4 block">
-                <span className="text-sm font-medium text-slate-200">Decision notes</span>
+                <span className="text-sm font-medium text-slate-700">Decision notes</span>
                 <textarea
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Add context for the change author and audit history"
-                  className="mt-2 min-h-24 w-full resize-y rounded-md border border-[#31445f] bg-[#09111f] p-3 text-sm text-white placeholder:text-slate-500"
+                  className="mt-2 min-h-24 w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-slate-950 placeholder:text-slate-500"
                 />
               </label>
               <div className="mt-4 flex flex-wrap gap-3">
@@ -187,7 +187,7 @@ export function ApprovalCenter() {
                   <GitPullRequest className="h-4 w-4" /> Post to GitHub
                 </Button>
               </div>
-              {!canReview ? <p className="mt-3 text-xs leading-5 text-amber-200">Reviewer or platform administrator access is required to record decisions or post comments.</p> : null}
+              {!canReview ? <p className="mt-3 text-xs leading-5 text-amber-800">Reviewer or platform administrator access is required to record decisions or post comments.</p> : null}
               {feedback ? <div className="mt-4"><AlertBanner tone={feedback.tone}>{feedback.text}{feedback.href ? <a href={feedback.href} target="_blank" rel="noreferrer" className="ml-1 font-semibold underline underline-offset-2">Open in GitHub</a> : null}</AlertBanner></div> : null}
             </div>
           ) : (

@@ -1,16 +1,20 @@
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import DateTime, Integer, JSON, MetaData, create_engine, select
 
 
-def test_existing_runs_and_legacy_patches_survive_provenance_upgrade(tmp_path) -> None:
+@pytest.mark.parametrize("postgres_url", [None] + ([os.environ["TEST_POSTGRES_URL"]] if os.environ.get("TEST_POSTGRES_URL") else []),
+                         ids=lambda url: "postgresql" if url else "sqlite")
+def test_existing_runs_and_legacy_patches_survive_provenance_upgrade(tmp_path, postgres_url) -> None:
     api_root = Path(__file__).resolve().parents[2]
     config = Config(str(api_root / "alembic.ini"))
     config.set_main_option("script_location", str(api_root / "alembic"))
-    url = f"sqlite:///{tmp_path / 'legacy.db'}"
+    url = postgres_url or f"sqlite:///{tmp_path / 'legacy.db'}"
     config.set_main_option("sqlalchemy.url", url)
     command.upgrade(config, "0007_run_org_scope")
     engine = create_engine(url)
@@ -33,9 +37,11 @@ def test_existing_runs_and_legacy_patches_survive_provenance_upgrade(tmp_path) -
         return values
 
     runs = metadata.tables["runs"]
+    users = metadata.tables["users"]
     patches = metadata.tables["fix_patches"]
     with engine.begin() as connection:
-        connection.execute(runs.insert().values({**required_values(runs), "id": "run_legacy", "pr_comment_draft": "Preserve this draft", "approval_status": "approved"}))
+        connection.execute(users.insert().values({**required_values(users), "id": "usr_legacy", "email": "legacy@example.test"}))
+        connection.execute(runs.insert().values({**required_values(runs), "id": "run_legacy", "user_id": "usr_legacy", "pr_comment_draft": "Preserve this draft", "approval_status": "approved"}))
         connection.execute(patches.insert().values({**required_values(patches), "id": "fix_legacy", "run_id": "run_legacy", "status": "approved", "diff": "@@\n+old unsafe snippet"}))
 
     command.upgrade(config, "head")
@@ -47,6 +53,10 @@ def test_existing_runs_and_legacy_patches_survive_provenance_upgrade(tmp_path) -
         assert run["pr_comment_draft"] == "Preserve this draft"
         assert run["approved_snapshot_hash"] is None
         assert run["policy_snapshot"] == {}
+        assert run["user_id"] == "usr_legacy"
+        assert upgraded.tables["users"].c.id.type.length == 255
+        assert upgraded.tables["runs"].c.user_id.type.length == 255
+        assert connection.execute(select(upgraded.tables["users"].c.email)).scalar_one() == "legacy@example.test"
         assert patch["kind"] == "snippet"
         assert patch["approved_snapshot_hash"] is None
         assert patch["diff"] == "@@\n+old unsafe snippet"

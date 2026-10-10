@@ -236,7 +236,7 @@ def test_sandbox_execution_is_explicitly_opt_in() -> None:
     assert "TERRAFORM_SANDBOX_ENABLED" in response.json()["detail"]
 
 
-def test_github_webhook_requires_plan_execution_configuration() -> None:
+def test_github_webhook_requires_plan_execution_configuration(monkeypatch) -> None:
     payload = {
         "action": "opened",
         "repository": {
@@ -249,11 +249,18 @@ def test_github_webhook_requires_plan_execution_configuration() -> None:
             "head": {"sha": "abc123"},
         },
     }
+    import hashlib
+    import hmac
+    import json
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "github_webhook_secret", "test-webhook-secret")
+    body = json.dumps(payload).encode()
+    signature = "sha256=" + hmac.new(b"test-webhook-secret", body, hashlib.sha256).hexdigest()
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/github/webhook",
-            headers={"X-GitHub-Event": "pull_request"},
-            json=payload,
+            headers={"X-GitHub-Event": "pull_request", "X-Hub-Signature-256": signature, "Content-Type": "application/json"},
+            content=body,
         )
 
     assert response.status_code == 202

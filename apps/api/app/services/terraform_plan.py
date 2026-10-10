@@ -33,6 +33,19 @@ def validate_terraform_plan(plan: dict[str, Any]) -> None:
         raise TerraformPlanError(
             "Terraform plan JSON must include a resource_changes array. Generate it with terraform show -json."
         )
+    for index, resource in enumerate(plan["resource_changes"]):
+        if not isinstance(resource, dict) or not isinstance(resource.get("change"), dict):
+            raise TerraformPlanError(f"resource_changes[{index}] must contain a change object.")
+        if any(not isinstance(resource.get(key), str) or not resource[key].strip() for key in ("address", "type")):
+            raise TerraformPlanError(f"resource_changes[{index}] requires an address and resource type.")
+        change = resource["change"]
+        actions = change.get("actions")
+        valid_actions = {"no-op", "create", "read", "update", "delete", "forget"}
+        if not isinstance(actions, list) or not actions or any(not isinstance(action, str) or action not in valid_actions for action in actions):
+            raise TerraformPlanError(f"resource_changes[{index}].change.actions must be a list of Terraform actions.")
+        for field in ("before", "after"):
+            if change.get(field) is not None and not isinstance(change[field], dict):
+                raise TerraformPlanError(f"resource_changes[{index}].change.{field} must be an object or null.")
 
 
 def redact_sensitive_values(value: Any, path: str = "$") -> Any:
@@ -44,10 +57,39 @@ def redact_sensitive_values(value: Any, path: str = "$") -> Any:
                 redacted[key] = REDACTED
             else:
                 redacted[key] = redact_sensitive_values(child, child_path)
+        for mask_key, value_key in (("before_sensitive", "before"), ("after_sensitive", "after"), ("sensitive_values", "values")):
+            if value_key in redacted and mask_key in value:
+                redacted[value_key] = redact_by_mask(redacted[value_key], value[mask_key])
+        if value.get("sensitive") is True and "value" in redacted:
+            redacted["value"] = REDACTED
         return redacted
     if isinstance(value, list):
         return [redact_sensitive_values(item, f"{path}[{index}]") for index, item in enumerate(value)]
     return value
+
+
+def redact_by_mask(value: Any, mask: Any) -> Any:
+    if mask is True:
+        if isinstance(value, dict):
+            return {key: REDACTED for key in value}
+        if isinstance(value, list):
+            return [REDACTED for _ in value]
+        return REDACTED
+    if isinstance(value, dict) and isinstance(mask, dict):
+        return {key: redact_by_mask(child, mask.get(key)) for key, child in value.items()}
+    if isinstance(value, list) and isinstance(mask, list):
+        return [redact_by_mask(child, mask[index] if index < len(mask) else None) for index, child in enumerate(value)]
+    return value
+
+
+def sensitive_mask_paths(value: Any, mask: Any, path: str) -> list[tuple[str, Any]]:
+    if mask is True:
+        return [(path, REDACTED)]
+    if isinstance(value, dict) and isinstance(mask, dict):
+        return [item for key, child in value.items() for item in sensitive_mask_paths(child, mask.get(key), f"{path}.{key}")]
+    if isinstance(value, list) and isinstance(mask, list):
+        return [item for index, child in enumerate(value) for item in sensitive_mask_paths(child, mask[index] if index < len(mask) else None, f"{path}[{index}]")]
+    return []
 
 
 def redact_sensitive_text(value: str) -> str:
@@ -144,6 +186,10 @@ def _redacted_block_line(line: str, label: str) -> str:
 def collect_sensitive_paths(value: Any, path: str = "$") -> list[tuple[str, Any]]:
     matches: list[tuple[str, Any]] = []
     if isinstance(value, dict):
+        for mask_key, value_key in (("before_sensitive", "before"), ("after_sensitive", "after"), ("sensitive_values", "values")):
+            matches.extend(sensitive_mask_paths(value.get(value_key), value.get(mask_key), f"{path}.{value_key}"))
+        if value.get("sensitive") is True and "value" in value:
+            matches.append((f"{path}.value", REDACTED))
         for key, child in value.items():
             child_path = f"{path}.{key}"
             if SENSITIVE_KEY_PATTERN.search(str(key)):
@@ -236,12 +282,30 @@ def redacted_plan_with_changes(plan: dict[str, Any]) -> dict[str, Any]:
 
 def get_attr(resource_change: dict[str, Any], key: str, prefer_after: bool = True) -> Any:
     change = resource_change.get("change", {})
-    scopes = ("after", "before") if prefer_after else ("before", "after")
-    for scope in scopes:
-        value = (change.get(scope) or {}).get(key)
-        if value is not None:
-            return value
-    return None
+    scope = "after" if prefer_after and change.get("after") is not None and "delete" not in change.get("actions", []) else "before"
+    if prefer_after and "create" in change.get("actions", []):
+        scope = "after"
+    value = (change.get(scope) or {}).get(key)
+    if scope == "after" and attribute_is_unknown(resource_change, key):
+        return None
+    return None if contains_redacted(value) else value
+
+
+def attribute_is_unknown(resource: dict[str, Any], key: str) -> bool:
+    mask = resource.get("change", {}).get("after_unknown", {})
+    return mask is True or isinstance(mask, dict) and mask_has_unknown(mask.get(key))
+
+
+def mask_has_unknown(mask: Any) -> bool:
+    if mask is True:
+        return True
+    return any(mask_has_unknown(child) for child in mask.values()) if isinstance(mask, dict) else any(mask_has_unknown(child) for child in mask) if isinstance(mask, list) else False
+
+
+def contains_redacted(value: Any) -> bool:
+    if value == REDACTED:
+        return True
+    return any(contains_redacted(child) for child in value.values()) if isinstance(value, dict) else any(contains_redacted(child) for child in value) if isinstance(value, list) else False
 
 
 def get_tags(resource_change: dict[str, Any]) -> dict[str, str]:

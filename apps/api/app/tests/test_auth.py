@@ -88,6 +88,7 @@ def test_cognito_mode_requires_and_accepts_signed_bearer_token(monkeypatch) -> N
         "token_use": "access",
         "client_id": "client-123",
         "cognito:groups": ["terragate-reviewers"],
+        "custom:org_id": "auth-test-org",
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
     }
@@ -102,11 +103,18 @@ def test_cognito_mode_requires_and_accepts_signed_bearer_token(monkeypatch) -> N
     try:
         with TestClient(app) as client:
             missing = client.get("/api/v1/auth/me")
+            unregistered = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+            from app.db.session import SessionLocal
+            from app.models import MembershipModel
+            with SessionLocal() as db:
+                db.add(MembershipModel(subject_id="cognito-sub", org_id="auth-test-org", role=ROLE_REVIEWER, active=True))
+                db.commit()
             allowed = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     finally:
         app.dependency_overrides.clear()
 
     assert missing.status_code == 401
+    assert unregistered.status_code == 403
     assert allowed.status_code == 200
     assert allowed.json()["auth_provider"] == "cognito"
     assert allowed.json()["role"] == ROLE_REVIEWER

@@ -14,7 +14,7 @@ export function PolicyPackSettings() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [readOnly, setReadOnly] = useState(false);
+  const [readOnly, setReadOnly] = useState(true);
   const [readOnlyReason, setReadOnlyReason] = useState<string | null>(null);
   const parsedPolicy = useMemo(() => {
     try {
@@ -39,9 +39,9 @@ export function PolicyPackSettings() {
       setLoading(true);
       try {
         const [available, runtime, user] = await Promise.all([listPolicyPacks(), getRuntimeCapabilities(), getCurrentUser()]);
-        const restricted = runtime.public_demo || user.role !== "platform-admin";
+        const restricted = runtime.public_demo || runtime.auth_provider === "cognito" || user.role !== "platform-admin";
         setReadOnly(restricted);
-        setReadOnlyReason(runtime.public_demo ? "Policy editing is disabled in this public environment." : user.role !== "platform-admin" ? "Platform administrator access is required to edit policy packs." : null);
+        setReadOnlyReason(runtime.public_demo ? "Policy editing is disabled in this public environment." : runtime.auth_provider === "cognito" ? "Shared policy files are operator-managed. Organization-owned policy editing is not implemented." : user.role !== "platform-admin" ? "Platform administrator access is required to edit policy packs." : null);
         setPacks(available);
         const initial = available.find((pack) => pack.name === "default") ?? available[0];
         if (initial) {
@@ -111,13 +111,13 @@ export function PolicyPackSettings() {
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-white">Policy pack workflow</h2>
+            <h2 className="text-lg font-semibold text-slate-950">Policy pack workflow</h2>
             <Badge tone={readOnly ? "neutral" : "success"}>{readOnly ? "Read only" : dirty ? "Unsaved changes" : "Saved"}</Badge>
           </div>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
             Teams can tune required tags, allowed regions, instance families, public ingress rules, stateful deletion rules, and cost thresholds without code changes.
           </p>
-          {readOnlyReason ? <p className="mt-2 text-sm text-amber-200">{readOnlyReason}</p> : null}
+          {readOnlyReason ? <p className="mt-2 text-sm text-amber-800">{readOnlyReason}</p> : null}
         </div>
         <div className="flex flex-wrap gap-2">
           {dirty ? <Button type="button" variant="secondary" onClick={() => { setEditorValue(savedValue); setMessage(null); }} disabled={saving}><RotateCcw className="h-4 w-4" /> Discard</Button> : null}
@@ -136,23 +136,23 @@ export function PolicyPackSettings() {
               onClick={() => void selectPack(pack.name)}
               className={`w-full rounded-md border px-3 py-3 text-left transition ${
                 selectedName === pack.name
-                  ? "border-[#43c6ac] bg-[#12352f]"
-                  : "border-[#26364d] bg-[#091424] hover:bg-[#111d31]"
+                  ? "border-[#0f766e] bg-[#12352f]"
+                  : "border-[var(--border)] bg-[var(--surface-muted)] hover:bg-[var(--surface-muted)]"
               }`}
             >
-              <p className="text-sm font-semibold text-white">{pack.name}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">{pack.description || "No description"}</p>
+              <p className="text-sm font-semibold text-slate-950">{pack.name}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-600">{pack.description || "No description"}</p>
               <p className="mt-2 text-xs text-slate-500">${pack.max_monthly_delta}/mo threshold</p>
             </button>
           ))}
         </div>
         <div className="space-y-4">
           {parsedPolicy ? (
-            <div className="rounded-lg border border-[#26364d] bg-[#091424] p-4">
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
               <div className="flex flex-col justify-between gap-2 md:flex-row md:items-start">
                 <div>
-                  <h3 className="text-base font-semibold text-white">Common controls</h3>
-                  <p className="mt-1 text-sm text-slate-400">Edit the fields teams usually care about without touching raw JSON.</p>
+                  <h3 className="text-base font-semibold text-slate-950">Common controls</h3>
+                  <p className="mt-1 text-sm text-slate-600">Edit the fields teams usually care about without touching raw JSON.</p>
                 </div>
                 <Badge tone="info">Policy version: {parsedPolicy.name}</Badge>
               </div>
@@ -198,24 +198,24 @@ export function PolicyPackSettings() {
               </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-amber-300/35 bg-amber-400/10 p-4 text-sm text-amber-100">
+            <div className="rounded-lg border border-amber-300/35 bg-amber-400/10 p-4 text-sm text-amber-800">
               Raw JSON is currently invalid. Fix the JSON below to restore the guided policy controls.
             </div>
           )}
           <label className="block space-y-2" htmlFor="policy-json-editor">
-            <span className="text-sm font-medium text-slate-200">Raw policy JSON</span>
+            <span className="text-sm font-medium text-slate-700">Raw policy JSON</span>
             <textarea
               id="policy-json-editor"
               value={editorValue}
               onChange={(event) => setEditorValue(event.target.value)}
-              className="min-h-[360px] w-full resize-y rounded-md border border-[#31445f] bg-[#07101d] p-4 font-mono text-xs leading-5 text-slate-100 outline-none focus:border-[#43c6ac]"
+              className="min-h-[360px] w-full resize-y rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-4 font-mono text-xs leading-5 text-slate-900 outline-none focus:border-[#0f766e]"
               spellCheck={false}
               disabled={readOnly}
             />
           </label>
         </div>
       </div>
-      {message ? <p className="mt-4 rounded-md border border-[#31445f] bg-[#091424] p-3 text-sm text-slate-200">{message}</p> : null}
+      {message ? <p className="mt-4 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm text-slate-700">{message}</p> : null}
     </Card>
   );
 }
@@ -227,14 +227,14 @@ function csv(value: string): string[] {
 function LabeledInput({ label, value, type = "text", onChange, disabled = false }: { label: string; value: string; type?: string; onChange: (value: string) => void; disabled?: boolean }) {
   return (
     <label className="space-y-2">
-      <span className="text-sm font-medium text-slate-200">{label}</span>
+      <span className="text-sm font-medium text-slate-700">{label}</span>
       <input
         type={type}
         min={type === "number" ? 0 : undefined}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
-        className="w-full rounded-md border border-[#31445f] bg-[#07101d] px-3 py-2.5 text-sm text-white placeholder:text-slate-500"
+        className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-950 placeholder:text-slate-500"
       />
     </label>
   );
@@ -242,9 +242,9 @@ function LabeledInput({ label, value, type = "text", onChange, disabled = false 
 
 function BooleanToggle({ label, checked, onChange, disabled = false }: { label: string; checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean }) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-md border border-[#26364d] bg-[#07101d] px-3 py-2.5 text-sm text-slate-200">
+    <label className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-slate-700">
       <span>{label}</span>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} disabled={disabled} className="h-4 w-4 accent-[#43c6ac]" />
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} disabled={disabled} className="h-4 w-4 accent-[#0f766e]" />
     </label>
   );
 }

@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-TerraGate treats Terraform plans and PR patches as sensitive artifacts, uses deterministic evidence before AI output, and blocks external GitHub writes until approval. The current public demo is intentionally guarded but not a hardened multi-tenant SaaS deployment.
+TerraGate treats Terraform plans and PR patches as sensitive artifacts, uses deterministic evidence before AI output, and requires versioned approval for GitHub comments. Checks update automatically. The public demo is intentionally guarded but not a hardened multi-tenant SaaS deployment. The [local workspace update](enterprise-workspace.md) is not deployed.
 
 ## Data Classification
 
@@ -17,7 +17,7 @@ TerraGate treats Terraform plans and PR patches as sensitive artifacts, uses det
 
 ## Controls Implemented
 
-- Secret-like keys are redacted in Terraform plan values.
+- Secret-like keys and Terraform sensitivity masks/outputs are redacted. Unknown or redacted policy inputs require verification instead of producing invented definite evidence.
 - GitHub patch context is redacted before it is stored or shown.
 - LLM reviewer nodes operate on reduced evidence summaries.
 - Policy findings include evidence paths, rule IDs, confidence, and reviewer source.
@@ -25,7 +25,10 @@ TerraGate treats Terraform plans and PR patches as sensitive artifacts, uses det
 - Generated remediation snippets cannot be approved or committed; their export controls provide guidance for local adaptation. Complete source-verified diffs use context checks, Terraform syntax/format checks, and non-force branch updates in the adapter; automatic generation and full module validation are not implemented.
 - Public demo mode mocks GitHub writes by default.
 - Public demo mode disables sandbox Terraform execution by default.
-- Cognito JWT validation and group-to-role mapping are available for private deployments.
+- Private Cognito authentication validates issuer, signature, expiry and client, then requires active subject/org membership and its database role. JWT groups cannot grant permissions on their own.
+- Redacted-plan reads are scoped to the run organization and check artifact root and SHA-256. Raw files are not exposed by a download route. New files/directories use 0600/0700 permissions; uploaded names cannot overwrite generated redacted artifacts.
+- Exceptions bind one finding to one snapshot, require a different administrator and expiration, and persist attributed decisions without reducing raw risk or changing comment approval/GitHub checks.
+- Webhooks fail closed without `GITHUB_WEBHOOK_SECRET` and compare HMAC signatures. Delivery replay protection and installation ownership are not implemented.
 - AWS demo RDS is private, encrypted, and only allows PostgreSQL from Lambda's security group.
 
 ## Least-Privilege IAM Approach
@@ -41,8 +44,10 @@ This is acceptable for a small demo stack. A production deployment should replac
 ## Auth And Authorization
 
 - `AUTH_MODE=dev` is used for local/public demo flows and should not be treated as production auth.
-- Cognito mode validates JWKS-signed JWTs and maps Cognito groups to roles.
-- Current org scoping exists at the application level, but full production tenant isolation would need first-class organizations, GitHub installation-to-org mapping, and policy ownership.
+- Cognito mode validates signed JWTs and active persisted membership. The browser prefers ID tokens containing the trusted organization attribute; the API validates their audience. Operator provisioning/revocation is documented in [private setup](enterprise-workspace.md#migration-and-private-auth-setup).
+- Review, finding, plan, report, audit and exception access is scoped at the application level. PostgreSQL row-level security, first-class organization management, GitHub installation ownership, and organization-owned policies are not implemented.
+- Cognito organization admins cannot edit shared policy files through the API; those files remain operator-managed until ownership is implemented. Local dev admin editing is retained, and public-demo policy edits remain disabled.
+- Private production mode refuses dev-header authentication. Public-demo records remain shared and anonymous identities are not trustworthy customer identities.
 
 ## Secret Management
 
@@ -65,5 +70,5 @@ This is acceptable for a small demo stack. A production deployment should replac
 2. Add organization/repository registration and GitHub App installation ownership.
 3. Store artifacts in S3 with SSE-KMS, retention policies, and explicit delete controls.
 4. Use a durable queue and isolated worker runtime for untrusted Terraform execution.
-5. Snapshot policy versions per run.
+5. Add approval/versioning and ownership for policy changes; evaluated snapshots and content hashes are already saved per run.
 6. Add audit export and administrative access review.

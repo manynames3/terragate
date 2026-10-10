@@ -10,9 +10,10 @@ The code supports GitHub PR metadata, webhooks, automatic checks, and versioned 
 - Redact PR patch context.
 - Map findings back to likely changed files.
 - Receive GitHub webhook events.
+- Require a configured HMAC secret and valid signature; otherwise webhook processing is disabled. Idempotent delivery handling is not implemented.
 - Create check-run style status records.
 - Post approved PR comments or return a clear mock response.
-- Commit approved suggested patches when safe PR metadata is available.
+- Validate complete source-context diffs in the patch adapter. Generated snippets are export-only, not executable commits.
 
 ## Minimal Turnkey Flow
 
@@ -37,3 +38,5 @@ Patch commits should remain separately approval-gated.
 ## Public Demo Behavior
 
 The public demo should not allow anonymous visitors to install or write through a real GitHub App. It should show the workflow and mock external writes unless configured for a private demo environment.
+
+The workspace's Repositories page lists **observed context**, not installations. No organization-owned installation/registration or trusted-CI artifact ingestion is implemented by the [local workspace update](enterprise-workspace.md). Do not present credentials being configured as verified webhook/check/merge health.

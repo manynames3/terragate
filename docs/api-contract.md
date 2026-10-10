@@ -14,12 +14,22 @@ Dev auth headers:
 - `X-TerraGate-Role`: optional role. Defaults to `platform-admin`; use `reviewer` for approval flows and `viewer` to verify restricted actions.
 - Legacy `X-CloudOps-*` headers are still accepted for older local scripts.
 
-Cognito role mapping:
+Cognito authorization requires issuer/signature/expiry/client validation and an active database membership for the exact signed `sub` and organization claim. The membership role overrides token groups and `custom:role`. Missing membership returns 403. `COGNITO_APP_CLIENT_ID` is mandatory. The browser prefers ID tokens containing organization attributes; access tokens require the same organization claim and matching client. Private production deployments reject dev authentication. See [operator provisioning](enterprise-workspace.md#migration-and-private-auth-setup).
 
-- `terragate-admins` -> `platform-admin`
-- `terragate-reviewers` -> `reviewer`
-- `terragate-viewers` -> `viewer`
-- `custom:role` can override when set to `platform-admin`, `reviewer`, or `viewer`.
+All responses include `X-Request-ID` (exposed to browser clients). Unexpected errors return a sanitized message and `trace_id`; no raw plan or credential values are included in these error logs.
+
+## Workspace Endpoints
+
+- `GET /api/v1/reviews`: scoped paginated review details. Filters: `q` (repository/PR/finding/resource), `status`, `environment`, `repository` (`owner/name`), `severity`; `limit` 1-100 (default 25), nonnegative `offset`. Returns `items`, filtered `total`, `limit`, `offset`. Status `attention` includes unfinished/comment-pending reviews and high/critical or uncertain findings, even after comment approval; `all` skips status filtering.
+- `GET /api/v1/repositories`: repository context observed in scoped saved reviews. This is not registration or proof of installation. `connection=observed_only`, `merge_enforcement=not_verified`.
+- `GET /api/v1/audit-log`: run-scoped events with total and pagination (default 50, max 100). Global policy/operator membership events are intentionally excluded.
+- `GET /api/v1/runs/{id}/plan`: saved redacted resource changes (`before`, `after`, `after_unknown`, actions), artifact SHA-256 and total. Optional exact `resource` filter, pagination default 25/max 100. Missing artifact: 409; expired file: 410; integrity mismatch: 409. Never returns raw plan data.
+- `GET /api/v1/exceptions`: scoped exceptions, optional `run_id` and `finding_id`, default limit 50/max 100, offset. Includes finding title/resource, derived pending/approved/denied/revoked/expired/stale status and attribution.
+- `POST /api/v1/runs/{id}/exceptions`: reviewer/admin only. Body: `finding_id`, exact `review_snapshot_hash`, justification (20-2000 nonblank characters), timezone-bearing `expires_at` within 90 days. Assessed run and saved policy required. Duplicate current request/approval or stale snapshot: 409.
+- `POST /api/v1/exceptions/{id}/decision`: a **different** platform admin only. Body: `decision` (`approved`, `denied`, `revoked`), notes (10-2000 nonblank characters). Stale/expired/ineligible transition: 409. Approval/denial requires pending; revocation requires approved. No deployment/comment authorization or GitHub check update occurs.
+- `GET /health`: process liveness. `GET /ready`: database reachability, returns 503 on failure; not proof of worker/storage/GitHub health.
+
+Run/list/report risk scores are nullable. Unfinished runs are `not_assessed`, failed runs `unavailable`; a completed assessed safe plan can legitimately score zero. Run details include assessment state, saved policy content hash, reviewed commit, local `policy_decision`, blocking/accepted counts and unverified merge enforcement. New deterministic findings include `rule_version` (implementation source hash); historical/LLM findings may have no value. Exceptions do not lower raw scores or change approval status.
 
 ## GET /api/v1/auth/me
 
