@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-TerraGate treats Terraform plans and PR patches as sensitive artifacts, uses deterministic evidence before AI output, and requires versioned approval for GitHub comments. Checks update automatically. The public demo is intentionally guarded but not a hardened multi-tenant SaaS deployment. The [local workspace update](enterprise-workspace.md) is not deployed.
+TerraGate treats Terraform plans and PR patches as sensitive artifacts, uses deterministic evidence before AI output, and requires versioned approval for GitHub comments. Checks update automatically. The public demo is intentionally guarded but not a hardened multi-tenant SaaS deployment. See the [workspace implementation](enterprise-workspace.md) and [verified deployment](deployment.md#verified-public-demo-release).
 
 ## Data Classification
 
@@ -29,17 +29,17 @@ TerraGate treats Terraform plans and PR patches as sensitive artifacts, uses det
 - Redacted-plan reads are scoped to the run organization and check artifact root and SHA-256. Raw files are not exposed by a download route. New files/directories use 0600/0700 permissions; uploaded names cannot overwrite generated redacted artifacts.
 - Exceptions bind one finding to one snapshot, require a different administrator and expiration, and persist attributed decisions without reducing raw risk or changing comment approval/GitHub checks.
 - Webhooks fail closed without `GITHUB_WEBHOOK_SECRET` and compare HMAC signatures. Delivery replay protection and installation ownership are not implemented.
-- AWS demo RDS is private, encrypted, and only allows PostgreSQL from Lambda's security group.
+- The Terraform reference stack defines private, encrypted RDS accessible from Lambda's security group. The hosted demo instead uses Neon PostgreSQL with TLS and Lambda outside a VPC; it does not have that private-network boundary.
 
 ## Least-Privilege IAM Approach
 
-The AWS public-demo Terraform uses narrow roles for the components it provisions:
+The AWS public-demo Terraform reference uses narrow roles for the components it provisions; this is not an exact live inventory:
 
 - CodeBuild can write logs and push/pull images in the TerraGate ECR repository.
 - Lambda uses AWS-managed basic execution and VPC access policies for logs and VPC networking.
 - RDS is not publicly accessible and is protected by security-group boundaries.
 
-This is acceptable for a small demo stack. A production deployment should replace broad AWS-managed Lambda VPC permissions with a more constrained custom policy where practical and should move secrets out of Terraform state.
+The hosted Lambda/database configuration differs from the reference. A production deployment should reconcile runtime IAM/network inventory, replace broad AWS-managed VPC permissions where practical, and move secrets out of Terraform state. TLS to Neon is not equivalent to private RDS security-group isolation.
 
 ## Auth And Authorization
 

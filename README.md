@@ -418,7 +418,7 @@ See [docs/teardown.md](docs/teardown.md).
 - Private Cognito mode requires persisted organization membership; invitations, installation-to-org mapping, organization-owned policies, and PostgreSQL row-level security remain unfinished. Live Cognito onboarding is not verified by offline JWT tests.
 - The public demo uses dev auth and shared review visibility. Do not upload private infrastructure plans; redaction is not a substitute for access control or private storage.
 - Lambda artifacts use ephemeral `/tmp`; durable encrypted storage, retention, and deletion controls remain unfinished.
-- The local workspace branch upgrades Next.js to 16.4.0 and refreshes affected locked packages: `npm audit --omit=dev` reports no findings. The full tooling audit still reports 18 findings (14 high, 1 moderate, 3 low); this is not a clean whole-repository security assessment. See [validation evidence](docs/testing.md#workspace-validation-record).
+- The released frontend pins patched Next.js 16.3.8 and OpenNext 1.20.10 for verified Worker compatibility: `npm audit --omit=dev` reports no findings. The full tooling audit still reports 14 findings (13 high, 1 low); this is not a clean whole-repository security assessment. See [validation evidence](docs/testing.md#workspace-validation-record).
 - Browser e2e coverage is not yet in CI, and PostgreSQL concurrency/crash recovery need dedicated integration tests.
 
 ## Roadmap
