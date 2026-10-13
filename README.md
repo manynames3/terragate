@@ -1,5 +1,7 @@
 # TerraGate
 
+**Harness engineering portfolio evidence:** [Architecture, controlled repair evaluations and subscription-based Codex workflow](docs/agent-harness.md) · [Evidence ledger and CI provenance](docs/agent-harness-evidence.md). The CI fixture is explicitly synthetic, not a measure of AI performance.
+
 TerraGate is a production-style Terraform PR risk gate for reviewing infrastructure changes before they merge. It parses Terraform plan JSON, redacts sensitive values, runs deterministic security/cost/reliability/governance checks, uses a LangGraph workflow to enrich and rank findings, persists review history, drafts a GitHub PR comment, and requires versioned human approval before posting. Generated remediation snippets are export-only guidance, not automatically executable patches.
 
 **Positioning:** AI-assisted Terraform review that treats policy evidence as the source of truth and LLM output as explanation, remediation, and workflow acceleration.

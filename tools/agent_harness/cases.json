@@ -1,0 +1,34 @@
+[
+  {
+    "id": "redaction-marker",
+    "path": "apps/api/app/services/terraform_plan.py",
+    "find": "REDACTED = \"[REDACTED]\"",
+    "replace": "REDACTED = \"[LEAKED]\"",
+    "test": "app/tests/test_terraform_plan.py::test_redaction_removes_sensitive_values",
+    "prompt": "Restore the canonical redaction marker used when masking secret values in Terraform plans."
+  },
+  {
+    "id": "redaction-key-detection",
+    "path": "apps/api/app/services/terraform_plan.py",
+    "find": "r\"(password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential|auth|cert)\",",
+    "replace": "r\"(passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential|auth|cert)\",",
+    "test": "app/tests/test_terraform_plan.py::test_redaction_removes_sensitive_values",
+    "prompt": "A regression causes password-like object keys to evade sensitive-value redaction. Fix the underlying key detection without weakening tests."
+  },
+  {
+    "id": "public-rds-detection",
+    "path": "apps/api/app/graph/terraform_review/nodes/policy_checks.py",
+    "find": "if get_attr(resource, \"publicly_accessible\") is True:",
+    "replace": "if get_attr(resource, \"publicly_accessible\") is False:",
+    "test": "app/tests/test_policy_checks.py::test_security_plan_flags_public_ingress_rds_and_iam",
+    "prompt": "Restore the production security rule that detects publicly accessible RDS instances. Preserve evidence and do not invent findings."
+  },
+  {
+    "id": "critical-risk-classification",
+    "path": "apps/api/app/services/risk.py",
+    "find": "if score >= 80:",
+    "replace": "if score >= 180:",
+    "test": "app/tests/test_risk.py::test_risk_scoring_separates_security_cost_and_stateful_scenarios",
+    "prompt": "Restore the bounded risk-score severity classification threshold. Preserve the distinction between high and critical risk."
+  }
+]

@@ -28,3 +28,6 @@ coverage/
 *.tfplan
 
 tfplan
+
+# Local agent evaluations may contain task transcripts or environment details
+agent-harness-results/
