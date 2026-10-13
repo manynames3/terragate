@@ -150,13 +150,18 @@ def run_case(case: dict, base_sha: str, args: argparse.Namespace, iteration: int
     result = {
         "case": case["id"], "iteration": iteration, "base_sha": base_sha,
         "agent": args.agent, "variant": args.variant, "model": args.model or "CLI default / not recorded",
-        "started_at": utcnow(), "baseline_red": False, "success": False,
+        "started_at": utcnow(), "control_green": False, "baseline_red": False, "success": False,
         "attempts": [], "reason": "", "synthetic": args.agent == "fixture",
     }
     with tempfile.TemporaryDirectory(prefix="terragate-harness-") as temp_dir:
         worktree = Path(temp_dir) / "repo"
         try:
             git(ROOT, "worktree", "add", "--quiet", "--detach", str(worktree), base_sha)
+            control = verify(worktree, case, args.verify_timeout)
+            result["control_green"] = control["exit"] == 0 and not control["timed_out"]
+            if not result["control_green"]:
+                result["reason"] = "invalid_control: source revision fails acceptance test before fault injection"
+                return result
             apply_mutation(worktree, case)
             baseline = verify(worktree, case, args.verify_timeout)
             result["baseline_red"] = baseline["exit"] != 0 and not baseline["timed_out"]
@@ -205,9 +210,21 @@ def run_case(case: dict, base_sha: str, args: argparse.Namespace, iteration: int
                 record["verification_timeout"] = check["timed_out"]
                 result["attempts"].append(record)
                 if check["exit"] == 0 and not check["timed_out"] and agent_run["exit"] == 0:
-                    result["success"] = True
-                    result["reason"] = "verified_repair"
-                    break
+                    regression = execute(
+                        [sys.executable, "-m", "pytest", "-q",
+                         "app/tests/test_risk.py", "app/tests/test_terraform_plan.py",
+                         "app/tests/test_policy_checks.py"],
+                        worktree / "apps" / "api", args.verify_timeout,
+                    )
+                    record["regression_exit"] = regression["exit"]
+                    record["regression_seconds"] = regression["seconds"]
+                    if regression["exit"] == 0 and not regression["timed_out"]:
+                        result["success"] = True
+                        result["reason"] = "verified_repair"
+                        break
+                    previous = regression["output"]
+                    result["reason"] = "regression_suite_failed"
+                    continue
                 previous = check["output"]
                 result["reason"] = "verification_failed" if not check["timed_out"] else "verification_timeout"
                 if agent_run["exit"] != 0:
@@ -225,6 +242,7 @@ def run_case(case: dict, base_sha: str, args: argparse.Namespace, iteration: int
 def summarize(report: dict) -> str:
     results = report["results"]
     passed = sum(result["success"] for result in results)
+    control_green = sum(result.get("control_green", False) for result in results)
     baseline_red = sum(result["baseline_red"] for result in results)
     rate = 100 * passed / len(results) if results else 0
     elapsed = [result["elapsed_seconds"] for result in results]
@@ -238,6 +256,7 @@ def summarize(report: dict) -> str:
         f"- Model: {report['model']}",
         f"- Provenance: {'SYNTHETIC harness smoke test, not AI performance' if report['synthetic'] else 'Real Codex CLI run; inspect configuration and GitHub evidence'}",
         f"- Cases: {len(results)}",
+        f"- Confirmed green controls: {control_green}/{len(results)}",
         f"- Confirmed red baselines: {baseline_red}/{len(results)}",
         f"- Verified repairs: {passed}/{len(results)} ({rate:.1f}%)",
         f"- Median elapsed: {statistics.median(elapsed):.2f}s" if elapsed else "- Median elapsed: N/A",
