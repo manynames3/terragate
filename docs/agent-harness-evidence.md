@@ -10,11 +10,17 @@ This ledger is intentionally conservative: code, unit tests, synthetic pipeline 
 | --- | --- | --- |
 | Agent context map and non-negotiable rules | [AGENTS.md](../AGENTS.md) | Implemented in harness PR |
 | Reproducible target regressions | [cases.json](../tools/agent_harness/cases.json) | Four versioned scenarios |
-| Disposable worktree, green/red/green, retry, file boundary, results | [run.py](../tools/agent_harness/run.py) | Implemented; CI verification required |
+| Disposable worktree, green/red/green, retry, file boundary, results | [run.py](../tools/agent_harness/run.py) | Implemented; [synthetic CI passed](https://github.com/manynames3/terragate/actions/runs/38369770486) |
 | Safety and report unit tests | [test_harness.py](../tools/agent_harness/test_harness.py) | Implemented; CI verification required |
-| No-credit fixture pipeline in GitHub Actions | [agent-harness.yml](../.github/workflows/agent-harness.yml) | CI run is synthetic, not real AI |
+| No-credit fixture pipeline in GitHub Actions | [agent-harness.yml](../.github/workflows/agent-harness.yml) | [Synthetic CI passed](https://github.com/manynames3/terragate/actions/runs/38369770486); not real AI |
 | Live repair rate, cost/time improvement, multiple models | None yet | **Not measured** |
 | Hardened sandbox or live Kubernetes orchestration | None in this harness | **Not implemented** |
+
+## Verified CI checkpoint
+
+On October 13, 2026, the [Agent Harness Evidence workflow](https://github.com/manynames3/terragate/actions/runs/38369770486) and [existing product CI](https://github.com/manynames3/terragate/actions/runs/38369770447) both completed successfully for source commit 1faa0e4463220610407c9b8b7c90e4d7b75ddd8f.
+
+**Interpretation:** this verifies harness unit tests and a four-case deterministic fixture-mode red/green repair pipeline. No real Codex benchmark has been completed or scored.
 
 ## How to verify independently
 
