@@ -1,0 +1,39 @@
+name: Agent Harness Evidence
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  harness-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+      - name: Install existing TerraGate test dependencies
+        run: python -m pip install -r apps/api/requirements.txt
+      - name: Verify harness controls
+        run: python -m unittest discover -s tools/agent_harness -p 'test_*.py' -v
+      - name: Verify red-to-green repair pipeline (synthetic control only)
+        run: |
+          python tools/agent_harness/run.py run \
+            --agent fixture \
+            --case all \
+            --attempts 1 \
+            --output agent-harness-results
+      - name: Upload labeled synthetic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-harness-synthetic-control
+          path: agent-harness-results/
+          if-no-files-found: warn
