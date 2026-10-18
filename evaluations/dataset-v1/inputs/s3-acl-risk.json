@@ -1,0 +1,29 @@
+{
+  "plan": {
+    "format_version": "1.2",
+    "terraform_version": "1.9.8",
+    "resource_changes": [
+      {
+        "address": "aws_s3_bucket_acl.main",
+        "mode": "managed",
+        "type": "aws_s3_bucket_acl",
+        "name": "main",
+        "provider_name": "registry.terraform.io/hashicorp/aws",
+        "change": {
+          "actions": [
+            "update"
+          ],
+          "before": null,
+          "after": {
+            "acl": "public-read",
+            "bucket": "demo"
+          },
+          "after_unknown": {},
+          "after_sensitive": {}
+        }
+      }
+    ]
+  },
+  "environment": "prod",
+  "policy_profile": "default"
+}

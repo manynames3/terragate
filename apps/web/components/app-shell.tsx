@@ -129,7 +129,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="mb-5 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] pb-3 text-xs text-slate-500" role="status">
             <span>{capabilityError ? "Environment capabilities unavailable" : capabilities ? capabilities.public_demo ? "Public demo · shared sample workspace" : capabilities.auth_provider === "dev" ? "Development workspace · not customer authentication" : "Private organization workspace" : "Checking environment..."}</span>
             <span>{capabilities ? capabilities.github_writes === "mocked" ? "GitHub writes mocked" : capabilities.github_writes === "live" ? "Live GitHub credentials configured" : "GitHub writes unavailable" : "Capabilities not yet verified"}</span>
-          </div>{children}
+          </div>
+          {process.env.NEXT_PUBLIC_V2_FRONTEND_ONLY === "true" ? <div className="mb-5 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" role="status">TerraGate v2 frontend preview · connected to the existing demo API. The grounded v2 backend is not deployed here. Reviews and history use the shared demo workspace.</div> : null}
+          {children}
         </div>
       </main>
     </div>

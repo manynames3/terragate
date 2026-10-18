@@ -154,6 +154,7 @@ class FindingModel(Base):
     source: Mapped[str] = mapped_column(String(80), default="deterministic_rule")
     reviewer_node: Mapped[str] = mapped_column(String(120), default="deterministic_policy_checks")
     rule_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    grounding: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     requires_human_review: Mapped[bool] = mapped_column(default=False)
     pr_file_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     pr_file_url: Mapped[str | None] = mapped_column(Text, nullable=True)

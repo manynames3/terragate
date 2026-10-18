@@ -28,3 +28,6 @@ coverage/
 *.tfplan
 
 tfplan
+# Evaluation runs may contain infrastructure context; promote/share deliberately.
+/evaluations/results/
+/checkov-report.json

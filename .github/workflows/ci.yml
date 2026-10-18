@@ -2,8 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, v2]
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   backend:
@@ -39,8 +42,20 @@ jobs:
           DATABASE_URL=sqlite:///./ci_migrations.db \
           ARTIFACT_STORAGE_DIR=./ci_artifacts \
           alembic upgrade head
+      - name: Validate benchmark and evaluation mechanics
+        run: |
+          python -m evaluations.cli validate
+          PYTHONPATH=apps/api:. python -m pytest -q evaluations/tests
+        working-directory: .
+      - name: Lint v2 Python
+        working-directory: .
+        run: |
+          pip install ruff==0.17.1
+          ruff check --select E4,E7,E9,F evaluations apps/api/app/services/grounded_review.py apps/api/app/services/evidence.py apps/api/app/services/v2_checks.py apps/api/app/tests/test_grounded_review.py
       - run: pytest -q
         env:
+          OPENAI_API_KEY: ""
+          LANGSMITH_TRACING: "false"
           TEST_POSTGRES_URL: postgresql+psycopg://terragate_ci:ci_only_password@127.0.0.1:5432/terragate_ci
 
   frontend:
@@ -70,6 +85,19 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.14.9"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check supported HCL controls with Checkov
+        run: |
+          pip install checkov==3.3.29
+          checkov -d infra/terraform/aws-public-demo --framework terraform --check CKV_AWS_24,CKV_AWS_17,CKV_AWS_16 --skip-download --output json > checkov-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checkov-infrastructure
+          path: checkov-report.json
+          retention-days: 7
       - name: Check Terraform formatting
         run: terraform fmt -check -recursive infra/terraform
       - name: Validate public demo Terraform
@@ -77,3 +105,39 @@ jobs:
         run: |
           terraform init -backend=false -input=false
           terraform validate
+
+  reviewer-quality:
+    name: Reviewer quality (current live evidence required)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate live evidence for both frozen splits
+        shell: bash
+        run: |
+          mkdir -p evaluations/results
+          verdict=0
+          for split in development held_out; do
+            python -m evaluations.cli gate --baseline "evaluations/accepted/$split-baseline.json" --candidate "evaluations/accepted/$split-candidate.json" --manual "evaluations/accepted/$split-manual.json" --out "evaluations/results/$split-gate.json" || verdict=1
+          done
+          exit "$verdict"
+      - name: Quality summary
+        if: always()
+        run: |
+          echo '## Reviewer quality' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Offline application tests and Checkov do not measure model quality. Missing/stale live artifacts yield UNEVALUATED and fail this job.' >> "$GITHUB_STEP_SUMMARY"
+          for report in evaluations/results/*-gate.json; do
+            if [[ -f "$report" ]]; then
+              echo '```json' >> "$GITHUB_STEP_SUMMARY"
+              cat "$report" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reviewer-quality-verdicts
+          path: evaluations/results/*-gate.json
+          retention-days: 7

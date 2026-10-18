@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import json
 from copy import deepcopy
 from typing import Any
 
@@ -27,17 +28,40 @@ class TerraformPlanError(ValueError):
 
 
 def validate_terraform_plan(plan: dict[str, Any]) -> None:
+    from app.config import get_settings
+    settings = get_settings()
     if not isinstance(plan, dict):
         raise TerraformPlanError("Terraform plan JSON must be an object.")
     if "resource_changes" not in plan or not isinstance(plan["resource_changes"], list):
         raise TerraformPlanError(
             "Terraform plan JSON must include a resource_changes array. Generate it with terraform show -json."
         )
+    stack = [(plan, 0)]
+    while stack:
+        value, depth = stack.pop()
+        if depth > 64:
+            raise TerraformPlanError("Plan exceeds the maximum JSON nesting depth of 64.")
+        if isinstance(value, dict):
+            stack.extend((child, depth + 1) for child in value.values())
+        elif isinstance(value, list):
+            stack.extend((child, depth + 1) for child in value)
+    try:
+        encoded = json.dumps(plan, allow_nan=False).encode()
+    except (ValueError, RecursionError) as exc:
+        raise TerraformPlanError("Plan contains invalid JSON values or excessive nesting.") from exc
+    if len(encoded) > settings.review_max_plan_bytes or len(plan["resource_changes"]) > settings.review_max_resources:
+        raise TerraformPlanError("Plan exceeds the configured byte or resource limit; split the review.")
+    addresses = set()
     for index, resource in enumerate(plan["resource_changes"]):
         if not isinstance(resource, dict) or not isinstance(resource.get("change"), dict):
             raise TerraformPlanError(f"resource_changes[{index}] must contain a change object.")
         if any(not isinstance(resource.get(key), str) or not resource[key].strip() for key in ("address", "type")):
             raise TerraformPlanError(f"resource_changes[{index}] requires an address and resource type.")
+        if len(resource["address"]) > 512 or not re.fullmatch(r'[A-Za-z0-9_.\[\]"/ -]+', resource["address"]):
+            raise TerraformPlanError(f"resource_changes[{index}] has an invalid resource address.")
+        if resource["address"] in addresses:
+            raise TerraformPlanError("Duplicate resource address in plan.")
+        addresses.add(resource["address"])
         change = resource["change"]
         actions = change.get("actions")
         valid_actions = {"no-op", "create", "read", "update", "delete", "forget"}
@@ -46,6 +70,18 @@ def validate_terraform_plan(plan: dict[str, Any]) -> None:
         for field in ("before", "after"):
             if change.get(field) is not None and not isinstance(change[field], dict):
                 raise TerraformPlanError(f"resource_changes[{index}].change.{field} must be an object or null.")
+        if "after" not in change or "before" not in change:
+            raise TerraformPlanError(f"resource_changes[{index}].change requires before and after values (null is allowed).")
+        for mask_key in ("after_unknown", "before_sensitive", "after_sensitive"):
+            masks = [change.get(mask_key, False)]
+            while masks:
+                mask = masks.pop()
+                if isinstance(mask, dict):
+                    masks.extend(mask.values())
+                elif isinstance(mask, list):
+                    masks.extend(mask)
+                elif not isinstance(mask, bool) and mask is not None:
+                    raise TerraformPlanError(f"resource_changes[{index}].change.{mask_key} is not a valid Terraform mask.")
 
 
 def redact_sensitive_values(value: Any, path: str = "$") -> Any:

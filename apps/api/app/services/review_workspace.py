@@ -27,6 +27,7 @@ def rule_revision() -> str:
         digest.update(name.encode())
         digest.update((nodes / name).read_bytes())
     digest.update((nodes.parents[2] / "services/terraform_plan.py").read_bytes())
+    digest.update((nodes.parents[2] / "services/v2_checks.py").read_bytes())
     return digest.hexdigest()
 
 

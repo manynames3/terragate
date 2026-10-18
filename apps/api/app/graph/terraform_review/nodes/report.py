@@ -1,4 +1,7 @@
 from collections import Counter
+from html import escape
+import re
+from urllib.parse import quote, urlsplit
 from typing import Any
 
 from app.graph.terraform_review.nodes.common import mark_node
@@ -13,14 +16,55 @@ def report_builder(state: dict[str, Any]) -> dict[str, Any]:
         cost_estimate=state.get("cost_estimate", {}),
         blast_radius=state.get("blast_radius", {}),
     )
-    comment = _build_pr_comment(state, findings, risk_score)
-    report = _build_report(state, findings, risk_score, comment)
+    safe_state, safe_findings, safe_score = _display(state), _display(findings), _display(risk_score)
+    comment = _build_pr_comment(safe_state, safe_findings, safe_score)
+    report = _build_report(safe_state, safe_findings, safe_score, comment)
+    assessment = state.get("grounded_assessment")
+    if assessment:
+        details = ["", "## Grounded reviewer", f"Status: {_text(assessment['status'])}",
+                   f"Assessment: {_text(assessment['classification'])}",
+                   "Rule heuristics are not calibrated probabilities. Citation validity is separate from semantic support."]
+        details += [f"- {_text(warning)}" for warning in assessment.get("warnings", [])]
+        for finding in findings:
+            grounding = finding.get("grounding", {})
+            if grounding.get("interpretation_source"):
+                details += [f"### {_text(finding['resource_address'])}",
+                            f"Interpretation: {_text(finding['impact'])}"]
+                details += [f"- Missing context: {_text(item)}" for item in grounding.get("missing_context", [])]
+                for doc in grounding.get("documents", []):
+                    # URLs come exclusively from the versioned corpus, never the model.
+                    details.append(f"- [{_text(doc['id'])}: {_text(doc['title'])}]({doc['url']}) — {_text(doc['passage'])}")
+        report += "\n" + "\n".join(details)
+        comment += f"\n\nGrounded review: {_text(assessment['status'])}; {_text(assessment['classification'])}. See full report for evidence and uncertainty."
     return {
         **mark_node(state, "report_builder"),
         "risk_score": risk_score,
         "pr_comment_draft": comment,
         "report_markdown": report,
     }
+
+
+def _text(value):
+    return re.sub(r"([\\`*_[\]{}()!|>#])", r"\\\1", escape(str(value), quote=True)).replace("\n", " ")
+
+
+def _display(value):
+    if isinstance(value, str):
+        return _text(value)
+    if isinstance(value, list):
+        return [_display(item) for item in value]
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            if key == "snippet" and isinstance(item, str):
+                result[key] = item.replace("```", "` ` `")
+            elif key == "pr_file_url" and isinstance(item, str):
+                parsed = urlsplit(item)
+                result[key] = quote(item, safe=":/%?=#&.-_") if parsed.scheme == "https" and parsed.hostname in {"github.com", "raw.githubusercontent.com"} else None
+            else:
+                result[key] = _display(item)
+        return result
+    return value
 
 
 def _build_pr_comment(

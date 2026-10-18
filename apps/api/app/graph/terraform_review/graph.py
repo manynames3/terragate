@@ -1,7 +1,9 @@
 from typing import Any
+from time import monotonic
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import RetryPolicy
+from langsmith import tracing_context
 
 from app.config import get_settings
 from app.graph.terraform_review.nodes.approval import human_approval_gate
@@ -11,6 +13,7 @@ from app.graph.terraform_review.nodes.cost_estimator import estimate_cost_delta_
 from app.graph.terraform_review.nodes.cost_reviewer import cost_reviewer
 from app.graph.terraform_review.nodes.github import github_comment_writer
 from app.graph.terraform_review.nodes.governance_reviewer import governance_reviewer
+from app.graph.terraform_review.nodes.grounded import grounded_review
 from app.graph.terraform_review.nodes.ingest import ingest_plan
 from app.graph.terraform_review.nodes.merge import deduplicate_and_rank, merge_findings
 from app.graph.terraform_review.nodes.normalize import normalize_resource_changes
@@ -39,6 +42,7 @@ def build_terraform_review_graph():
     builder.add_node("reliability_reviewer", reliability_reviewer, retry_policy=retry_policy)
     builder.add_node("governance_reviewer", governance_reviewer, retry_policy=retry_policy)
     builder.add_node("merge_findings", merge_findings, retry_policy=retry_policy)
+    builder.add_node("grounded_review", grounded_review)
     builder.add_node("deduplicate_and_rank", deduplicate_and_rank, retry_policy=retry_policy)
     builder.add_node("map_github_pr_context", map_github_pr_context, retry_policy=retry_policy)
     builder.add_node("generate_remediations", generate_remediations, retry_policy=retry_policy)
@@ -58,7 +62,8 @@ def build_terraform_review_graph():
     builder.add_edge("cost_reviewer", "reliability_reviewer")
     builder.add_edge("reliability_reviewer", "governance_reviewer")
     builder.add_edge("governance_reviewer", "merge_findings")
-    builder.add_edge("merge_findings", "deduplicate_and_rank")
+    builder.add_edge("merge_findings", "grounded_review")
+    builder.add_edge("grounded_review", "deduplicate_and_rank")
     builder.add_edge("deduplicate_and_rank", "map_github_pr_context")
     builder.add_edge("map_github_pr_context", "generate_remediations")
     builder.add_edge("generate_remediations", "compliance_mapper")
@@ -70,10 +75,20 @@ def build_terraform_review_graph():
 
 
 def run_terraform_review(initial_state: dict[str, Any]) -> dict[str, Any]:
-    graph = build_terraform_review_graph()
-    return graph.invoke(initial_state)
+    final_state = initial_state
+    for final_state in stream_terraform_review(initial_state):
+        pass
+    return final_state
 
 
 def stream_terraform_review(initial_state: dict[str, Any]):
     graph = build_terraform_review_graph()
-    yield from graph.stream(initial_state, stream_mode="values")
+    settings = get_settings()
+    graph.step_timeout = max(35, settings.review_model_timeout_seconds + 5)
+    deadline = monotonic() + settings.review_max_seconds
+    # Graph state includes the raw plan. Progress and sanitized usage are persisted locally instead.
+    with tracing_context(enabled=False):
+        for state in graph.stream(initial_state, stream_mode="values", config={"recursion_limit": 32}):
+            if monotonic() > deadline:
+                raise TimeoutError("Review exceeded its execution budget")
+            yield state

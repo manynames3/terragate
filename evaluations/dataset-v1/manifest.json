@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "label_authority": "project-authored synthetic benchmark, not independent ground truth",
+  "split_method": "Explicit scenario groups: 40 development and 20 held-out cases; equivalent IAM root/module and principal variants are grouped. Related variants never cross splits.",
+  "tuning_policy": "Tune only on development. Held-out execution requires an explicit flag; preserve the first live result."
+}

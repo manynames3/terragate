@@ -1,0 +1,45 @@
+{
+  "plan": {
+    "format_version": "1.2",
+    "terraform_version": "1.9.8",
+    "resource_changes": [
+      {
+        "address": "aws_ebs_volume.main",
+        "mode": "managed",
+        "type": "aws_ebs_volume",
+        "name": "main",
+        "provider_name": "registry.terraform.io/hashicorp/aws",
+        "change": {
+          "actions": [
+            "delete",
+            "create"
+          ],
+          "before": {
+            "size": 20,
+            "encrypted": true,
+            "tags": {
+              "owner": "platform",
+              "environment": "prod",
+              "service": "demo",
+              "cost_center": "portfolio"
+            }
+          },
+          "after": {
+            "size": 20,
+            "encrypted": true,
+            "tags": {
+              "owner": "platform",
+              "environment": "prod",
+              "service": "demo",
+              "cost_center": "portfolio"
+            }
+          },
+          "after_unknown": {},
+          "after_sensitive": {}
+        }
+      }
+    ]
+  },
+  "environment": "prod",
+  "policy_profile": "default"
+}

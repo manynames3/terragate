@@ -51,7 +51,7 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
                   <th className="px-4 py-3">PR file</th>
                   <th className="px-4 py-3">Action</th>
                   <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Confidence</th>
+                  <th className="px-4 py-3">Evidence status</th>
                   <th className="px-4 py-3">Source</th>
                   <th className="px-4 py-3">Reviewer</th>
                   <th className="px-4 py-3"></th>
@@ -79,7 +79,7 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
                     </td>
                     <td className="px-4 py-4 font-mono text-xs text-slate-600">{finding.change_actions.join(", ") || "n/a"}</td>
                     <td className="px-4 py-4 text-slate-950">{finding.title}</td>
-                    <td className="px-4 py-4 text-slate-600">{Math.round(finding.confidence * 100)}%</td>
+                    <td className="px-4 py-4 text-slate-600">{finding.requires_human_review ? "Needs verification" : "Rule evidence"}</td>
                     <td className="px-4 py-4 text-slate-600">{finding.source.replaceAll("_", " ")}</td>
                     <td className="px-4 py-4 text-slate-600">{finding.reviewer_node}</td>
                     <td className="px-4 py-4">

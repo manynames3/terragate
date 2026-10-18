@@ -138,3 +138,7 @@ terraform validate
 - Run the checked-in browser smoke reproducibly in CI; add deeper runbook-progress, private-login, webhook replay and worker recovery cases.
 - Add contract tests for the Cloudflare-hosted frontend against the deployed API.
 - Add infrastructure policy scanning if a project dependency such as Checkov or TFLint is adopted.
+
+## V2 reviewer validation
+
+See [evaluation commands and methodology](evaluations.md) for the versioned benchmark, real application adapter tests, source-bound quality gate and opt-in live workflow. The new Checkov job scans selected supported HCL controls; it is independent of GenAI measurement. Raw graph tracing is disabled in v2. Current local results and unperformed validation are recorded in [STATE.md](../STATE.md), rather than changing the dated October 10 release record above.

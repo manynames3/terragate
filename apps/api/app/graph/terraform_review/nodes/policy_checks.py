@@ -79,6 +79,8 @@ def run_policy_checks(
 
     for resource in resource_changes:
         findings.extend(_security_checks(resource, policy_pack))
+        from app.services.v2_checks import additional_checks
+        findings.extend(additional_checks(resource, block_public_admin_ingress=policy_pack.block_public_admin_ingress))
         findings.extend(_cost_checks(resource, environment, policy_pack))
         findings.extend(_reliability_checks(resource, environment, policy_pack))
         findings.extend(_governance_checks(resource, environment, policy_profile, policy_pack))
@@ -108,9 +110,9 @@ def run_policy_checks(
         if bucket_name and bucket_name not in encryption_configs:
             findings.append(
                 make_finding(
-                    title="S3 bucket encryption not visible in plan",
-                    description="A new or changed S3 bucket has no matching server-side encryption configuration in the plan.",
-                    severity="medium",
+                    title="Explicit S3 encryption configuration not visible in plan",
+                    description="S3 encrypts new uploads with SSE-S3 by default. A customer-managed key requirement cannot be verified from this plan.",
+                    severity="info",
                     category="security",
                     resource=bucket,
                     evidence=[
@@ -122,8 +124,8 @@ def run_policy_checks(
                             "Server-side encryption could not be confirmed from this plan.",
                         )
                     ],
-                    impact="Objects may be stored without explicit encryption controls.",
-                    recommendation="Configure default server-side encryption with SSE-S3 or KMS.",
+                    impact="An explicit encryption configuration or customer-managed key requirement needs separate verification.",
+                    recommendation="Confirm whether SSE-S3 meets requirements or explicitly configure KMS. Do not infer that objects are unencrypted from an absent Terraform resource.",
                 )
             )
 
@@ -154,7 +156,7 @@ def run_policy_checks(
         )
 
     evaluated_keys = {"ingress", "from_port", "to_port", "cidr_ipv4", "cidr_ipv6", "publicly_accessible",
-        "storage_encrypted", "policy", "instance_type", "multi_az", "size", "iops", "tags", "tags_all",
+        "storage_encrypted", "encrypted", "policy", "assume_role_policy", "acl", "instance_type", "multi_az", "size", "iops", "tags", "tags_all",
         "backup_retention_period", "deletion_protection", "health_check", "region", "name", "bucket", "identifier",
         "block_public_acls", "block_public_policy", "ignore_public_acls", "restrict_public_buckets"}
     for resource in resource_changes:
@@ -237,7 +239,7 @@ def _security_checks(resource: dict[str, Any], policy_pack: PolicyPack) -> list[
             findings.append(
                 make_finding(
                     title="RDS instance is publicly accessible",
-                    description="The RDS instance allows public network access.",
+                    description="The RDS instance requests a public IP; external reachability also depends on security groups and subnet routing.",
                     severity="high",
                     category="security",
                     resource=resource,
@@ -250,7 +252,7 @@ def _security_checks(resource: dict[str, Any], policy_pack: PolicyPack) -> list[
                             "RDS databases should not be publicly reachable.",
                         )
                     ],
-                    impact="Database endpoints exposed to the internet increase breach and brute-force risk.",
+                    impact="Public addressing increases possible exposure; security groups, routes and internet gateway are not established by this flag alone.",
                     recommendation="Place RDS in private subnets and require access through private networking or controlled bastion/SSM workflows.",
                 )
             )
@@ -272,7 +274,7 @@ def _security_checks(resource: dict[str, Any], policy_pack: PolicyPack) -> list[
                         )
                     ],
                     impact="Database snapshots and storage may not satisfy encryption-at-rest requirements.",
-                    recommendation="Set storage_encrypted = true and use a managed or customer-managed KMS key.",
+                    recommendation="For an existing unencrypted instance, plan an encrypted snapshot-copy and restore migration. Confirm downtime, key access and rollback with the owner; setting storage_encrypted alone is not an in-place fix.",
                 )
             )
 
@@ -575,7 +577,7 @@ def _reliability_checks(resource: dict[str, Any], environment: str, policy_pack:
             )
         )
 
-    if resource_type == "aws_db_instance" and environment == "prod":
+    if resource_type == "aws_db_instance" and environment == "prod" and is_create_or_update(resource):
         backup_retention = get_attr(resource, "backup_retention_period")
         deletion_protection = get_attr(resource, "deletion_protection")
         multi_az = get_attr(resource, "multi_az")
@@ -811,7 +813,7 @@ def _check_ingress(resource: dict[str, Any], ingress: dict[str, Any], path: str)
     return [
         make_finding(
             title="Public ingress exposes sensitive service",
-            description=f"Security group ingress allows internet access to {target}.",
+            description=f"Security group ingress permits an internet-wide source to {target}; effective reachability depends on network and service configuration.",
             severity="high",
             category="security",
             resource=resource,
@@ -828,7 +830,7 @@ def _check_ingress(resource: dict[str, Any], ingress: dict[str, Any], path: str)
                     "Ingress from 0.0.0.0/0 or ::/0 should not expose administrative or data ports.",
                 )
             ],
-            impact="The service is reachable from the public internet and may be scanned or attacked.",
+            impact="This rule increases possible internet exposure. Routes, network ACLs, resource associations and the listening service must be verified before claiming reachability.",
             recommendation="Restrict ingress to approved CIDR ranges, a VPN, or SSM Session Manager.",
         )
     ]
@@ -853,16 +855,22 @@ def _wildcard_policy_evidence(policy: Any) -> dict[str, Any] | None:
         try:
             policy = json.loads(policy)
         except json.JSONDecodeError:
-            return {"raw_policy_contains_wildcard": '"*" in policy' if '"*"' in policy else "*"}
+            return None
     if not isinstance(policy, dict):
         return None
     statements = policy.get("Statement") or []
     if isinstance(statements, dict):
         statements = [statements]
     for index, statement in enumerate(statements):
+        if not isinstance(statement, dict) or statement.get("Effect") != "Allow":
+            continue
         action = statement.get("Action")
         resource = statement.get("Resource")
-        if _has_wildcard(action) or _has_wildcard(resource):
+        if "NotAction" in statement and _has_wildcard(resource):
+            return {"statement_index": index, "NotAction": statement["NotAction"], "Resource": resource}
+        actions = action if isinstance(action, list) else [action]
+        unscoped_read = {"s3:listallmybuckets", "ec2:describeregions", "cloudwatch:listmetrics"}
+        if any(isinstance(a, str) and "*" in a for a in actions) or _has_wildcard(resource) and not set(a.casefold() for a in actions if isinstance(a, str)).issubset(unscoped_read):
             return {"statement_index": index, "Action": action, "Resource": resource}
     return None
 

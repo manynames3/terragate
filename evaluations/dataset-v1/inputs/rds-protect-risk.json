@@ -1,0 +1,52 @@
+{
+  "plan": {
+    "format_version": "1.2",
+    "terraform_version": "1.9.8",
+    "resource_changes": [
+      {
+        "address": "aws_db_instance.main",
+        "mode": "managed",
+        "type": "aws_db_instance",
+        "name": "main",
+        "provider_name": "registry.terraform.io/hashicorp/aws",
+        "change": {
+          "actions": [
+            "update"
+          ],
+          "before": {
+            "publicly_accessible": false,
+            "storage_encrypted": true,
+            "backup_retention_period": 7,
+            "deletion_protection": true,
+            "multi_az": true,
+            "instance_class": "db.t3.micro",
+            "tags": {
+              "owner": "platform",
+              "environment": "prod",
+              "service": "demo",
+              "cost_center": "portfolio"
+            }
+          },
+          "after": {
+            "publicly_accessible": false,
+            "storage_encrypted": true,
+            "backup_retention_period": 7,
+            "deletion_protection": false,
+            "multi_az": true,
+            "instance_class": "db.t3.micro",
+            "tags": {
+              "owner": "platform",
+              "environment": "prod",
+              "service": "demo",
+              "cost_center": "portfolio"
+            }
+          },
+          "after_unknown": {},
+          "after_sensitive": {}
+        }
+      }
+    ]
+  },
+  "environment": "prod",
+  "policy_profile": "default"
+}

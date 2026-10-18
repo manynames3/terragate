@@ -42,3 +42,7 @@ Observability is split between application-level review progress/audit records a
 3. Surface LangSmith trace IDs in run detail when tracing is enabled.
 4. Extend existing sanitized request-failure JSON logs with safe worker/run/node/action correlation, without raw plans or credentials.
 5. Add dead-letter queue metrics once the worker moves to SQS or another durable queue.
+
+## V2 tracing change
+
+V2 disables raw LangGraph trace export even when a LangSmith environment toggle is set; the graph contains original plan state. Runtime capabilities report tracing disabled and new reviews do not advertise a synthetic trace ID. Persisted node progress, grounding, model status, latency and returned usage remain available. Evaluation reports distinguish measured local latency, provider-returned usage, estimated token cost and unknown telemetry. Sanitized remote trace instrumentation remains unimplemented.

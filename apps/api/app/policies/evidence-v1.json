@@ -1,0 +1,195 @@
+{
+  "version": "1.0.0",
+  "items": [
+    {
+      "id": "AWS-IAM-LEAST-PRIVILEGE",
+      "title": "IAM least privilege",
+      "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "Grant the actions needed for a task on appropriate resources and conditions. Broad Allow permissions merit review; a Deny wildcard does not grant permissions. Some AWS actions do not support resource-level permissions, so Resource * alone is not proof of administrator access.",
+      "resource_types": [
+        "aws_iam_policy",
+        "aws_iam_role_policy",
+        "aws_iam_user_policy"
+      ],
+      "controls": [
+        "iam_permissions"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    },
+    {
+      "id": "AWS-IAM-PRINCIPAL",
+      "title": "IAM principals and conditions",
+      "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "A wildcard Principal represents all principals. Conditions can restrict a statement; inspect their semantics before calling access unrestricted. Effective access also depends on identity policies, boundaries and other controls absent from a plan. Scope role trust to intended principals.",
+      "resource_types": [
+        "aws_iam_role",
+        "aws_s3_bucket_policy"
+      ],
+      "controls": [
+        "iam_trust",
+        "s3_public"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    },
+    {
+      "id": "AWS-VPC-SG",
+      "title": "Security group rule sources",
+      "url": "https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "Rules define protocol, ports and IPv4 or IPv6 sources. Allow database traffic from application security groups; allow web traffic through the load balancer. World-open administrative and data ports merit restriction. Reachability additionally depends on routes, network ACLs and service configuration.",
+      "resource_types": [
+        "aws_security_group",
+        "aws_security_group_rule",
+        "aws_vpc_security_group_ingress_rule"
+      ],
+      "controls": [
+        "network"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    },
+    {
+      "id": "AWS-RDS-PUBLIC",
+      "title": "RDS public accessibility",
+      "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "Public accessibility assigns a public IP and changes external DNS resolution. Actual external access still requires suitable security group ingress, internet gateway and subnet networking. Publicly_accessible=true alone does not prove that arbitrary internet clients can connect.",
+      "resource_types": [
+        "aws_db_instance"
+      ],
+      "controls": [
+        "network"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    },
+    {
+      "id": "AWS-RDS-ENCRYPTION",
+      "title": "RDS encryption and migration",
+      "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "RDS encryption protects underlying storage, logs, backups and snapshots. Encryption cannot simply be enabled on an existing unencrypted DB instance; use an encrypted snapshot copy and restore workflow. Plan migration, downtime and key access before changing encryption.",
+      "resource_types": [
+        "aws_db_instance"
+      ],
+      "controls": [
+        "encryption"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    },
+    {
+      "id": "AWS-RDS-BACKUP",
+      "title": "RDS backup retention",
+      "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.BackupRetention.html",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "A DB instance retention of zero disables automated backups. Changing between zero and nonzero retention causes an outage. Alternate backup coverage and restore readiness need human confirmation.",
+      "resource_types": [
+        "aws_db_instance"
+      ],
+      "controls": [
+        "recovery"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    },
+    {
+      "id": "AWS-S3-PUBLIC",
+      "title": "S3 Block Public Access",
+      "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "S3 Block Public Access overrides public policies and ACLs. S3 uses the most restrictive combination of applicable organization, account, bucket and access-point controls. Disabling a bucket setting increases possible exposure but does not by itself prove objects are publicly readable.",
+      "resource_types": [
+        "aws_s3_bucket",
+        "aws_s3_bucket_acl",
+        "aws_s3_bucket_policy",
+        "aws_s3_bucket_public_access_block"
+      ],
+      "controls": [
+        "s3_public"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    },
+    {
+      "id": "AWS-S3-ENCRYPTION",
+      "title": "S3 default encryption",
+      "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/default-bucket-encryption.html",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "Since January 5, 2023, new S3 uploads automatically receive SSE-S3 encryption. Absence of an explicit Terraform encryption resource does not establish unencrypted storage. Existing objects, customer-managed key requirements and access to keys need separate verification.",
+      "resource_types": [
+        "aws_s3_bucket",
+        "aws_s3_bucket_server_side_encryption_configuration"
+      ],
+      "controls": [
+        "encryption"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    },
+    {
+      "id": "TG-POL-STATEFUL",
+      "title": "TerraGate production deletion policy",
+      "url": "https://github.com/manynames3/terragate/blob/main/docs/v2-policy.md",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "Project policy: production deletion or replacement of a stateful resource is critical and requires a reviewed exception, verified restore point, owner signoff and rollback plan. The plan proves the destructive action, not whether backups or approvals exist.",
+      "resource_types": [
+        "aws_db_instance",
+        "aws_ebs_volume",
+        "aws_efs_file_system",
+        "aws_dynamodb_table",
+        "aws_s3_bucket"
+      ],
+      "controls": [
+        "destruction"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    },
+    {
+      "id": "TG-POL-RECOVERY",
+      "title": "TerraGate production recovery policy",
+      "url": "https://github.com/manynames3/terragate/blob/main/docs/v2-policy.md",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "Project default policy requires production DB deletion protection and at least seven days of automated backup retention. Use the selected policy pack values if different. A planned reduction below policy requires review; missing or unknown controls require verification, not a claim of confirmed failure.",
+      "resource_types": [
+        "aws_db_instance"
+      ],
+      "controls": [
+        "recovery"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    },
+    {
+      "id": "AWS-EBS-ENCRYPTION",
+      "title": "EBS encryption and snapshot migration",
+      "url": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html",
+      "retrieved_at": "2026-10-16",
+      "updated_at": "2026-10-16",
+      "passage": "EBS encryption uses KMS keys to protect volumes and snapshots. Existing unencrypted volumes require a snapshot and new encrypted volume; encryption and key changes are not simple in-place edits. Verify key access and migration plans. A size-only update retaining encryption is not a loss of encryption.",
+      "resource_types": [
+        "aws_ebs_volume"
+      ],
+      "controls": [
+        "encryption"
+      ],
+      "status": "active",
+      "passage_kind": "authored_summary"
+    }
+  ]
+}

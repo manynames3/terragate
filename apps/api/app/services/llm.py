@@ -23,7 +23,7 @@ def summarize_with_llm(
     findings: list[dict[str, Any]],
     resource_summaries: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    if not settings.openai_api_key or not findings:
+    if settings.reviewer_version != "legacy-v1" or not settings.openai_api_key or not findings:
         return findings
 
     try:
@@ -59,7 +59,9 @@ def summarize_with_llm(
             ),
         ]
     )
-    model = ChatOpenAI(model=settings.openai_model, temperature=0, api_key=settings.openai_api_key)
+    model = ChatOpenAI(model=settings.openai_model, temperature=0, api_key=settings.openai_api_key,
+                       max_tokens=settings.review_max_output_tokens, max_retries=0,
+                       timeout=settings.review_model_timeout_seconds)
     chain = prompt | model.with_structured_output(ReviewerOutput)
 
     try:

@@ -26,6 +26,8 @@ class Remediation(BaseModel):
 
 
 class Finding(BaseModel):
+    grounding: dict[str, Any] = Field(default_factory=dict)
+    confidence_kind: str = "legacy_rule_heuristic_not_probability"
     rule_version: str | None = None
     id: str
     title: str
@@ -300,6 +302,7 @@ class RunDetail(BaseModel):
 
 
 class ReportResponse(BaseModel):
+    grounded_assessment: dict[str, Any] = Field(default_factory=dict)
     run_id: str
     report_markdown: str
     pr_comment_draft: str

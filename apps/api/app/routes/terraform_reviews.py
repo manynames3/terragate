@@ -21,7 +21,6 @@ from app.integrations.github import (
     GitHubPostResult,
     GitHubPRContext as GitHubPRContextData,
 )
-from app.integrations.langsmith import configure_langsmith
 from app.integrations.storage import FileSystemArtifactStore
 from app.models import (
     ApprovalModel,
@@ -156,25 +155,19 @@ def get_runtime_capabilities(_: DevUser = Depends(get_current_user)) -> RuntimeC
     sandbox_enabled = settings.terraform_sandbox_enabled and not (
         settings.public_demo_mode and settings.public_demo_disable_sandbox
     )
-    tracing_enabled = bool(settings.langsmith_api_key) and settings.langsmith_tracing.lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
     return RuntimeCapabilities(
         environment=settings.app_env,
         public_demo=settings.public_demo_mode,
         auth_provider="cognito" if settings.auth_mode.lower() == "cognito" else "dev",
         review_execution_mode=settings.review_execution_mode,
-        max_upload_bytes=settings.public_demo_max_upload_bytes if settings.public_demo_mode else None,
+        max_upload_bytes=min(settings.public_demo_max_upload_bytes, settings.review_max_plan_bytes) if settings.public_demo_mode else settings.review_max_plan_bytes,
         github_reads="live" if live_github_reads else "disabled",
         github_writes=github_writes,
         terraform_sandbox="enabled" if sandbox_enabled else "disabled",
         terraform_sandbox_driver=settings.terraform_sandbox_driver if sandbox_enabled else None,
         cost_estimation="infracost" if settings.infracost_api_key else "heuristic",
         llm_enrichment="enabled" if settings.openai_api_key else "disabled",
-        tracing="enabled" if tracing_enabled else "disabled",
+        tracing="disabled",
     )
 
 
@@ -339,7 +332,7 @@ async def create_terraform_review_from_json_upload(
     _enforce_public_demo_upload_limit(raw_bytes, settings)
     try:
         raw_plan = json.loads(raw_bytes)
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, RecursionError) as exc:
         raise HTTPException(status_code=400, detail="Uploaded file is not valid JSON.") from exc
 
     try:
@@ -587,6 +580,7 @@ def get_report(
         "top_drivers": [],
     }
     return ReportResponse(
+        grounded_assessment=(run.risk_score_detail or {}).get("grounded_assessment", {}),
         run_id=run.id,
         report_markdown=run.report_markdown,
         pr_comment_draft=run.pr_comment_draft,
@@ -1148,6 +1142,7 @@ def _persist_final_state(db: Session, run: RunModel, final_state: dict[str, Any]
             source=item.get("source", "deterministic_rule"),
             reviewer_node=item.get("reviewer_node", "deterministic_policy_checks"),
             rule_version=revision if item.get("source", "deterministic_rule") == "deterministic_rule" else None,
+            grounding=item.get("grounding"),
             requires_human_review=item.get("requires_human_review", False),
             pr_file_path=item.get("pr_file_path"),
             pr_file_url=item.get("pr_file_url"),
@@ -1198,7 +1193,7 @@ def _persist_final_state(db: Session, run: RunModel, final_state: dict[str, Any]
     run.policy_snapshot = final_state.get("policy_pack", {})
     run.risk_score = risk_score.get("overall_score", 0)
     run.risk_level = risk_score.get("risk_level", "low")
-    run.risk_score_detail = risk_score
+    run.risk_score_detail = {**risk_score, "grounded_assessment": final_state.get("grounded_assessment", {})}
     run.summary = risk_score.get("summary", "")
     run.trace_id = final_state.get("trace_id")
     run.graph_progress = final_state.get("graph_progress", [])
@@ -1285,7 +1280,7 @@ def _execute_review_job(run_id: str, initial_state: dict[str, Any]) -> None:
             state = {
                 **initial_state,
                 "raw_plan": raw_plan,
-                "trace_id": configure_langsmith(settings),
+                "trace_id": None,
             }
             _record_github_check(db, run, status="in_progress", summary="TerraGate Terraform review started.")
             final_state: dict[str, Any] = {}
@@ -1575,6 +1570,7 @@ def _finding_schema(finding: FindingModel) -> Finding:
         source=finding.source,
         reviewer_node=finding.reviewer_node,
         rule_version=finding.rule_version,
+        grounding=finding.grounding or {},
         requires_human_review=finding.requires_human_review,
         pr_file_path=finding.pr_file_path,
         pr_file_url=finding.pr_file_url,
@@ -1650,23 +1646,18 @@ def _fix_patch_schema(patch: FixPatchModel) -> dict[str, Any]:
 
 
 async def _read_upload_bytes(file: UploadFile, settings) -> bytes:
-    if not settings.public_demo_mode:
-        return await file.read()
-
-    max_bytes = max(settings.public_demo_max_upload_bytes, 1)
+    max_bytes = min(settings.review_max_plan_bytes, max(settings.public_demo_max_upload_bytes, 1)) if settings.public_demo_mode else settings.review_max_plan_bytes
     raw_bytes = await file.read(max_bytes + 1)
     _enforce_public_demo_upload_limit(raw_bytes, settings)
     return raw_bytes
 
 
 def _enforce_public_demo_upload_limit(raw_bytes: bytes, settings) -> None:
-    if not settings.public_demo_mode:
-        return
-    max_bytes = max(settings.public_demo_max_upload_bytes, 1)
+    max_bytes = min(settings.review_max_plan_bytes, max(settings.public_demo_max_upload_bytes, 1)) if settings.public_demo_mode else settings.review_max_plan_bytes
     if len(raw_bytes) > max_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=f"Public demo uploads are limited to {max_bytes} bytes.",
+            detail=f"{'Public demo' if settings.public_demo_mode else 'Plan'} uploads are limited to {max_bytes} bytes.",
         )
 
 

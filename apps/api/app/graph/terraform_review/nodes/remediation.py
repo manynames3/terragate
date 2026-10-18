@@ -25,37 +25,38 @@ def generate_remediations(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def _remediation_for(finding: dict[str, Any]) -> dict[str, Any] | None:
+    if finding.get("source") == "llm_reviewer":
+        return None  # A validated interpretation is not an executable Terraform patch.
     title = finding.get("title", "").lower()
     resource_type = finding.get("resource_type", "")
     if "public ingress" in title:
+        observed = next((e.get("observed_value") for e in finding.get("evidence", []) if isinstance(e.get("observed_value"), dict)), {})
+        port = observed.get("from_port")
+        if resource_type != "aws_security_group" or not isinstance(port, int) or port != observed.get("to_port") or not 1 <= port <= 65535:
+            return None
         return {
             "language": "hcl",
             "snippet": (
                 'ingress {\n'
                 '  description = "Admin access from approved network"\n'
-                "  from_port   = 22\n"
-                "  to_port     = 22\n"
+                f"  from_port   = {port}\n"
+                f"  to_port     = {port}\n"
                 '  protocol    = "tcp"\n'
                 "  cidr_blocks = var.approved_admin_cidrs\n"
                 "}"
             ),
-            "explanation": "Replace world-open ingress with an approved CIDR variable or remove SSH/RDP entirely in favor of SSM.",
+            "explanation": "Example only: define approved_admin_cidrs with the owner and preserve the intended service port. Verify protocol, IPv6 sources, routes and emergency access before editing.",
             "risk_of_change": "medium",
         }
     if "rds" in title and "public" in title:
         return {
             "language": "hcl",
-            "snippet": "publicly_accessible = false\nvpc_security_group_ids = [aws_security_group.db_private.id]",
-            "explanation": "Keep the database endpoint private and route access through private networking.",
+            "snippet": "publicly_accessible = false",
+            "explanation": "Review private client connectivity, security groups and subnet routing with the owner before changing public addressing.",
             "risk_of_change": "high",
         }
     if resource_type == "aws_db_instance" and "storage encryption" in title:
-        return {
-            "language": "hcl",
-            "snippet": "storage_encrypted = true\nkms_key_id        = aws_kms_key.rds.arn",
-            "explanation": "Enables RDS encryption at rest with a managed or customer-managed KMS key.",
-            "risk_of_change": "high",
-        }
+        return None  # Existing unencrypted RDS requires snapshot-copy/restore planning.
     if "storage encryption" in title or "bucket encryption" in title:
         return {
             "language": "hcl",
@@ -92,11 +93,11 @@ def _remediation_for(finding: dict[str, Any]) -> dict[str, Any] | None:
             "language": "hcl",
             "snippet": (
                 "statement {\n"
-                '  actions   = ["s3:GetObject", "s3:ListBucket"]\n'
-                "  resources = [aws_s3_bucket.app.arn, \"${aws_s3_bucket.app.arn}/*\"]\n"
+                "  actions   = var.required_actions\n"
+                "  resources = var.required_resource_arns\n"
                 "}"
             ),
-            "explanation": "Replace wildcard IAM privileges with the minimum service actions and resource ARNs.",
+            "explanation": "Example placeholders: define required_actions and required_resource_arns from observed workload needs. Verify action/resource compatibility and test before applying.",
             "risk_of_change": "medium",
         }
     if "cost_center" in title or "governance tags" in title:

@@ -59,7 +59,7 @@ def test_runtime_capabilities_do_not_expose_configuration_values() -> None:
     assert payload["github_reads"] == "disabled"
     assert payload["github_writes"] == "disabled"
     assert payload["cost_estimation"] == "heuristic"
-    assert payload["max_upload_bytes"] is None
+    assert payload["max_upload_bytes"] == 1_500_000
     assert "github_token" not in payload
     assert "database_url" not in payload
 

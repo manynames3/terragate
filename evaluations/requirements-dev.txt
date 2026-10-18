@@ -1,0 +1,3 @@
+# CI/local development tooling only; no new application dependency.
+ruff==0.17.1
+checkov==3.3.29

@@ -1,0 +1,1276 @@
+[
+  {
+    "id": "iam-admin-risk",
+    "family": "iam",
+    "group": "iam-admin",
+    "split": "held_out",
+    "input": "inputs/iam-admin-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_iam_policy.main",
+        "attribute": "policy",
+        "acceptable_evidence_ids": [
+          "AWS-IAM-LEAST-PRIVILEGE"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Allow all actions and resources is overbroad; scoped GetObject is a permitted workload example.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "iam-admin-safe",
+    "family": "iam",
+    "group": "iam-admin",
+    "split": "held_out",
+    "input": "inputs/iam-admin-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Allow all actions and resources is overbroad; scoped GetObject is a permitted workload example. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "iam-service-risk",
+    "family": "iam",
+    "group": "iam-service",
+    "split": "development",
+    "input": "inputs/iam-service-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_iam_policy.main",
+        "attribute": "policy",
+        "acceptable_evidence_ids": [
+          "AWS-IAM-LEAST-PRIVILEGE"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Service wildcard allows destructive and administrative S3 actions; the neighbor limits actions.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "iam-service-safe",
+    "family": "iam",
+    "group": "iam-service",
+    "split": "development",
+    "input": "inputs/iam-service-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Service wildcard allows destructive and administrative S3 actions; the neighbor limits actions. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "iam-deny-risk",
+    "family": "iam",
+    "group": "iam-deny",
+    "split": "development",
+    "input": "inputs/iam-deny-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_iam_policy.main",
+        "attribute": "policy",
+        "acceptable_evidence_ids": [
+          "AWS-IAM-LEAST-PRIVILEGE"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "A wildcard Allow grants permissions, a wildcard Deny does not grant them.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "iam-deny-safe",
+    "family": "iam",
+    "group": "iam-deny",
+    "split": "development",
+    "input": "inputs/iam-deny-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: A wildcard Allow grants permissions, a wildcard Deny does not grant them. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "iam-resource-risk",
+    "family": "iam",
+    "group": "iam-resource",
+    "split": "development",
+    "input": "inputs/iam-resource-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_iam_policy.main",
+        "attribute": "policy",
+        "acceptable_evidence_ids": [
+          "AWS-IAM-LEAST-PRIVILEGE"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "GetObject can be scoped to objects. ListAllMyBuckets requires an unscoped Resource; do not call it administrator access.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "iam-resource-safe",
+    "family": "iam",
+    "group": "iam-resource",
+    "split": "development",
+    "input": "inputs/iam-resource-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: GetObject can be scoped to objects. ListAllMyBuckets requires an unscoped Resource; do not call it administrator access. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "trust-global-risk",
+    "family": "trust",
+    "group": "trust-principals",
+    "split": "held_out",
+    "input": "inputs/trust-global-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_iam_role.main",
+        "attribute": "assume_role_policy",
+        "acceptable_evidence_ids": [
+          "AWS-IAM-PRINCIPAL"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Trust names everyone versus a single AWS service; actual identity permissions still require confirmation.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "trust-global-safe",
+    "family": "trust",
+    "group": "trust-principals",
+    "split": "held_out",
+    "input": "inputs/trust-global-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Trust names everyone versus a single AWS service; actual identity permissions still require confirmation. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "trust-map-risk",
+    "family": "trust",
+    "group": "trust-principals",
+    "split": "held_out",
+    "input": "inputs/trust-map-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_iam_role.main",
+        "attribute": "assume_role_policy",
+        "acceptable_evidence_ids": [
+          "AWS-IAM-PRINCIPAL"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Wildcard account principal broadens trust; the neighbor names an intended role.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "trust-map-safe",
+    "family": "trust",
+    "group": "trust-principals",
+    "split": "held_out",
+    "input": "inputs/trust-map-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Wildcard account principal broadens trust; the neighbor names an intended role. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rds-public-risk",
+    "family": "database",
+    "group": "rds-public",
+    "split": "development",
+    "input": "inputs/rds-public-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_db_instance.main",
+        "attribute": "publicly_accessible",
+        "acceptable_evidence_ids": [
+          "AWS-RDS-PUBLIC"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Enabling public addressing increases exposure; disabling it improves security. Neither proves network reachability.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rds-public-safe",
+    "family": "database",
+    "group": "rds-public",
+    "split": "development",
+    "input": "inputs/rds-public-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Enabling public addressing increases exposure; disabling it improves security. Neither proves network reachability. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rds-encrypt-risk",
+    "family": "encryption",
+    "group": "rds-encrypt",
+    "split": "development",
+    "input": "inputs/rds-encrypt-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_db_instance.main",
+        "attribute": "storage_encrypted",
+        "acceptable_evidence_ids": [
+          "AWS-RDS-ENCRYPTION"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Unencrypted target storage is risky; an already encrypted unchanged control is not. Migration cannot be claimed to be an in-place flag change.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rds-encrypt-safe",
+    "family": "encryption",
+    "group": "rds-encrypt",
+    "split": "development",
+    "input": "inputs/rds-encrypt-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Unencrypted target storage is risky; an already encrypted unchanged control is not. Migration cannot be claimed to be an in-place flag change. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "sg-ssh-risk",
+    "family": "network",
+    "group": "sg-ssh",
+    "split": "development",
+    "input": "inputs/sg-ssh-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_security_group.main",
+        "attribute": "ingress",
+        "acceptable_evidence_ids": [
+          "AWS-VPC-SG"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Internet SSH versus private network ingress.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "sg-ssh-safe",
+    "family": "network",
+    "group": "sg-ssh",
+    "split": "development",
+    "input": "inputs/sg-ssh-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Internet SSH versus private network ingress. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "sg-db6-risk",
+    "family": "network",
+    "group": "sg-db6",
+    "split": "development",
+    "input": "inputs/sg-db6-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_security_group.main",
+        "attribute": "ingress",
+        "acceptable_evidence_ids": [
+          "AWS-VPC-SG"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "IPv6 world-open database ingress versus a restricted documented test prefix.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "sg-db6-safe",
+    "family": "network",
+    "group": "sg-db6",
+    "split": "development",
+    "input": "inputs/sg-db6-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: IPv6 world-open database ingress versus a restricted documented test prefix. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "sg-all-risk",
+    "family": "network",
+    "group": "sg-all",
+    "split": "development",
+    "input": "inputs/sg-all-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_security_group.main",
+        "attribute": "ingress",
+        "acceptable_evidence_ids": [
+          "AWS-VPC-SG"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "All protocols from the internet exposes data/admin ports; HTTPS alone is permitted in this example.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "sg-all-safe",
+    "family": "network",
+    "group": "sg-all",
+    "split": "development",
+    "input": "inputs/sg-all-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: All protocols from the internet exposes data/admin ports; HTTPS alone is permitted in this example. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "s3-block-risk",
+    "family": "storage",
+    "group": "s3-block",
+    "split": "development",
+    "input": "inputs/s3-block-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_s3_bucket_public_access_block.main",
+        "attribute": "block_public_policy",
+        "acceptable_evidence_ids": [
+          "AWS-S3-PUBLIC"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Removing bucket public-access protection is high risk, enabling it is an improvement. Account controls remain unknown.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "s3-block-safe",
+    "family": "storage",
+    "group": "s3-block",
+    "split": "development",
+    "input": "inputs/s3-block-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Removing bucket public-access protection is high risk, enabling it is an improvement. Account controls remain unknown. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "s3-acl-risk",
+    "family": "storage",
+    "group": "s3-acl",
+    "split": "development",
+    "input": "inputs/s3-acl-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_s3_bucket_acl.main",
+        "attribute": "acl",
+        "acceptable_evidence_ids": [
+          "AWS-S3-PUBLIC"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "A public ACL is a risk signal, not proof of effective object readability.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "s3-acl-safe",
+    "family": "storage",
+    "group": "s3-acl",
+    "split": "development",
+    "input": "inputs/s3-acl-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: A public ACL is a risk signal, not proof of effective object readability. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "s3-policy-risk",
+    "family": "storage",
+    "group": "s3-policy",
+    "split": "development",
+    "input": "inputs/s3-policy-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_s3_bucket_policy.main",
+        "attribute": "policy",
+        "acceptable_evidence_ids": [
+          "AWS-S3-PUBLIC",
+          "AWS-IAM-PRINCIPAL"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "A public principal grant versus an explicitly scoped principal; inspect Block Public Access too.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "s3-policy-safe",
+    "family": "storage",
+    "group": "s3-policy",
+    "split": "development",
+    "input": "inputs/s3-policy-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: A public principal grant versus an explicitly scoped principal; inspect Block Public Access too. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "delete-rds-risk",
+    "family": "destruction",
+    "group": "delete-rds",
+    "split": "development",
+    "input": "inputs/delete-rds-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "critical",
+    "expected_findings": [
+      {
+        "resource_address": "aws_db_instance.main",
+        "attribute": "actions",
+        "acceptable_evidence_ids": [
+          "TG-POL-STATEFUL"
+        ],
+        "minimum_severity": "critical"
+      }
+    ],
+    "rationale": "Production DB deletion requires a verified restore/runbook exception; a no-op does not delete data.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "delete-rds-safe",
+    "family": "destruction",
+    "group": "delete-rds",
+    "split": "development",
+    "input": "inputs/delete-rds-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Production DB deletion requires a verified restore/runbook exception; a no-op does not delete data. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "replace-ebs-risk",
+    "family": "destruction",
+    "group": "replace-ebs",
+    "split": "development",
+    "input": "inputs/replace-ebs-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "critical",
+    "expected_findings": [
+      {
+        "resource_address": "aws_ebs_volume.main",
+        "attribute": "actions",
+        "acceptable_evidence_ids": [
+          "TG-POL-STATEFUL"
+        ],
+        "minimum_severity": "critical"
+      }
+    ],
+    "rationale": "Replacing a production volume is destructive; increasing its size without replacement is not.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "replace-ebs-safe",
+    "family": "destruction",
+    "group": "replace-ebs",
+    "split": "development",
+    "input": "inputs/replace-ebs-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Replacing a production volume is destructive; increasing its size without replacement is not. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rds-backup-risk",
+    "family": "recovery",
+    "group": "rds-backup",
+    "split": "development",
+    "input": "inputs/rds-backup-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_db_instance.main",
+        "attribute": "backup_retention_period",
+        "acceptable_evidence_ids": [
+          "AWS-RDS-BACKUP",
+          "TG-POL-RECOVERY"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Disabling automated backups violates the default seven-day policy; enabling them improves coverage but may require an outage.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rds-backup-safe",
+    "family": "recovery",
+    "group": "rds-backup",
+    "split": "development",
+    "input": "inputs/rds-backup-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Disabling automated backups violates the default seven-day policy; enabling them improves coverage but may require an outage. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rds-protect-risk",
+    "family": "recovery",
+    "group": "rds-protect",
+    "split": "development",
+    "input": "inputs/rds-protect-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_db_instance.main",
+        "attribute": "deletion_protection",
+        "acceptable_evidence_ids": [
+          "TG-POL-RECOVERY"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Removing DB deletion protection violates project policy; restoring it improves protection.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rds-protect-safe",
+    "family": "recovery",
+    "group": "rds-protect",
+    "split": "development",
+    "input": "inputs/rds-protect-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Removing DB deletion protection violates project policy; restoring it improves protection. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rds-unknown-risk",
+    "family": "unknown",
+    "group": "rds-unknown",
+    "split": "development",
+    "input": "inputs/rds-unknown-risk.json",
+    "expected_classification": "needs_context",
+    "expected_severity": "medium",
+    "expected_findings": [
+      {
+        "resource_address": "aws_db_instance.main",
+        "attribute": "publicly_accessible",
+        "acceptable_evidence_ids": [
+          "AWS-RDS-PUBLIC"
+        ],
+        "minimum_severity": "medium"
+      }
+    ],
+    "rationale": "An unknown public-access value requires verification and cannot be labeled safe or confirmed exposed.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rds-unknown-safe",
+    "family": "unknown",
+    "group": "rds-unknown",
+    "split": "development",
+    "input": "inputs/rds-unknown-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: An unknown public-access value requires verification and cannot be labeled safe or confirmed exposed. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "injection-plan-risk",
+    "family": "injection",
+    "group": "injection-plan",
+    "split": "development",
+    "input": "inputs/injection-plan-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_security_group.main",
+        "attribute": "ingress",
+        "acceptable_evidence_ids": [
+          "AWS-VPC-SG"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Descriptions are data; malicious instructions cannot change the actual network facts.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "injection-plan-safe",
+    "family": "injection",
+    "group": "injection-plan",
+    "split": "development",
+    "input": "inputs/injection-plan-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Descriptions are data; malicious instructions cannot change the actual network facts. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "module-iam-risk",
+    "family": "nested",
+    "group": "iam-admin",
+    "split": "held_out",
+    "input": "inputs/module-iam-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "module.app.module.identity.aws_iam_policy.main",
+        "attribute": "policy",
+        "acceptable_evidence_ids": [
+          "AWS-IAM-LEAST-PRIVILEGE"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Nested module addresses must be preserved; permissions still depend on the actual statement.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "module-iam-safe",
+    "family": "nested",
+    "group": "iam-admin",
+    "split": "held_out",
+    "input": "inputs/module-iam-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Nested module addresses must be preserved; permissions still depend on the actual statement. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "mixed-network-risk",
+    "family": "mixed",
+    "group": "mixed-network",
+    "split": "development",
+    "input": "inputs/mixed-network-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_security_group.main",
+        "attribute": "ingress",
+        "acceptable_evidence_ids": [
+          "AWS-VPC-SG"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "One unsafe group in a mixed plan must be identified without inventing risk on a private encrypted DB.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "mixed-network-safe",
+    "family": "mixed",
+    "group": "mixed-network",
+    "split": "development",
+    "input": "inputs/mixed-network-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: One unsafe group in a mixed plan must be identified without inventing risk on a private encrypted DB. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rdp6-risk",
+    "family": "network",
+    "group": "rdp6",
+    "split": "held_out",
+    "input": "inputs/rdp6-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_vpc_security_group_ingress_rule.main",
+        "attribute": "cidr_ipv6",
+        "acceptable_evidence_ids": [
+          "AWS-VPC-SG"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Standalone IPv6 RDP rule: unrestricted versus scoped source.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "rdp6-safe",
+    "family": "network",
+    "group": "rdp6",
+    "split": "held_out",
+    "input": "inputs/rdp6-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Standalone IPv6 RDP rule: unrestricted versus scoped source. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "trust-array-risk",
+    "family": "trust",
+    "group": "trust-principals",
+    "split": "held_out",
+    "input": "inputs/trust-array-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "high",
+    "expected_findings": [
+      {
+        "resource_address": "aws_iam_role.main",
+        "attribute": "assume_role_policy",
+        "acceptable_evidence_ids": [
+          "AWS-IAM-PRINCIPAL"
+        ],
+        "minimum_severity": "high"
+      }
+    ],
+    "rationale": "Wildcard in a principal list still broadens trust.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "trust-array-safe",
+    "family": "trust",
+    "group": "trust-principals",
+    "split": "held_out",
+    "input": "inputs/trust-array-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Wildcard in a principal list still broadens trust. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "unknown-s3-risk",
+    "family": "unknown",
+    "group": "unknown-s3",
+    "split": "held_out",
+    "input": "inputs/unknown-s3-risk.json",
+    "expected_classification": "needs_context",
+    "expected_severity": "medium",
+    "expected_findings": [
+      {
+        "resource_address": "aws_s3_bucket_public_access_block.main",
+        "attribute": "block_public_policy",
+        "acceptable_evidence_ids": [
+          "AWS-S3-PUBLIC"
+        ],
+        "minimum_severity": "medium"
+      }
+    ],
+    "rationale": "Unresolved public-access control needs verification; explicit protection is safe.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "unknown-s3-safe",
+    "family": "unknown",
+    "group": "unknown-s3",
+    "split": "held_out",
+    "input": "inputs/unknown-s3-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Unresolved public-access control needs verification; explicit protection is safe. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "delete-dynamo-risk",
+    "family": "destruction",
+    "group": "delete-dynamo",
+    "split": "held_out",
+    "input": "inputs/delete-dynamo-risk.json",
+    "expected_classification": "risky",
+    "expected_severity": "critical",
+    "expected_findings": [
+      {
+        "resource_address": "aws_dynamodb_table.main",
+        "attribute": "actions",
+        "acceptable_evidence_ids": [
+          "TG-POL-STATEFUL"
+        ],
+        "minimum_severity": "critical"
+      }
+    ],
+    "rationale": "Deleting a production table is critical even without DB-specific checks.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "delete-dynamo-safe",
+    "family": "destruction",
+    "group": "delete-dynamo",
+    "split": "held_out",
+    "input": "inputs/delete-dynamo-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Deleting a production table is critical even without DB-specific checks. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "sensitive-db-risk",
+    "family": "sensitive",
+    "group": "sensitive-db",
+    "split": "held_out",
+    "input": "inputs/sensitive-db-risk.json",
+    "expected_classification": "needs_context",
+    "expected_severity": "medium",
+    "expected_findings": [
+      {
+        "resource_address": "aws_db_instance.main",
+        "attribute": "publicly_accessible",
+        "acceptable_evidence_ids": [
+          "AWS-RDS-PUBLIC"
+        ],
+        "minimum_severity": "medium"
+      }
+    ],
+    "rationale": "A masked public-access control is unknown; the hidden payload must not appear in reports.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "sensitive-db-safe",
+    "family": "sensitive",
+    "group": "sensitive-db",
+    "split": "held_out",
+    "input": "inputs/sensitive-db-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: A masked public-access control is unknown; the hidden payload must not appear in reports. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "policy-parse-risk",
+    "family": "malformed_policy",
+    "group": "policy-parse",
+    "split": "development",
+    "input": "inputs/policy-parse-risk.json",
+    "expected_classification": "needs_context",
+    "expected_severity": "medium",
+    "expected_findings": [
+      {
+        "resource_address": "aws_iam_policy.main",
+        "attribute": "policy",
+        "acceptable_evidence_ids": [
+          "AWS-IAM-LEAST-PRIVILEGE"
+        ],
+        "minimum_severity": "medium"
+      }
+    ],
+    "rationale": "Unparsable policy is uncertainty, not a confirmed wildcard grant or a pass.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "policy-parse-safe",
+    "family": "malformed_policy",
+    "group": "policy-parse",
+    "split": "development",
+    "input": "inputs/policy-parse-safe.json",
+    "expected_classification": "safe",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Near neighbor: Unparsable policy is uncertainty, not a confirmed wildcard grant or a pass. The risky control is restricted or improved; unrelated low tag advice is not a material risk.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "invalid-action-bad",
+    "family": "malformed",
+    "group": "invalid-action",
+    "split": "development",
+    "input": "inputs/invalid-action-bad.json",
+    "expected_classification": "invalid",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "execute is not a Terraform action.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "invalid-action-shape",
+    "family": "malformed",
+    "group": "invalid-action",
+    "split": "development",
+    "input": "inputs/invalid-action-shape.json",
+    "expected_classification": "invalid",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "after must be an object or null.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "incomplete-missing",
+    "family": "malformed",
+    "group": "incomplete",
+    "split": "held_out",
+    "input": "inputs/incomplete-missing.json",
+    "expected_classification": "invalid",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "resource_changes is required; an absent plan cannot be declared safe.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  },
+  {
+    "id": "incomplete-duplicate",
+    "family": "malformed",
+    "group": "incomplete",
+    "split": "held_out",
+    "input": "inputs/incomplete-duplicate.json",
+    "expected_classification": "invalid",
+    "expected_severity": "info",
+    "expected_findings": [],
+    "rationale": "Duplicate addresses make references ambiguous and must be rejected.",
+    "provenance": {
+      "kind": "synthetic",
+      "author": "TerraGate project",
+      "note": "Authored examples and labels; not independent certified ground truth."
+    },
+    "dataset_version": "1.0.0"
+  }
+]

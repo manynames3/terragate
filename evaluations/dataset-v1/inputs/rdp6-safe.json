@@ -1,0 +1,37 @@
+{
+  "plan": {
+    "format_version": "1.2",
+    "terraform_version": "1.9.8",
+    "resource_changes": [
+      {
+        "address": "aws_vpc_security_group_ingress_rule.main",
+        "mode": "managed",
+        "type": "aws_vpc_security_group_ingress_rule",
+        "name": "main",
+        "provider_name": "registry.terraform.io/hashicorp/aws",
+        "change": {
+          "actions": [
+            "update"
+          ],
+          "before": null,
+          "after": {
+            "cidr_ipv6": "2001:db8::/64",
+            "from_port": 3389,
+            "to_port": 3389,
+            "ip_protocol": "tcp",
+            "tags": {
+              "owner": "platform",
+              "environment": "prod",
+              "service": "demo",
+              "cost_center": "portfolio"
+            }
+          },
+          "after_unknown": {},
+          "after_sensitive": {}
+        }
+      }
+    ]
+  },
+  "environment": "prod",
+  "policy_profile": "default"
+}

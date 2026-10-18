@@ -52,6 +52,26 @@ The repo uses `@opennextjs/cloudflare` and `wrangler.jsonc`. Frontend deployment
 
 ## GitHub App Setup Path
 
+### Separate v2 frontend preview
+
+The `v2` branch supports a separate frontend at `https://terragate2.pages.dev`. It uses a Pages advanced-mode proxy (`apps/web/pages-v2`) with a service binding to the `terragate2-web` OpenNext Worker. The original `terragate` Worker is unaffected. The proxy forwards only `/api/v1/*` to the fixed existing AWS API endpoint; it preserves authorization and request bodies, strips browser cookies/origin/referrer, disables API response caching and does not follow upstream redirects.
+
+This is a **frontend preview**, not deployment of the grounded v2 backend. It shares the existing public-demo API, data and development identity. A visible banner makes that limitation explicit. No provider key is shipped to Cloudflare. Updating the shared AWS backend requires a separate release and database migration and would affect the original demo too.
+
+From `apps/web`, after `npm ci`, run:
+
+```bash
+npm run build:v2
+npm run deploy:v2:worker
+# First release only; production branch must be v2, not main:
+npx wrangler pages project create terragate2 --production-branch v2
+npm run deploy:v2:pages
+```
+
+The build pins an empty public API base so browser requests use the Pages origin. Rebuild after changing public environment values. Pages routes the full dynamic app through the bound Worker; static export would lose arbitrary `/runs/[runId]` routes. These are serverless services with no keep-warm jobs. Existing account quotas and request-based charges still apply.
+
+Rollback only this preview by deploying the previous `v2` commit with the same commands. Do not use the original `deploy:cloudflare` command for this preview; it targets the existing v1 Worker. CI runs on `v2` pushes; the live quality job remains deliberately unevaluated/failing until compatible actual model evidence and human assessments exist.
+
 The code supports GitHub token/App-style configuration, PR metadata reads, webhooks, automatic checks, and versioned approval-gated comments. Generated remediation is export-only; automatic source-verified patch generation is not implemented. A production onboarding flow should:
 
 1. Create a GitHub App with pull request read, checks write, contents write, and metadata read permissions.

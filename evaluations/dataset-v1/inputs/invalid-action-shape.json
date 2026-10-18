@@ -1,0 +1,18 @@
+{
+  "plan": {
+    "resource_changes": [
+      {
+        "address": "aws_instance.main",
+        "type": "aws_instance",
+        "change": {
+          "actions": [
+            "create"
+          ],
+          "after": []
+        }
+      }
+    ]
+  },
+  "environment": "prod",
+  "policy_profile": "default"
+}

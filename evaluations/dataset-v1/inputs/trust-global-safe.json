@@ -1,0 +1,34 @@
+{
+  "plan": {
+    "format_version": "1.2",
+    "terraform_version": "1.9.8",
+    "resource_changes": [
+      {
+        "address": "aws_iam_role.main",
+        "mode": "managed",
+        "type": "aws_iam_role",
+        "name": "main",
+        "provider_name": "registry.terraform.io/hashicorp/aws",
+        "change": {
+          "actions": [
+            "update"
+          ],
+          "before": null,
+          "after": {
+            "assume_role_policy": "{\"Version\": \"2012-10-17\", \"Statement\": [{\"Effect\": \"Allow\", \"Action\": \"sts:AssumeRole\", \"Principal\": {\"Service\": \"lambda.amazonaws.com\"}}]}",
+            "tags": {
+              "owner": "platform",
+              "environment": "prod",
+              "service": "demo",
+              "cost_center": "portfolio"
+            }
+          },
+          "after_unknown": {},
+          "after_sensitive": {}
+        }
+      }
+    ]
+  },
+  "environment": "prod",
+  "policy_profile": "default"
+}

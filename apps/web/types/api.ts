@@ -90,6 +90,13 @@ export type DemoSamplePlan = {
 };
 
 export type Finding = {
+  grounding?: {
+    origin?: string;
+    interpretation_source?: string;
+    evidence_ids?: string[];
+    missing_context?: string[];
+    documents?: { id: string; title: string; url: string; passage: string; updated_at: string }[];
+  };
   rule_version: string | null;
   id: string;
   title: string;
@@ -300,6 +307,7 @@ export type RiskScore = {
 };
 
 export type Report = {
+  grounded_assessment?: { status?: string; classification?: string; warnings?: string[] };
   run_id: string;
   report_markdown: string;
   pr_comment_draft: string;

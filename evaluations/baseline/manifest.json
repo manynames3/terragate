@@ -1,0 +1,7 @@
+{
+  "reviewer": "legacy-v1",
+  "origin": "https://github.com/manynames3/terragate",
+  "commit": "46988c330d2a18e6f68058db277665aae23e24d4",
+  "source_sha256": "02919288732023d6d6205599efe404cabb1deef2b28508bf49c57451545e4528",
+  "description": "Unmodified app source and requirements captured before v2 edits. Extract to inspect. Evaluator enforces request/time/output limits externally; see evaluation docs."
+}

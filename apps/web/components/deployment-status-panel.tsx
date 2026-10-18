@@ -23,7 +23,7 @@ export function DeploymentStatusPanel() {
 
   useEffect(() => {
     const hostname = window.location.hostname;
-    setFrontendTarget(hostname.endsWith("workers.dev") ? "Cloudflare Workers" : hostname === "localhost" || hostname === "127.0.0.1" ? "Local Next.js" : hostname);
+    setFrontendTarget(hostname.endsWith("pages.dev") ? "Cloudflare Pages + Workers" : hostname.endsWith("workers.dev") ? "Cloudflare Workers" : hostname === "localhost" || hostname === "127.0.0.1" ? "Local Next.js" : hostname);
     setFrontendHost(window.location.host);
     Promise.all([getRuntimeCapabilities(), getCurrentUser()])
       .then(([runtime, currentUser]) => {
@@ -34,7 +34,7 @@ export function DeploymentStatusPanel() {
   }, []);
 
   const statusItems = useMemo<StatusItem[]>(() => {
-    const apiTarget = API_BASE_URL.includes("execute-api") ? "AWS API Gateway + Lambda" : "FastAPI";
+    const apiTarget = API_BASE_URL === "" ? "Same-origin API proxy" : API_BASE_URL.includes("execute-api") ? "AWS API Gateway + Lambda" : "FastAPI";
     if (!capabilities) {
       return [
         { label: "Frontend", value: frontendTarget, detail: frontendHost, tone: "success", icon: Cloud },

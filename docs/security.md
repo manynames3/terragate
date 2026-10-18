@@ -72,3 +72,7 @@ The hosted Lambda/database configuration differs from the reference. A productio
 4. Use a durable queue and isolated worker runtime for untrusted Terraform execution.
 5. Add approval/versioning and ownership for policy changes; evaluated snapshots and content hashes are already saved per run.
 6. Add audit export and administrative access review.
+
+## V2 reviewer boundary
+
+The candidate makes one bounded model request after local retrieval, accepts only validated scoped references/attributes, preserves deterministic provenance, and treats plan/documents as data. Unknown or hidden controls require verification. Inputs, completion tokens, attempts, concurrency and time are limited. Raw graph tracing is disabled to prevent exporting original plan state. Reduced-input redaction remains best effort, not a guarantee for unmarked secrets. See [v2 operation](terragate-v2.md) and [evaluation trust/CI boundaries](evaluations.md); accepted artifacts are reviewed evidence, not provider attestations.

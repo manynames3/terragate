@@ -12,3 +12,5 @@ These ADRs document the main architecture choices behind TerraGate.
 - [ADR 0006: Add guarded public demo mode](0006-guarded-public-demo-mode.md)
 - [ADR 0007: Use Cloudflare Workers and AWS Lambda for the low-cost public demo](0007-low-cost-public-demo-on-cloudflare-and-aws.md)
 - [ADR 0008: Defer S3 artifact storage and durable queue until paid pilot](0008-defer-s3-and-durable-queue-until-paid-pilot.md)
+
+- [0009: Grounded review and regression evidence](0009-grounded-review-and-regression-evidence.md)

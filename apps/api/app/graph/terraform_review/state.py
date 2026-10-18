@@ -17,6 +17,7 @@ class TerraformReviewState(TypedDict, total=False):
     redacted_plan_sha256: str
     plan_summary: dict[str, Any]
     resource_changes: list[dict[str, Any]]
+    grounded_assessment: dict[str, Any]
     sensitive_paths: list[dict[str, Any]]
     deterministic_results: list[dict[str, Any]]
     policy_pack: dict[str, Any]

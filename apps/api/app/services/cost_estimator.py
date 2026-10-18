@@ -77,7 +77,7 @@ def _estimate_with_infracost(plan_path: str | None, policy_pack: PolicyPack) -> 
             ["infracost", "breakdown", "--path", str(path), "--format", "json"],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=20,
             check=True,
         )
         payload = json.loads(completed.stdout)

@@ -4,6 +4,17 @@ TerraGate is a production-style Terraform PR risk gate for reviewing infrastruct
 
 **Positioning:** AI-assisted Terraform review that treats policy evidence as the source of truth and LLM output as explanation, remediation, and workflow acceleration.
 
+## TerraGate v2 — grounded GenAI review
+
+The application now retrieves curated AWS/project evidence before one bounded structured model call, validates resource/attribute/citation references, preserves deterministic provenance, and persists explanations plus uncertainty. The existing UI shows evidence, missing context and model availability without probability-style confidence labels.
+
+A 60-case authored benchmark, frozen original reviewer, offline/live/replay commands, deterministic scoring, explicit baseline promotion and CI regression gate are included. **Live model quality is unevaluated:** no provider key was available during implementation. Offline tests and Checkov cannot turn that status green. The separate `terragate2.pages.dev` frontend preview uses the existing demo API; the grounded v2 backend remains undeployed. No accuracy improvement is claimed.
+
+- [V2 architecture, limits and local operation](docs/terragate-v2.md)
+- [Evaluation commands, scoring, cost and CI](docs/evaluations.md)
+- [Current verification and limitations](STATE.md)
+- [Four-minute interview demo](docs/demo-v2.md)
+
 ## TL;DR
 
 - **What it is:** An AI-assisted Terraform PR reviewer for cloud/platform teams.
@@ -69,7 +80,7 @@ The following screenshots are captured from the running local workspace with rep
 | Artifact storage | Local filesystem adapter for dev, structured for future object storage |
 | GitHub | PR metadata, webhook endpoint, check runs, versioned comment approvals, snippet export, mock fallback |
 | Cost | Optional Infracost CLI, deterministic heuristic fallback |
-| Observability | Optional LangSmith tracing, audit log records in the database |
+| Observability | Persisted progress, audit events and sanitized model usage; raw graph tracing disabled in v2 |
 | Local dev/deploy | Docker Compose, API/web Dockerfiles, GitHub Actions CI |
 | Public demo hosting | Cloudflare Workers/OpenNext frontend, AWS API Gateway + Lambda/Mangum backend path |
 
@@ -107,7 +118,7 @@ Implementation evidence: [approval provenance](apps/api/app/services/review_appr
 | CI/CD | `.github/workflows/ci.yml` runs backend tests, Alembic migration validation, frontend typecheck/lint/build, and Terraform fmt/validate. AWS backend deploy uses Terraform + CodeBuild; Cloudflare deploy uses OpenNext/Wrangler. |
 | Security | Terraform plan and PR patch redaction, Cognito JWT support, explicit dev/public-demo modes, private RDS, security-group scoped DB access, content-bound comment approval, public-demo guardrails. Dev auth is not tenant isolation. |
 | Reliability | Persisted run/job state, node-level graph progress, retry metadata, worker claim flow, explicit public-demo fallback behavior, documented failure modes and recovery. |
-| Observability | CloudWatch log groups, Cloudflare Workers observability, persisted audit events, optional LangSmith tracing, graph progress visible in the UI. |
+| Observability | CloudWatch log groups, Cloudflare Workers observability, persisted audit events/model usage, graph progress visible in the UI; raw graph tracing disabled in v2. |
 | Cost | Lambda/API Gateway request-driven backend, no NAT gateway in demo stack, stoppable small RDS, 14-day log retention, optional Infracost, documented low-idle public-demo path. |
 | Operations | Runbook-grade remediation output, deployment docs, teardown docs, threat model, public demo guide, API contract, reviewer guide. |
 | Testing | Pytest coverage for parser/redaction/policy/risk/API/auth/GitHub behavior, approval provenance and migration/patch regressions, frontend action guards, TypeScript/lint/build checks, and CI Terraform validation. |
@@ -265,7 +276,7 @@ Copy `.env.example` to `.env`. Important variables:
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string; SQLite fallback when empty in manual mode |
 | `OPENAI_API_KEY` | Enables optional LLM reviewer enrichment |
-| `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` | Optional LangSmith tracing |
+| `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` | Legacy configuration; raw review-graph trace export is disabled in v2 |
 | `GITHUB_TOKEN` or GitHub App variables | Enables live PR metadata, automatic checks, and approved comments; generated remediation remains export-only |
 | `INFRACOST_API_KEY` | Enables stronger Infracost-backed cost estimation |
 | `AUTH_MODE` | `dev` or `cognito` |
@@ -371,7 +382,7 @@ See [docs/security.md](docs/security.md) and [docs/threat-model.md](docs/threat-
 - Runs persist graph progress, node status, findings, approvals, GitHub action attempts, and audit events.
 - Public-demo infrastructure writes Lambda and CodeBuild logs to CloudWatch with 14-day retention.
 - Cloudflare Workers observability is enabled in `apps/web/wrangler.jsonc`.
-- LangSmith tracing is optional through environment variables and disabled in the low-cost public-demo Terraform by default.
+- Raw review-graph tracing is disabled in v2 to prevent exporting original plan state; node progress and sanitized model usage remain local.
 
 See [docs/observability.md](docs/observability.md).
 
@@ -430,5 +441,5 @@ See [docs/teardown.md](docs/teardown.md).
 - S3/KMS artifact storage adapter with retention and deletion controls.
 - OPA/Rego policy execution alongside Python checks.
 - Chroma/Qdrant runbook retrieval for incident investigation and remediation context.
-- LangSmith trace links in the UI.
+- Sanitized remote trace instrumentation, excluding raw plan state.
 - First-class GitHub App installation onboarding and repository registration.

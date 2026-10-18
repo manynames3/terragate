@@ -1,0 +1,7 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "terragate2",
+  "pages_build_output_dir": "./public",
+  "compatibility_date": "2026-05-14",
+  "services": [{ "binding": "WEB", "service": "terragate2-web" }]
+}

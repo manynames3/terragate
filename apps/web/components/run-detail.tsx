@@ -259,6 +259,9 @@ export function RunDetailClient({ runId }: { runId: string }) {
         <div className="flex items-center gap-3"><PolicyBadge decision={run.policy_decision} /><p className="text-sm text-slate-600">{run.assessment_state === "assessed" ? `${run.blocking_findings} blocking findings · ${run.accepted_findings} accepted risks` : "Assessment is not available yet"}</p></div>
         <p className="text-xs text-slate-500">Merge enforcement not verified · No deployment authorization</p>
       </div>
+      {report.grounded_assessment?.status ? <AlertBanner title={`Grounded review: ${report.grounded_assessment.status.replaceAll("_", " ")}`}>
+        Assessment: {report.grounded_assessment.classification?.replaceAll("_", " ")}. {report.grounded_assessment.warnings?.join(" ")}
+      </AlertBanner> : null}
       <nav aria-label="Review sections" className="flex gap-5 overflow-x-auto border-b border-[var(--border)]">
         {["overview","findings","plan","runbook","compliance","history"].map(tab => <a key={tab} href={`#${tab}`} aria-current={workspaceTab === tab ? "page" : undefined} className={cx("shrink-0 border-b-2 px-1 py-3 text-sm font-medium capitalize", workspaceTab === tab ? "border-teal-700 text-teal-700" : "border-transparent text-slate-500 hover:text-slate-900")}>{tab}</a>)}
       </nav>
@@ -540,7 +543,7 @@ function FindingsCommandTable({
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                     <Badge tone="neutral">{finding.category}</Badge>
-                    <span>{Math.round(finding.confidence * 100)}% confidence</span>
+                    <span>{finding.requires_human_review ? "Needs verification" : "Rule evidence"}</span>
                     {finding.requires_human_review ? <Badge tone="warn">human review</Badge> : null}
                   </div>
                 </button>
@@ -557,7 +560,7 @@ function FindingsCommandTable({
                 <th className="px-3 py-3">Title</th>
                 <th className="px-3 py-3">Resource</th>
                 <th className="hidden px-3 py-3 2xl:table-cell">File</th>
-                <th className="px-3 py-3">Confidence</th>
+                <th className="px-3 py-3">Evidence status</th>
                 <th className="hidden px-3 py-3 2xl:table-cell">Source</th>
               </tr>
             </thead>
@@ -593,12 +596,7 @@ function FindingsCommandTable({
                     <td className="max-w-44 truncate px-3 py-3 font-mono text-xs text-slate-600">{finding.resource_address ?? "n/a"}</td>
                     <td className="hidden max-w-36 truncate px-3 py-3 font-mono text-xs text-slate-600 2xl:table-cell">{finding.pr_file_path ?? "not mapped"}</td>
                     <td className="px-3 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-9 text-xs text-slate-600">{Math.round(finding.confidence * 100)}%</span>
-                        <span className="h-1.5 w-12 overflow-hidden rounded-full bg-[var(--border)]">
-                          <span className="block h-full rounded-full bg-[#0f766e]" style={{ width: `${Math.round(finding.confidence * 100)}%` }} />
-                        </span>
-                      </div>
+                      <span className="text-xs text-slate-600">{finding.requires_human_review ? "Needs verification" : "Rule evidence"}</span>
                     </td>
                     <td className="hidden px-3 py-3 text-xs text-slate-600 2xl:table-cell">{finding.source.replaceAll("_", " ")}</td>
                   </tr>
@@ -763,7 +761,7 @@ function FindingInspector({ finding, tab, setTab, runId }: { finding: Finding | 
             </div>
             <h2 className="mt-4 text-xl font-semibold text-slate-950">{finding.title}</h2>
             <p className="mt-1 text-sm capitalize text-slate-600">{finding.category} / {finding.severity}</p>
-            <p className="mt-3 break-words text-xs text-slate-600">{evidence?.rule_id ?? "Rule ID not captured"} · {Math.round(finding.confidence * 100)}% confidence · {finding.source.replaceAll("_", " ")}</p>
+            <p className="mt-3 break-words text-xs text-slate-600">{evidence?.rule_id ?? "Rule ID not captured"} · {finding.requires_human_review ? "Needs verification" : "Rule evidence"} · {finding.source.replaceAll("_", " ")}</p>
             {finding.requires_human_review ? <div className="mt-2"><Badge tone="warn">Verification required</Badge></div> : null}
           </div>
         </div>
@@ -823,6 +821,17 @@ function FindingInspector({ finding, tab, setTab, runId }: { finding: Finding | 
               <p className="break-words rounded-md bg-[var(--surface-muted)] p-3 font-mono text-xs text-slate-700">{stringifyValue(evidence?.expected_value ?? "n/a")}</p>
             </InspectorBlock>
             <InspectorBlock title="Rule" body={`${evidence?.rule_id ?? "n/a"} - ${evidence?.explanation ?? ""}`} />
+            {finding.grounding?.documents?.length ? <InspectorBlock title="Supporting documentation">
+              <p className="mb-3 text-xs text-slate-500">References are validated; semantic support still requires review.</p>
+              {finding.grounding.documents.map(doc => <div key={doc.id} className="mb-4 text-sm">
+                <a href={doc.url} target="_blank" rel="noreferrer" className="text-teal-700 underline">{doc.id}: {doc.title}</a>
+                <p className="mt-1 text-slate-600">{doc.passage}</p>
+                <p className="mt-1 text-xs text-slate-500">Updated {doc.updated_at}</p>
+              </div>)}
+            </InspectorBlock> : null}
+            {finding.grounding?.missing_context?.length ? <InspectorBlock title="Missing context">
+              <ul className="list-disc space-y-2 pl-4 text-sm text-slate-600">{finding.grounding.missing_context.map(item => <li key={item}>{item}</li>)}</ul>
+            </InspectorBlock> : null}
             <InspectorBlock title="Rule implementation version" body={finding.rule_version ?? "Not captured for this historical finding"} />
             {finding.resource_address ? <PlanEvidence runId={runId} resource={finding.resource_address} /> : null}
           </>
@@ -862,13 +871,8 @@ function FindingInspector({ finding, tab, setTab, runId }: { finding: Finding | 
               )}
             </InspectorBlock>
             <InspectorBlock title="Compliance" body={finding.compliance_refs.join(", ") || "Internal TerraGate policy"} />
-            <InspectorBlock title="Confidence">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-[#0f766e]">{Math.round(finding.confidence * 100)}%</span>
-                <span className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
-                  <span className="block h-full rounded-full bg-[#0f766e]" style={{ width: `${Math.round(finding.confidence * 100)}%` }} />
-                </span>
-              </div>
+            <InspectorBlock title="Evidence status">
+              <p className="text-sm text-slate-600">{finding.requires_human_review ? "Needs human verification" : "Rule evidence"}. Heuristic scores are not calibrated probabilities.</p>
               <p className="mt-2 text-xs text-slate-500">{finding.source.replaceAll("_", " ")} via {finding.reviewer_node}</p>
             </InspectorBlock>
           </>

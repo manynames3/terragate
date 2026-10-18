@@ -1,0 +1,7 @@
+{
+  "plan": {
+    "format_version": "1.2"
+  },
+  "environment": "prod",
+  "policy_profile": "default"
+}

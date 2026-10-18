@@ -1,0 +1,88 @@
+name: Opt-in reviewer evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Reviewed 40-character SHA at the tip of an internal branch
+        required: true
+        type: string
+      split:
+        description: Freeze development changes before the first held-out run
+        type: choice
+        options: [development, held_out]
+        default: development
+      reviewed_source:
+        description: I reviewed this code and authorize provider-secret access and the bounded spend
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-reviewer-evaluation
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    # No fork event, pull_request_target, arbitrary ref, or automatic paid execution.
+    if: github.ref == 'refs/heads/main' && github.actor == github.repository_owner && inputs.reviewed_source
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify explicitly reviewed internal branch SHA
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        shell: bash
+        run: |
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git ls-remote origin 'refs/heads/*' > /tmp/internal-branches
+          awk -v sha="$CANDIDATE_SHA" '$1 == sha { found=1 } END { exit !found }' /tmp/internal-branches
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+      - run: pip install -r apps/api/requirements.txt
+      - name: Bounded sequential inference
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SPLIT: ${{ inputs.split }}
+        shell: bash
+        run: |
+          test -n "$OPENAI_API_KEY"
+          python -m evaluations.cli validate
+          held_out_args=()
+          if [[ "$SPLIT" == held_out ]]; then held_out_args=(--allow-held-out); fi
+          python -m evaluations.cli run --reviewer baseline --mode live --allow-live --split "$SPLIT" "${held_out_args[@]}" --budget-usd 4.40 --out evaluations/results/baseline.json
+          python -m evaluations.cli run --reviewer candidate --mode live --allow-live --split "$SPLIT" "${held_out_args[@]}" --budget-usd 1.10 --out evaluations/results/candidate.json
+      - name: Reports and human inspection template
+        if: always()
+        shell: bash
+        run: |
+          for reviewer in baseline candidate; do
+            if [[ -f "evaluations/results/$reviewer.json" ]]; then
+              python -m evaluations.cli report "evaluations/results/$reviewer.json" --out "evaluations/results/$reviewer.md"
+            fi
+          done
+          if [[ -f evaluations/results/candidate.json ]]; then
+            python -m evaluations.cli manual-template evaluations/results/candidate.json --out evaluations/results/manual.json
+          fi
+          echo '## Inference artifacts' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Live inference alone is not a quality verdict. Inspect explanations, explicitly promote a baseline, and run the current-source gate.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reviewer-live-${{ inputs.candidate_sha }}-${{ inputs.split }}
+          path: evaluations/results/
+          retention-days: 7
