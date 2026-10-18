@@ -5,7 +5,7 @@
   "scripts": {
     "build:v2": "NEXT_PUBLIC_API_BASE_URL='' NEXT_PUBLIC_AUTH_PROVIDER=dev NEXT_PUBLIC_V2_FRONTEND_ONLY=true opennextjs-cloudflare build --config wrangler.v2.jsonc",
     "deploy:v2:worker": "wrangler deploy --config wrangler.v2.jsonc",
-    "deploy:v2:pages": "wrangler pages deploy --config pages-v2/wrangler.jsonc --branch v2",
+    "deploy:v2:pages": "cd pages-v2 && wrangler pages deploy --branch v2",
     "dev": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",

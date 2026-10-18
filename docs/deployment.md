@@ -50,9 +50,7 @@ npm run deploy:cloudflare
 
 The repo uses `@opennextjs/cloudflare` and `wrangler.jsonc`. Frontend deployment is manual in this repo.
 
-## GitHub App Setup Path
-
-### Separate v2 frontend preview
+## Separate v2 frontend preview
 
 The `v2` branch supports a separate frontend at `https://terragate2.pages.dev`. It uses a Pages advanced-mode proxy (`apps/web/pages-v2`) with a service binding to the `terragate2-web` OpenNext Worker. The original `terragate` Worker is unaffected. The proxy forwards only `/api/v1/*` to the fixed existing AWS API endpoint; it preserves authorization and request bodies, strips browser cookies/origin/referrer, disables API response caching and does not follow upstream redirects.
 
@@ -64,13 +62,27 @@ From `apps/web`, after `npm ci`, run:
 npm run build:v2
 npm run deploy:v2:worker
 # First release only; production branch must be v2, not main:
-npx wrangler pages project create terragate2 --production-branch v2
+npx wrangler pages project create terragate2 --production-branch v2 --force
 npm run deploy:v2:pages
 ```
 
 The build pins an empty public API base so browser requests use the Pages origin. Rebuild after changing public environment values. Pages routes the full dynamic app through the bound Worker; static export would lose arbitrary `/runs/[runId]` routes. These are serverless services with no keep-warm jobs. Existing account quotas and request-based charges still apply.
 
 Rollback only this preview by deploying the previous `v2` commit with the same commands. Do not use the original `deploy:cloudflare` command for this preview; it targets the existing v1 Worker. CI runs on `v2` pushes; the live quality job remains deliberately unevaluated/failing until compatible actual model evidence and human assessments exist.
+
+The initial create uses `--force` to retain the specifically requested Pages project; Wrangler 4.149 otherwise delegates creation to Workers for coding-agent sessions. Subsequent deploys use the existing Pages project normally. Pages configuration must be discovered from its own working directory; `pages deploy --config` is unsupported.
+
+### Observed release: October 18, 2026
+
+- Implementation pushed to `v2`, commit `23f3ebc`; deployment-command corrections and this record follow in a separate commit.
+- OpenNext Worker `terragate2-web`, version `aec2a0fb-79d7-491c-ac68-8f0143d565e6`, has public `workers.dev` routing disabled and is reached through the Pages service binding.
+- Pages production deployment `9d670e3f` served `https://terragate2.pages.dev` with HTTP 200 for `/overview`, `/reviews/new`, `/settings`, `/runs/deployment-smoke` and the branding SVG. The dynamic smoke route establishes shell rendering, not the existence of that run.
+- Same-origin `/api/v1/auth/me` and `/api/v1/runtime-capabilities` returned HTTP 200. The backend reported public demo, AI disabled, tracing disabled and GitHub writes mocked. The browser loaded actual shared review history and the explicit frontend-only banner. No new review or external GitHub write was submitted.
+- Local checks: 123 backend tests, 15 evaluation mechanics tests, 60-case dataset validation, six frontend tests, typecheck, lint, production OpenNext build and local workerd route smoke passed. [GitHub CI run 39124515894](https://github.com/manynames3/terragate/actions/runs/39124515894) passed backend/frontend/infrastructure; its reviewer-quality job failed as deliberately unevaluated, with no live evidence. This is not a green overall CI or model-quality verdict.
+- Browser DOM inspection succeeded. Screenshot capture failed first with a zero-size browser viewport, then timed out after setting a desktop viewport; no successful release screenshot or visual inspection is claimed.
+- Wrangler's initial automatic delegation also created a redundant Worker script named `terragate2`, version `50ca44e9-5e9c-4758-b3bd-cb82816db39b`. It is not used by the Pages service binding. Automatic approval review rejected its deletion because its name overlaps the Pages project and deletion is irreversible; cleanup awaits explicit approval. The original `terragate` deployment was not changed.
+
+## GitHub App Setup Path
 
 The code supports GitHub token/App-style configuration, PR metadata reads, webhooks, automatic checks, and versioned approval-gated comments. Generated remediation is export-only; automatic source-verified patch generation is not implemented. A production onboarding flow should:
 
